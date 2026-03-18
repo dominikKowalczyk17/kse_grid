@@ -2,6 +2,7 @@
 Diagnostyka braku zbieżności load flow w modelu KSE.
 Uruchom ten skrypt zamiast main.py żeby znaleźć przyczynę.
 """
+import copy
 
 import pandapower as pp
 import pandas as pd
@@ -165,6 +166,48 @@ def try_no_q_limits(net):
         print(f"  ❌ Nie zbiegł nawet bez Q limits → problem nie jest w PV→PQ switching")
         print(f"  → Sprawdź impedancje trafo lub topologię")
 
+def check_impedances(net):
+    print("\n=== 9. ANALIZA IMPEDANCJI (szukanie 'wąskich gardeł') ===")
+    # Szukamy linii o nienaturalnie dużej rezystancji/reaktancji
+    high_r = net.line[net.line.r_ohm_per_km > 0.2]
+    if not high_r.empty:
+        print("  ⚠️  Linie o dużej rezystancji (>0.2 Ohm/km):")
+        print(high_r[["name", "r_ohm_per_km", "length_km"]].to_string())
+
+    # Szukamy trafos o dużym vk_percent
+    high_vk = net.trafo[net.trafo.vk_percent > 15]
+    if not high_vk.empty:
+        print("  ⚠️  Transformatory o dużym napięciu zwarcia (>15%):")
+        print(high_vk[["name", "vk_percent", "sn_mva"]].to_string())
+    else:
+        print("  ✅ Parametry impedancji wydają się być w normie.")
+
+
+def analyze_voltage_at_limit(net, scale=0.6):
+    print(f"\n=== 10. SZCZEGÓŁY NAPIĘĆ PRZY OBCIĄŻENIU {scale * 100}% ===")
+    net_test = copy.deepcopy(net)
+    net_test.load["p_mw"] *= scale
+    net_test.load["q_mvar"] *= scale
+    try:
+        pp.runpp(net_test, algorithm="nr", init="flat")
+        res = net_test.res_bus[["vm_pu"]].copy()
+        res["name"] = net_test.bus["name"]
+        res["vn_kv"] = net_test.bus["vn_kv"]
+
+        # Sortujemy po najniższym napięciu
+        critical = res.sort_values("vm_pu").head(5)
+        print("  Najniższe napięcia (potencjalne punkty zapaści):")
+        print(critical.to_string(index=False))
+
+        # Sprawdźmy obciążenie linii
+        line_load = net_test.res_line[["loading_percent"]].copy()
+        line_load["name"] = net_test.line["name"]
+        print("\n  Najbardziej obciążone linie:")
+        print(line_load.sort_values("loading_percent", ascending=False).head(3).to_string(index=False))
+
+    except:
+        print(f"  ❌ Nie udało się policzyć rozpływu nawet dla {scale * 100}% do analizy szczegółowej.")
+
 if __name__ == "__main__":
     print("Buduję sieć...")
     grid = kse_grid.KSEGrid().build()
@@ -178,3 +221,5 @@ if __name__ == "__main__":
     try_reduced_load(net)
     try_load_scaling(net)
     try_no_q_limits(net)
+    analyze_voltage_at_limit(net, scale=0.6)
+    check_impedances(net)

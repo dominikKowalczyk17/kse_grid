@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="uv (PowerFlow)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="uv (PowerFlow)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="uv (kse_grid)" project-jdk-type="Python SDK" />
 </project>

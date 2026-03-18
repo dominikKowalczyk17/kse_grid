@@ -26,21 +26,30 @@ class GridBuilder:
             "q_mm2":        243,
         }, name=KSETopology.LT220, element="line")
 
-        # Autotransformator 275 MVA 400/220 kV – dane znamionowe PSE
+        # Definicja wiązki 2x490 mm2 dla 400 kV (uproszczona)
         create_std_type(self.net, {
-            "sn_mva":           275,
-            "vn_hv_kv":         400,
-            "vn_lv_kv":         220,
-            "vk_percent":        8.5,   # obniżone z 12.5 → AT 400/220kV PSE typowo 8-10%
-            "vkr_percent":       0.15,  # obniżone z 0.3 → niższe straty w uzwojeniu
-            "pfe_kw":           120,
-            "i0_percent":        0.06,
-            "shift_degree":      0,
-            "tap_side":         "hv",
-            "tap_neutral":       0,
-            "tap_min":          -10,
-            "tap_max":           10,
-            "tap_step_percent":  1.5,
+            "r_ohm_per_km": 0.029,  # Połowa z pojedynczego (0.059 / 2)
+            "x_ohm_per_km": 0.28,  # Niższa reaktancja wiązki
+            "c_nf_per_km": 13.0,  # Wyższa pojemność wiązki
+            "max_i_ka": 1.92,  # Dwukrotność pojedynczego (0.96 * 2)
+            "type": "ol",
+        }, name="400kV_Wiazka_2x", element="line")
+
+        # Zmień parametry typu AT na poniższe:
+        create_std_type(self.net, {
+            "sn_mva": 450,  # Zwiększamy z 275 na 450 MVA (standard PSE)
+            "vn_hv_kv": 400,
+            "vn_lv_kv": 220,
+            "vk_percent": 10.0,  # Typowe dla jednostek 450MVA
+            "vkr_percent": 0.2,
+            "pfe_kw": 150,
+            "i0_percent": 0.05,
+            "shift_degree": 0,
+            "tap_side": "hv",
+            "tap_neutral": 0,
+            "tap_min": -10,
+            "tap_max": 10,
+            "tap_step_percent": 1.5,
         }, name=KSETopology.AT, element="trafo")
 
     # ------------------------------------------------------------------
