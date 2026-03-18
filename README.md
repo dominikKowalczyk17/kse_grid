@@ -22,24 +22,25 @@ PowerFlow/
 |---|---|
 | Szyny 400 kV | 18 |
 | Szyny 220 kV | 13 |
-| Linie 400 kV | 35 (tory pojedyncze i podwójne) |
-| Linie 220 kV | 13 |
-| Autotransformatory 400/220 kV | 14 |
+| Linie 400 kV | 40 (tory pojedyncze i podwójne) |
+| Linie 220 kV | 18 |
+| Autotransformatory 400/220 kV | 15 |
 | Generatory | 10 (+ slack) |
 | Obciążenia | 15 węzłów |
-| Kompensatory Q | 29 (baterie kondensatorów + reaktory) |
+| Kompensatory Q | 32 (baterie kondensatorów + reaktory) |
 
 ### Główne elektrownie
 
 | Elektrownia | Węzeł | Moc [MW] |
 |---|---|---|
-| Bełchatów | Rogowiec 400kV | 3 800 |
-| Połaniec + Kozienice | Połaniec 400kV | 4 600 |
+| Bełchatów | Rogowiec 400kV | 4 500 |
+| Połaniec | Połaniec 400kV | 1 800 |
+| Kozienice | Kozienice 400kV | Slack |
 | Turów | Turów 400kV | 2 000 |
-| Adamów / Pątnów | Adamów 400kV | 1 200 |
+| Adamów / Pątnów | Pątnów 220kV | 1 200 |
 | Blachownia | Blachownia 220kV | 800 |
 | CCGT Stalowa Wola | Stalowa Wola 220kV | 450 |
-| Żarnowiec PSP | Żarnowiec 400kV | ±716 |
+| Żarnowiec PSP | Żarnowiec 400kV | ±500 |
 | Żydowo PSP | Żydowo 220kV | ±150 |
 | Import DE (Krajnik) | Krajnik 400kV | 800 |
 | Import SwePol+DE (Plewiska) | Plewiska 400kV | 900 |
@@ -48,7 +49,7 @@ PowerFlow/
 
 - **400 kV:** `490-AL1/64-ST1A` (AFL-8 490 mm²), `max_i = 960 A`
 - **220 kV:** `243-AL1/39-ST1A` (AFL-8 243 mm²), `max_i = 645 A`
-- **AT 400/220 kV:** 275 MVA, `vk = 8.5%`, zdefiniowany jako custom std type
+- **AT 400/220 kV:** 450 MVA, `vk = 10%`, zdefiniowany jako custom std type
 
 ## Wymagania
 
@@ -130,7 +131,7 @@ Raport zawiera:
 - Obciążenia reprezentują pobór przez sieci 110 kV / dystrybucję (węzły zbiorcze)
 - cos φ obciążeń ≈ 0.97 (po kompensacji po stronie DSO)
 - Model nie uwzględnia sieci 110 kV ani połączeń HVDC (SwePol Link, LitPol Link)
-- Slack bus: **Kozienice 400kV**
+- Slack bus: **Kozienice 400kV** (w modelu jako `ext_grid`)
 
 ## Licencja
 

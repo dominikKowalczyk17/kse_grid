@@ -5,14 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5c06e28e-4fb8-4925-9536-1f5c0199d11f" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/PowerFlow.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/PowerFlow.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kse_grid/builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/kse_grid/builder.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kse_grid/debug_convergence.py" beforeDir="false" afterPath="$PROJECT_DIR$/kse_grid/debug_convergence.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kse_grid/topology.py" beforeDir="false" afterPath="$PROJECT_DIR$/kse_grid/topology.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uv.lock" beforeDir="false" afterPath="$PROJECT_DIR$/uv.lock" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -73,7 +66,7 @@
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
-  <component name="RunManager" selected="Python.debug_convergence">
+  <component name="RunManager" selected="Python.main">
     <configuration name="debug_convergence" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
       <module name="PowerFlow" />
       <option name="ENV_FILES" value="" />
@@ -125,8 +118,8 @@
       <method v="2" />
     </configuration>
     <list>
-      <item itemvalue="Python.main" />
       <item itemvalue="Python.debug_convergence" />
+      <item itemvalue="Python.main" />
     </list>
   </component>
   <component name="SharedIndexes">
@@ -146,7 +139,7 @@
       <updated>1773766308002</updated>
       <workItem from="1773822513593" duration="17000" />
       <workItem from="1773822573344" duration="1207000" />
-      <workItem from="1773824631291" duration="5796000" />
+      <workItem from="1773824631291" duration="6232000" />
     </task>
     <servers />
   </component>
@@ -155,6 +148,6 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/kse_grid$debug_convergence.coverage" NAME="debug_convergence Coverage Results" MODIFIED="1773831206603" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/kse_grid" />
-    <SUITE FILE_PATH="coverage/kse_grid$main.coverage" NAME="main Coverage Results" MODIFIED="1773830110632" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
+    <SUITE FILE_PATH="coverage/kse_grid$main.coverage" NAME="main Coverage Results" MODIFIED="1773831339881" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
   </component>
 </project>
