@@ -5,7 +5,7 @@ from kse_grid.models import BusConfig, LineConfig, TrafoConfig, GenConfig, LoadC
 class KSETopology:
     """Surowe dane topologiczne KSE (stacje, linie, trafos itp.)"""
 
-    LT400 = "400kV_Wiazka_2x"   # istniejący typ pandapower (380 = tier 400kV)
+    LT400 = "400kV_Wiazka_3x_AFL8_525"   # istniejący typ pandapower (380 = tier 400kV)
     LT220 = "243-AL1/39-ST1A 220.0"   # własny typ – rejestrowany w GridBuilder
     AT    = "AT 275MVA 400/220kV"      # własny typ autotransformatora
 
@@ -51,46 +51,63 @@ class KSETopology:
     ]
 
     LINES_400KV: list[LineConfig] = [
-        # Pierścień północny
-        LineConfig("Gdańsk Błonia 400kV",    "Żarnowiec 400kV",          55,  LT400, "LNN Gdańsk–Żarnowiec 400kV"),
-        LineConfig("Gdańsk Błonia 400kV",    "Dunowo 400kV",            140,  LT400, "LNN Gdańsk–Dunowo 400kV"),
-        LineConfig("Dunowo 400kV",           "Bydgoszcz Zachód 400kV",   90,  LT400, "LNN Dunowo–Bydgoszcz 400kV"),
-        LineConfig("Bydgoszcz Zachód 400kV", "Plewiska 400kV",           95,  LT400, "LNN Bydgoszcz–Plewiska 400kV"),
-        LineConfig("Żarnowiec 400kV",        "Krajnik 400kV",           120,  LT400, "LNN Żarnowiec–Krajnik 400kV"),
-        LineConfig("Krajnik 400kV",          "Dunowo 400kV",            160,  LT400, "LNN Krajnik–Dunowo 400kV"),
-        # Zachód–Centrum (tory podwójne na głównych korytarzach)
-        LineConfig("Plewiska 400kV",         "Adamów 400kV",            175,  LT400, "LNN Plewiska–Adamów 400kV T1"),
-        LineConfig("Plewiska 400kV",         "Adamów 400kV",            175,  LT400, "LNN Plewiska–Adamów 400kV T2"),
-        LineConfig("Adamów 400kV",           "Rogowiec 400kV",           55,  LT400, "LNN Adamów–Rogowiec 400kV"),
-        LineConfig("Rogowiec 400kV",         "Byczyna 400kV",            60,  LT400, "LNN Rogowiec–Byczyna 400kV T1"),
-        LineConfig("Rogowiec 400kV",         "Byczyna 400kV",            84,  LT400, "LNN Rogowiec–Byczyna 400kV T2"),
-        LineConfig("Byczyna 400kV",          "Kopanina 400kV",           90,  LT400, "LNN Byczyna–Kopanina 400kV T1"),
-        LineConfig("Byczyna 400kV",          "Kopanina 400kV",           90,  LT400, "LNN Byczyna–Kopanina 400kV T2"),
-        LineConfig("Rogowiec 400kV",         "Adamów 400kV",             55,  LT400, "LNN Rogowiec–Adamów (2) 400kV"),
-        LineConfig("Adamów 400kV",           "Kozienice 400kV",         130,  LT400, "LNN Adamów–Kozienice 400kV"),
-        LineConfig("Adamów 400kV",           "Kozienice 400kV",         154,  LT400, "LNN Adamów–Kozienice 400kV T2"),
-        # Warszawa – wiele wejść (rzeczywistość: Kozienice, Siedlce, Miłosna, Bydgoszcz)
-        LineConfig("Kozienice 400kV",        "Warszawa Wschód 400kV",   120,  LT400, "LNN Kozienice–Warszawa Wschód 400kV T1"),
-        LineConfig("Kozienice 400kV",        "Warszawa Wschód 400kV",   120,  LT400, "LNN Kozienice–Warszawa Wschód 400kV T2"),
-        LineConfig("Miłosna 400kV",          "Warszawa Wschód 400kV",    20,  LT400, "LNN Miłosna–Warszawa Wschód 400kV T1"),
-        LineConfig("Miłosna 400kV",          "Warszawa Wschód 400kV",    20,  LT400, "LNN Miłosna–Warszawa Wschód 400kV T2"),
-        LineConfig("Siedlce Ujrzanów 400kV", "Warszawa Wschód 400kV",    90,  LT400, "LNN Siedlce–Warszawa Wschód 400kV"),
-        # Centrum
-        LineConfig("Bydgoszcz Zachód 400kV", "Miłosna 400kV",           260,  LT400, "LNN Bydgoszcz–Miłosna 400kV T1"),
-        LineConfig("Bydgoszcz Zachód 400kV", "Miłosna 400kV",           260,  LT400, "LNN Bydgoszcz–Miłosna 400kV T2"),
-        LineConfig("Plewiska 400kV",         "Kozienice 400kV",         210,  LT400, "LNN Plewiska–Kozienice 400kV"),
-        LineConfig("Kozienice 400kV",        "Miłosna 400kV",            95,  LT400, "LNN Kozienice–Miłosna 400kV T1"),
-        LineConfig("Kozienice 400kV",        "Miłosna 400kV",            95,  LT400, "LNN Kozienice–Miłosna 400kV T2"),
-        LineConfig("Miłosna 400kV",          "Siedlce Ujrzanów 400kV",   70,  LT400, "LNN Miłosna–Siedlce 400kV"),
-        LineConfig("Siedlce Ujrzanów 400kV", "Lublin Systemowa 400kV",  130,  LT400, "LNN Siedlce–Lublin 400kV"),
-        LineConfig("Kozienice 400kV",        "Lublin Systemowa 400kV",  100,  LT400, "LNN Kozienice–Lublin 400kV"),
-        LineConfig("Lublin Systemowa 400kV", "Rzeszów 400kV",           160,  LT400, "LNN Lublin–Rzeszów 400kV"),
-        LineConfig("Połaniec 400kV",         "Lublin Systemowa 400kV",  110,  LT400, "LNN Połaniec–Lublin 400kV"),
-        LineConfig("Połaniec 400kV",         "Rzeszów 400kV",           120,  LT400, "LNN Połaniec–Rzeszów 400kV"),
-        LineConfig("Kopanina 400kV",         "Turów 400kV",             145,  LT400, "LNN Kopanina–Turów 400kV"),
-        LineConfig("Turów 400kV",            "Byczyna 400kV",           180,  LT400, "LNN Turów–Byczyna 400kV"),
-        LineConfig("Kopanina 400kV",         "Połaniec 400kV",          200,  LT400, "LNN Kopanina–Połaniec 400kV T1"),
-        LineConfig("Kopanina 400kV",         "Połaniec 400kV",          200,  LT400, "LNN Kopanina–Połaniec 400kV T2"),
+        # Pierścień północny (jednotorowe - wystarczająca redundancja)
+        LineConfig("Gdańsk Błonia 400kV", "Żarnowiec 400kV", 55, LT400, "LNN Gdańsk–Żarnowiec 400kV"),
+        LineConfig("Gdańsk Błonia 400kV", "Dunowo 400kV", 140, LT400, "LNN Gdańsk–Dunowo 400kV"),
+        LineConfig("Dunowo 400kV", "Bydgoszcz Zachód 400kV", 90, LT400, "LNN Dunowo–Bydgoszcz 400kV"),
+        LineConfig("Bydgoszcz Zachód 400kV", "Plewiska 400kV", 95, LT400, "LNN Bydgoszcz–Plewiska 400kV"),
+        LineConfig("Żarnowiec 400kV", "Krajnik 400kV", 120, LT400, "LNN Żarnowiec–Krajnik 400kV"),
+        LineConfig("Krajnik 400kV", "Dunowo 400kV", 160, LT400, "LNN Krajnik–Dunowo 400kV"),
+
+        # Zachód–Centrum (dwutorowe - główne korytarze)
+        LineConfig("Plewiska 400kV", "Adamów 400kV", 175, LT400, "LNN Plewiska–Adamów 400kV T1"),
+        LineConfig("Plewiska 400kV", "Adamów 400kV", 175, LT400, "LNN Plewiska–Adamów 400kV T2"),
+        LineConfig("Adamów 400kV", "Rogowiec 400kV", 55, LT400, "LNN Adamów–Rogowiec 400kV"),
+        LineConfig("Rogowiec 400kV", "Byczyna 400kV", 72, LT400, "LNN Rogowiec–Byczyna 400kV T1"),
+        LineConfig("Rogowiec 400kV", "Byczyna 400kV", 72, LT400, "LNN Rogowiec–Byczyna 400kV T2"),
+        LineConfig("Byczyna 400kV", "Kopanina 400kV", 90, LT400, "LNN Byczyna–Kopanina 400kV T1"),
+        LineConfig("Byczyna 400kV", "Kopanina 400kV", 90, LT400, "LNN Byczyna–Kopanina 400kV T2"),
+        LineConfig("Rogowiec 400kV", "Adamów 400kV", 55, LT400, "LNN Rogowiec–Adamów 400kV T1"),
+        LineConfig("Rogowiec 400kV", "Adamów 400kV", 55, LT400, "LNN Rogowiec–Adamów 400kV T2"),
+        LineConfig("Adamów 400kV", "Kozienice 400kV", 142, LT400, "LNN Adamów–Kozienice 400kV T1"),
+        LineConfig("Adamów 400kV", "Kozienice 400kV", 142, LT400, "LNN Adamów–Kozienice 400kV T2"),
+
+        # Warszawa (dwutorowe - kluczowe zasilanie stolicy)
+        LineConfig("Kozienice 400kV", "Warszawa Wschód 400kV", 120, LT400, "LNN Kozienice–Warszawa Wschód 400kV T1"),
+        LineConfig("Kozienice 400kV", "Warszawa Wschód 400kV", 120, LT400, "LNN Kozienice–Warszawa Wschód 400kV T2"),
+        LineConfig("Miłosna 400kV", "Warszawa Wschód 400kV", 20, LT400, "LNN Miłosna–Warszawa Wschód 400kV T1"),
+        LineConfig("Miłosna 400kV", "Warszawa Wschód 400kV", 20, LT400, "LNN Miłosna–Warszawa Wschód 400kV T2"),
+        LineConfig("Siedlce Ujrzanów 400kV", "Warszawa Wschód 400kV", 90, LT400,
+                   "LNN Siedlce–Warszawa Wschód 400kV T1"),
+        LineConfig("Siedlce Ujrzanów 400kV", "Warszawa Wschód 400kV", 90, LT400,
+                   "LNN Siedlce–Warszawa Wschód 400kV T2"),
+
+        # Centrum (dwutorowe na głównych trasach)
+        LineConfig("Bydgoszcz Zachód 400kV", "Miłosna 400kV", 260, LT400, "LNN Bydgoszcz–Miłosna 400kV T1"),
+        LineConfig("Bydgoszcz Zachód 400kV", "Miłosna 400kV", 260, LT400, "LNN Bydgoszcz–Miłosna 400kV T2"),
+        LineConfig("Plewiska 400kV", "Kozienice 400kV", 210, LT400, "LNN Plewiska–Kozienice 400kV"),  # Zapasowa
+        LineConfig("Kozienice 400kV", "Miłosna 400kV", 95, LT400, "LNN Kozienice–Miłosna 400kV T1"),
+        LineConfig("Kozienice 400kV", "Miłosna 400kV", 95, LT400, "LNN Kozienice–Miłosna 400kV T2"),
+
+        # Wschód (jednotorowe - niższe obciążenie)
+        LineConfig("Miłosna 400kV", "Siedlce Ujrzanów 400kV", 70, LT400, "LNN Miłosna–Siedlce 400kV"),
+        LineConfig("Siedlce Ujrzanów 400kV", "Lublin Systemowa 400kV", 130, LT400, "LNN Siedlce–Lublin 400kV"),
+        LineConfig("Kozienice 400kV", "Lublin Systemowa 400kV", 100, LT400, "LNN Kozienice–Lublin 400kV"),
+
+        # Południowy Wschód (dwutorowe - zasilanie Rzeszowa/Lublina)
+        LineConfig("Lublin Systemowa 400kV", "Rzeszów 400kV", 160, LT400, "LNN Lublin–Rzeszów 400kV T1"),
+        LineConfig("Lublin Systemowa 400kV", "Rzeszów 400kV", 160, LT400, "LNN Lublin–Rzeszów 400kV T2"),
+        LineConfig("Połaniec 400kV", "Lublin Systemowa 400kV", 110, LT400, "LNN Połaniec–Lublin 400kV"),
+        LineConfig("Połaniec 400kV", "Rzeszów 400kV", 120, LT400, "LNN Połaniec–Rzeszów 400kV T1"),
+        LineConfig("Połaniec 400kV", "Rzeszów 400kV", 120, LT400, "LNN Połaniec–Rzeszów 400kV T2"),
+
+        # Południe (dwutorowe - Śląsk + Turów)
+        LineConfig("Kopanina 400kV", "Turów 400kV", 145, LT400, "LNN Kopanina–Turów 400kV T1"),
+        LineConfig("Kopanina 400kV", "Turów 400kV", 145, LT400, "LNN Kopanina–Turów 400kV T2"),
+        LineConfig("Turów 400kV", "Byczyna 400kV", 180, LT400, "LNN Turów–Byczyna 400kV T1"),
+        LineConfig("Turów 400kV", "Byczyna 400kV", 180, LT400, "LNN Turów–Byczyna 400kV T2"),
+        LineConfig("Kopanina 400kV", "Połaniec 400kV", 200, LT400, "LNN Kopanina–Połaniec 400kV T1"),
+        LineConfig("Kopanina 400kV", "Połaniec 400kV", 200, LT400, "LNN Kopanina–Połaniec 400kV T2"),
     ]
 
     LINES_220KV: list[LineConfig] = [

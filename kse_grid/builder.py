@@ -28,12 +28,12 @@ class GridBuilder:
 
         # Definicja wiązki 2x490 mm2 dla 400 kV (uproszczona)
         create_std_type(self.net, {
-            "r_ohm_per_km": 0.029,  # Połowa z pojedynczego (0.059 / 2)
-            "x_ohm_per_km": 0.28,  # Niższa reaktancja wiązki
-            "c_nf_per_km": 13.0,  # Wyższa pojemność wiązki
-            "max_i_ka": 1.92,  # Dwukrotność pojedynczego (0.96 * 2)
+            "r_ohm_per_km": 0.020,  # Wiązka 3x: 0.059 / 3
+            "x_ohm_per_km": 0.26,  # Niższa reaktancja dla 3x
+            "c_nf_per_km": 14.5,  # Wyższa pojemność dla 3x
+            "max_i_ka": 2.88,  # Trzykrotność pojedynczego (0.96 * 3)
             "type": "ol",
-        }, name="400kV_Wiazka_2x", element="line")
+        }, name="400kV_Wiazka_3x_AFL8_525", element="line")
 
         # Zmień parametry typu AT na poniższe:
         create_std_type(self.net, {
