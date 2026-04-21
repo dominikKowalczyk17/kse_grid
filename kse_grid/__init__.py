@@ -31,6 +31,7 @@ from kse_grid.models import (
 )
 from kse_grid.topology import KSETopology
 from kse_grid.builder import GridBuilder
+from kse_grid.matpower import load_matpower_case
 from kse_grid.runner import PowerFlowRunner
 from kse_grid.grid import KSEGrid
 
@@ -38,6 +39,7 @@ __all__ = [
     "KSEGrid",
     "KSETopology",
     "GridBuilder",
+    "load_matpower_case",
     "PowerFlowRunner",
     "BusConfig",
     "LineConfig",

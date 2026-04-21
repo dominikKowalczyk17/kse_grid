@@ -10,7 +10,7 @@ class PowerFlowRunner:
 
     # ------------------------------------------------------------------
     def run(self,
-            algorithm: str = "iwamoto_nr",
+            algorithm: str = "nr",
             max_iteration: int = 100,
             tolerance_mva: float = 1.0) -> bool:
         """
@@ -38,49 +38,53 @@ class PowerFlowRunner:
         sep = "=" * 65
 
         print(sep)
-        print("  Model KSE – Polska sieć przesyłowa 400/220 kV")
+        print(f"  Model sieci – {getattr(net, 'name', 'pandapower')}")
         print(sep)
 
         # --- Bilans mocy ---
-        p_gen  = net.res_gen["p_mw"].sum()
-        p_ext  = net.res_ext_grid["p_mw"].sum()
-        p_load = net.res_load["p_mw"].sum()
-        p_loss = net.res_line["pl_mw"].sum() + net.res_trafo["pl_mw"].sum()
+        p_gen = net.res_gen["p_mw"].sum() if len(net.res_gen) else 0.0
+        p_ext = net.res_ext_grid["p_mw"].sum() if len(net.res_ext_grid) else 0.0
+        p_load = net.res_load["p_mw"].sum() if len(net.res_load) else 0.0
+        p_loss = (
+            (net.res_line["pl_mw"].sum() if len(net.res_line) else 0.0) +
+            (net.res_trafo["pl_mw"].sum() if len(net.res_trafo) else 0.0)
+        )
         print(f"\n📊 BILANS MOCY:")
         print(f"   Generacja (PV):  {p_gen:>8.1f} MW")
         print(f"   Import/Slack:    {p_ext:>8.1f} MW")
         print(f"   Obciążenie:      {p_load:>8.1f} MW")
         print(f"   Straty:          {p_loss:>8.1f} MW")
 
-        # --- Napięcia – szyny 400 kV ---
-        buses_400 = net.bus[net.bus.vn_kv == 400].index
-        res_400 = net.res_bus.loc[buses_400, ["vm_pu", "va_degree"]].copy()
-        res_400["nazwa"] = net.bus.loc[buses_400, "name"]
-        print(f"\n⚡ NAPIĘCIA – SZYNY 400 kV:")
-        print(f"   {'Stacja':<35} {'U [p.u.]':>8}  {'δ [°]':>8}")
+        # --- Napięcia – największe odchylenia ---
+        bus_res = net.res_bus[["vm_pu", "va_degree"]].copy()
+        bus_res["nazwa"] = net.bus["name"]
+        bus_res["vn_kv"] = net.bus["vn_kv"]
+        bus_res["odchylenie"] = (bus_res["vm_pu"] - 1.0).abs()
+        print(f"\n⚡ NAPIĘCIA – największe odchylenia:")
+        print(f"   {'Stacja':<35} {'kV':>6}  {'U [p.u.]':>8}  {'δ [°]':>8}")
         print(f"   {'-'*35} {'-'*8}  {'-'*8}")
-        for _, row in res_400.sort_values("vm_pu").iterrows():
+        for _, row in bus_res.sort_values("odchylenie", ascending=False).head(10).iterrows():
             flag = " ⚠️" if row.vm_pu < 0.95 or row.vm_pu > 1.05 else ""
-            print(f"   {row.nazwa:<35} {row.vm_pu:>8.4f}  {row.va_degree:>8.2f}{flag}")
+            print(f"   {row.nazwa:<35} {row.vn_kv:>6.0f}  {row.vm_pu:>8.4f}  {row.va_degree:>8.2f}{flag}")
 
-        # --- Obciążenie linii 400 kV (top 10) ---
+        # --- Obciążenie linii (top 10) ---
         line_res = net.res_line[["p_from_mw", "loading_percent"]].copy()
         line_res["nazwa"] = net.line["name"]
-        lines_400 = line_res[line_res["nazwa"].str.contains("400kV")]
-        print(f"\n🔌 LINIE 400 kV – TOP 10 obciążonych:")
-        print(f"   {'Linia':<45} {'P [MW]':>8}  {'Obciąż. [%]':>11}")
+        line_res["vn_kv"] = net.bus.loc[net.line["from_bus"], "vn_kv"].to_numpy()
+        print(f"\n🔌 LINIE – TOP 10 obciążonych:")
+        print(f"   {'Linia':<45} {'kV':>6}  {'P [MW]':>8}  {'Obciąż. [%]':>11}")
         print(f"   {'-'*45} {'-'*8}  {'-'*11}")
-        for _, row in lines_400.sort_values("loading_percent", ascending=False).head(10).iterrows():
+        for _, row in line_res.sort_values("loading_percent", ascending=False).head(10).iterrows():
             flag = " 🔴" if row.loading_percent > 80 else (" 🟡" if row.loading_percent > 60 else "")
-            print(f"   {row.nazwa:<45} {row.p_from_mw:>8.1f}  {row.loading_percent:>10.1f}%{flag}")
+            print(f"   {row.nazwa:<45} {row.vn_kv:>6.0f}  {row.p_from_mw:>8.1f}  {row.loading_percent:>10.1f}%{flag}")
 
-        # --- Autotransformatory ---
+        # --- Transformatory ---
         trafo_res = net.res_trafo[["p_hv_mw", "loading_percent"]].copy()
         trafo_res["nazwa"] = net.trafo["name"]
-        print(f"\n🔄 AUTOTRANSFORMATORY 400/220 kV:")
-        print(f"   {'AT':<40} {'P_HV [MW]':>10}  {'Obciąż. [%]':>11}")
+        print(f"\n🔄 TRANSFORMATORY:")
+        print(f"   {'Trafo':<40} {'P_HV [MW]':>10}  {'Obciąż. [%]':>11}")
         print(f"   {'-'*40} {'-'*10}  {'-'*11}")
-        for _, row in trafo_res.sort_values("loading_percent", ascending=False).iterrows():
+        for _, row in trafo_res.sort_values("loading_percent", ascending=False).head(10).iterrows():
             flag = " 🔴" if row.loading_percent > 80 else ""
             print(f"   {row.nazwa:<40} {row.p_hv_mw:>10.1f}  {row.loading_percent:>10.1f}%{flag}")
 

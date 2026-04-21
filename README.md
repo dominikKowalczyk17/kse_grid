@@ -69,20 +69,64 @@ uv pip install pandapower pandas
 python main.py
 ```
 
+Polecenie załaduje publiczny przypadek MATPOWER `case3120sp`, uruchomi rozpływ mocy i otworzy lokalny podgląd pod `http://127.0.0.1:8000/`. Serwer działa do `Ctrl+C`.
+
 lub bezpośrednio z kodu:
 
 ```python
+from pathlib import Path
 import kse_grid
 
-kse_grid.KSEGrid().build().run_powerflow().report()
+kse_grid.KSEGrid.from_matpower_case(Path("data/case3120sp.m")).run_powerflow().report()
 ```
 
 Dostęp do surowej sieci pandapower:
 
 ```python
-grid = kse_grid.KSEGrid().build().run_powerflow()
-net  = grid.net   # pp.pandapowerNet – pełne API pandapower
+from pathlib import Path
+import kse_grid
+
+grid = kse_grid.KSEGrid.from_matpower_case(Path("data/case3120sp.m")).run_powerflow()
+net = grid.net   # pp.pandapowerNet – pełne API pandapower
 ```
+
+Interaktywny graf do przeglądarki:
+
+```python
+from pathlib import Path
+import kse_grid
+
+grid = kse_grid.KSEGrid.from_matpower_case(Path("data/case3120sp.m")).run_powerflow()
+grid.plot_interactive("kse_grid_interactive.html")
+```
+
+Graf pozwala powiększać, przesuwać i sprawdzać szczegóły szyn, linii oraz transformatorów po najechaniu kursorem. Dla importu MATPOWER geodane nie są dostępne, więc układ jest generowany automatycznie jako schemat poglądowy.
+
+Podgląd live w lokalnej przeglądarce:
+
+```python
+from pathlib import Path
+import kse_grid
+
+grid = kse_grid.KSEGrid.from_matpower_case(Path("data/case3120sp.m")).run_powerflow()
+grid.serve_interactive()
+```
+
+To uruchamia prosty lokalny serwer HTTP. W widoku są dostępne filtry `Wszystko`, `Bez 110 kV`, `Tylko 400 kV` oraz `Tylko transformatory`. Kolor linii pokazuje obciążenie, a kolor szyn napięcie `Vm`.
+
+Nałożenie sieci na rastrową mapę Polski:
+
+```python
+grid = kse_grid.KSEGrid().build().run_powerflow()
+grid.serve_interactive(
+    background_image="kse_grid/poland_map_natural_earth.png",
+    background_bounds=(13.7, 24.6, 48.8, 55.1),  # lon_min, lon_max, lat_min, lat_max
+)
+```
+
+`background_bounds` określa geograficzne granice obrazu. Jeśli pominiesz ten parametr, wykres dopasuje tło automatycznie do zakresu węzłów, co działa dobrze dla obrazów już przyciętych do obszaru sieci.
+
+Dołączona mapa została wyrenderowana z public-domain Natural Earth.
 
 ## Modyfikacja topologii
 
