@@ -5,16 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5c06e28e-4fb8-4925-9536-1f5c0199d11f" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/PowerFlow.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/PowerFlow.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kse_grid/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/kse_grid/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kse_grid/grid.py" beforeDir="false" afterPath="$PROJECT_DIR$/kse_grid/grid.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kse_grid/runner.py" beforeDir="false" afterPath="$PROJECT_DIR$/kse_grid/runner.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uv.lock" beforeDir="false" afterPath="$PROJECT_DIR$/uv.lock" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/kse_grid/docs/preview.png" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
