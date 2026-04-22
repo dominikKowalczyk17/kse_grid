@@ -148,6 +148,7 @@ def _apply_geojson_sidecar(net: pp.pandapowerNet, sidecar_path: Path) -> None:
     }
 
     matched = 0
+    renamed = 0
     for feature in features:
         if not isinstance(feature, dict):
             continue
@@ -169,10 +170,57 @@ def _apply_geojson_sidecar(net: pp.pandapowerNet, sidecar_path: Path) -> None:
             {"type": "Point", "coordinates": [lon, lat]},
             separators=(",", ":"),
         )
+
+        properties = feature.get("properties") or {}
+        station = _clean_station_name(properties.get("station"))
+        if station:
+            current = str(net.bus.at[bus_idx, "name"]).strip()
+            if not current or _DEFAULT_BUS_NAME_RE.match(current):
+                vn = float(net.bus.at[bus_idx, "vn_kv"])
+                net.bus.at[bus_idx, "name"] = f"{station} {vn:g} kV"
+                renamed += 1
+
         matched += 1
 
     if matched == 0:
         raise ValueError(f"{sidecar_path.name} nie zawiera żadnych dopasowanych punktów szyn")
+
+    if renamed:
+        _refresh_composite_names(net)
+
+
+_DEFAULT_BUS_NAME_RE = re.compile(r"^(?:Bus\s+)?\d+$", re.IGNORECASE)
+_DEFAULT_LINE_NAME_RE = re.compile(r"^Linia\s+\d+:\s")
+_DEFAULT_TRAFO_NAME_RE = re.compile(r"^Trafo\s+\d+:\s")
+_STATION_PREFIX_RE = re.compile(r"^\s*\d+\s+")
+_STATION_NOISE_RE = re.compile(r"\s*&.*$")
+
+
+def _clean_station_name(raw: object) -> str:
+    if not isinstance(raw, str):
+        return ""
+    text = _STATION_PREFIX_RE.sub("", raw)
+    text = _STATION_NOISE_RE.sub("", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _refresh_composite_names(net: pp.pandapowerNet) -> None:
+    for line_idx, row in net.line.iterrows():
+        current = str(net.line.at[line_idx, "name"] or "").strip()
+        if current and not _DEFAULT_LINE_NAME_RE.match(current):
+            continue
+        from_name = net.bus.at[row.from_bus, "name"]
+        to_name = net.bus.at[row.to_bus, "name"]
+        net.line.at[line_idx, "name"] = f"Linia {line_idx + 1}: {from_name} → {to_name}"
+
+    for trafo_idx, row in net.trafo.iterrows():
+        current = str(net.trafo.at[trafo_idx, "name"] or "").strip()
+        if current and not _DEFAULT_TRAFO_NAME_RE.match(current):
+            continue
+        hv_name = net.bus.at[row.hv_bus, "name"]
+        lv_name = net.bus.at[row.lv_bus, "name"]
+        net.trafo.at[trafo_idx, "name"] = f"Trafo {trafo_idx + 1}: {hv_name} → {lv_name}"
 
 
 def _match_geo_feature_to_bus(
