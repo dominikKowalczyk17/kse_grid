@@ -288,6 +288,46 @@ def build_interactive_figure(
     return fig
 
 
+def build_figure_for_dash(
+    net: pp.pandapowerNet,
+) -> tuple[go.Figure, list[dict], list[float]]:
+    """Buduje figurę Plotly dla dashboardu Dash (bez menu filtrów Plotly).
+
+    Returns:
+        (fig, trace_meta, voltage_levels) gdzie voltage_levels to posortowana
+        lista unikalnych napięć (malejąco) do budowy checkboxów filtrów.
+    """
+    positions, _ = _bus_positions(net)
+    traces, trace_meta = _build_traces(net, positions)
+
+    fig = go.Figure(data=traces)
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#0e1116",
+        plot_bgcolor="#0e1116",
+        font=dict(family="Inter, system-ui, sans-serif", color="#e6edf3", size=12),
+        hovermode="closest",
+        dragmode="pan",
+        clickmode="event+select",
+        hoverdistance=18,
+        autosize=True,
+        showlegend=False,
+        uirevision="kse-grid",
+        margin=dict(l=0, r=0, t=0, b=0),
+        hoverlabel=dict(
+            bgcolor="#161b22",
+            bordercolor="#30363d",
+            font=dict(family="Inter, system-ui, sans-serif", color="#e6edf3", size=12),
+        ),
+    )
+    _configure_axes(fig, positions, None)
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(visible=False, scaleanchor="x", scaleratio=1)
+
+    voltage_levels = sorted({m["voltage"] for m in trace_meta}, reverse=True)
+    return fig, trace_meta, voltage_levels
+
+
 def serve_interactive_graph(
     net: pp.pandapowerNet,
     host: str = "127.0.0.1",
@@ -686,6 +726,12 @@ def _bus_traces(
                     ),
                     line=dict(color="#0e1116", width=1.0),
                 ),
+                selected=dict(marker=dict(
+                    size=_bus_size(level) * 1.9,
+                    color="#ffffff",
+                    opacity=1.0,
+                )),
+                unselected=dict(marker=dict(opacity=0.3)),
             )
         )
         trace_meta.append({"kind": "bus", "voltage": level})
@@ -745,9 +791,9 @@ def _line_width(voltage_kv: float) -> float:
 
 def _bus_size(voltage_kv: float) -> float:
     if voltage_kv >= 400:
-        return 10
+        return 14
     if voltage_kv >= 220:
-        return 8
+        return 12
     if voltage_kv >= 110:
-        return 6
-    return 5
+        return 10
+    return 8

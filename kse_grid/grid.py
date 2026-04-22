@@ -15,11 +15,11 @@ class KSEGrid:
 
     Przykłady użycia
     ----------------
-    # Załaduj plik .m i otwórz podgląd w przeglądarce:
+    # Załaduj plik .m i otwórz interaktywny dashboard Dash w przeglądarce:
         import kse_grid
-        kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow().serve_interactive()
+        kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow().serve_dash()
 
-    # Eksport interaktywnego grafu HTML:
+    # Eksport interaktywnego grafu HTML (stary tryb):
         grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
         grid.plot_interactive("output.html")
 
@@ -89,6 +89,20 @@ class KSEGrid:
         )
         print(f"📍 Graf zapisany do: {output_path}")
         return output_path
+
+    # ------------------------------------------------------------------
+    def serve_dash(self,
+                   host: str = "127.0.0.1",
+                   port: int = 8050,
+                   auto_open: bool = True,
+                   debug: bool = False) -> None:
+        """Uruchamia interaktywny dashboard Dash z grafem Plotly i filtrami."""
+        if self.net is None:
+            raise RuntimeError("Wywołaj najpierw from_matpower_case()")
+        from kse_grid.dash_app import serve_dash
+        print(f"🌐 Dashboard dostępny pod: http://{host}:{port}/")
+        print("   Zatrzymaj serwer skrótem Ctrl+C.")
+        serve_dash(self.net, host=host, port=port, auto_open=auto_open, debug=debug)
 
     # ------------------------------------------------------------------
     def serve_interactive(self,

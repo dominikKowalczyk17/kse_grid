@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Interaktywny plotter sieci elektroenergetycznej dla plików MATPOWER (.m)"
 requires-python = ">=3.13"
 dependencies = [
+    "dash>=2.14",
+    "dash-cytoscape>=1.0",
     "matpowercaseframes>=2.1.0",
     "pandapower>=3.4.0",
     "pandas-stubs~=2.3.3",
