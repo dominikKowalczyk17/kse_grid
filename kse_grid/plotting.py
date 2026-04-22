@@ -5,6 +5,61 @@ import pandapower as pp
 import plotly.graph_objects as go
 
 
+def _compute_stats(net: pp.pandapowerNet) -> dict[str, object]:
+    has_bus_results = not net.res_bus.empty
+    has_line_results = not net.res_line.empty
+    has_trafo_results = not net.res_trafo.empty
+
+    max_line_loading = (
+        float(net.res_line["loading_percent"].max())
+        if has_line_results and not net.res_line["loading_percent"].dropna().empty
+        else 0.0
+    )
+    max_trafo_loading = (
+        float(net.res_trafo["loading_percent"].max())
+        if has_trafo_results and not net.res_trafo["loading_percent"].dropna().empty
+        else 0.0
+    )
+    max_loading = max(max_line_loading, max_trafo_loading)
+
+    n_viol = 0
+    if has_bus_results:
+        vm = net.res_bus["vm_pu"].dropna()
+        n_viol = int(((vm < 0.95) | (vm > 1.05)).sum())
+
+    n_line_overload = (
+        int((net.res_line["loading_percent"].fillna(0.0) > 100.0).sum())
+        if has_line_results
+        else 0
+    )
+    n_trafo_overload = (
+        int((net.res_trafo["loading_percent"].fillna(0.0) > 100.0).sum())
+        if has_trafo_results
+        else 0
+    )
+    n_overload = n_line_overload + n_trafo_overload
+
+    def _status_class(value: float, warn_threshold: float, bad_threshold: float) -> str:
+        if value >= bad_threshold:
+            return "bad"
+        if value >= warn_threshold:
+            return "warn"
+        return "good"
+
+    return {
+        "n_bus": int(len(net.bus)),
+        "n_line": int(len(net.line)),
+        "n_trafo": int(len(net.trafo)),
+        "n_gen": int(len(net.gen)),
+        "max_loading": f"{max_loading:.1f}%",
+        "load_class": _status_class(max_loading, 80.0, 100.0),
+        "n_viol": n_viol,
+        "viol_class": _status_class(float(n_viol), 1.0, 5.0),
+        "n_overload": n_overload,
+        "ovl_class": _status_class(float(n_overload), 1.0, 5.0),
+    }
+
+
 def build_figure_for_dash(
     net: pp.pandapowerNet,
 ) -> tuple[go.Figure, list[dict], list[float]]:
