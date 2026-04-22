@@ -8,6 +8,7 @@ from typing import Any
 
 import networkx as nx
 import pandapower as pp
+from pandapower.topology import create_nxgraph
 
 
 _VOLTAGE_OK_MIN = 0.95
@@ -21,49 +22,70 @@ _CORE_VOLTAGE_KV = 220.0
 def serialize_network(net: pp.pandapowerNet) -> dict[str, Any]:
     """Zwraca słownik z całą siecią + wynikami load flow gotowy do JSON-a."""
     positions = _compute_positions(net)
+    geo_positions = _extract_geo_positions(net)
     has_bus_results = not net.res_bus.empty
     has_line_results = not net.res_line.empty
     has_trafo_results = not net.res_trafo.empty
 
     voltage_levels = sorted({float(v) for v in net.bus.vn_kv.dropna().tolist() if v > 0}, reverse=True)
     default_voltage_filter = [v for v in voltage_levels if v >= _CORE_VOLTAGE_KV] or list(voltage_levels)
+    graph_bounds = _compute_bounds(positions)
+    geo_view = _compute_geo_view(geo_positions) if geo_positions else None
 
     return {
         "name": getattr(net, "name", None) or "Sieć elektroenergetyczna",
         "hasResults": has_bus_results,
         "voltageLevels": voltage_levels,
         "defaultVoltageFilter": default_voltage_filter,
+        "layoutModes": ["graph", "geo"] if geo_view else ["graph"],
+        "defaultViewMode": "geo" if geo_view else "graph",
+        "geoAvailable": geo_view is not None,
         "stats": _compute_stats(net),
-        "buses": _serialize_buses(net, positions, has_bus_results),
+        "buses": _serialize_buses(net, positions, geo_positions, has_bus_results),
         "lines": _serialize_lines(net, has_line_results),
         "trafos": _serialize_trafos(net, has_trafo_results),
-        "bounds": _compute_bounds(positions),
+        "bounds": graph_bounds,
+        "graphBounds": graph_bounds,
+        "geoView": geo_view,
     }
 
 
 # ---------------------------------------------------------------------------
-# Pozycje szyn
+# Pozycje szyn (layout grafu — bez geodanych)
 # ---------------------------------------------------------------------------
 
 def _compute_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, float]]:
-    geo: dict[int, tuple[float, float]] = {}
-    for bus_idx, row in net.bus.iterrows():
-        raw = row.get("geo")
-        if not raw:
-            continue
-        data = json.loads(raw) if isinstance(raw, str) else raw
-        lat, lon = data["coordinates"]
-        geo[bus_idx] = (float(lon), float(lat))
+    """
+    Liczy pozycje szyn algorytmem spring layout (Fruchterman-Reingold) na grafie
+    topologii sieci. Geodane (`net.bus.geo`) są celowo ignorowane — siatka jest
+    renderowana jako abstrakcyjny graf, nie jako mapa.
+    """
+    graph = create_nxgraph(
+        net,
+        respect_switches=True,
+        include_out_of_service=False,
+        multi=False,
+    )
+    for bus_idx in net.bus.index:
+        if bus_idx not in graph:
+            graph.add_node(bus_idx)
 
-    if len(geo) == len(net.bus):
-        return geo
+    components = list(nx.connected_components(graph))
+    positions: dict[int, tuple[float, float]] = {}
 
-    graph = nx.Graph()
-    graph.add_nodes_from(net.bus.index.tolist())
-    graph.add_edges_from(zip(net.line.from_bus.tolist(), net.line.to_bus.tolist()))
-    graph.add_edges_from(zip(net.trafo.hv_bus.tolist(), net.trafo.lv_bus.tolist()))
-    layout = nx.spring_layout(graph, seed=42, iterations=30)
-    return {bus_idx: (float(x), float(y)) for bus_idx, (x, y) in layout.items()}
+    for i, comp in enumerate(components):
+        subgraph = graph.subgraph(comp)
+        if len(comp) == 1:
+            sub_layout = {next(iter(comp)): (0.0, 0.0)}
+        else:
+            sub_layout = nx.spring_layout(subgraph, seed=42, iterations=50)
+
+        offset_x = (i % 4) * 2.5
+        offset_y = (i // 4) * 2.5
+        for bus_idx, (x, y) in sub_layout.items():
+            positions[bus_idx] = (float(x) + offset_x, float(y) + offset_y)
+
+    return positions
 
 
 def _compute_bounds(positions: dict[int, tuple[float, float]]) -> dict[str, list[float]]:
@@ -76,6 +98,80 @@ def _compute_bounds(positions: dict[int, tuple[float, float]]) -> dict[str, list
     return {"x": [x_min - pad_x, x_max + pad_x], "y": [y_min - pad_y, y_max + pad_y]}
 
 
+def _extract_geo_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, float]]:
+    positions: dict[int, tuple[float, float]] = {}
+
+    if hasattr(net, "bus_geodata") and not net.bus_geodata.empty:
+        for bus_idx, row in net.bus_geodata.iterrows():
+            x = _safe_float(row.get("x"))
+            y = _safe_float(row.get("y"))
+            if x is None or y is None:
+                continue
+            positions[int(bus_idx)] = (x, y)
+
+    if "geo" not in net.bus.columns:
+        return positions
+
+    for bus_idx, row in net.bus.iterrows():
+        raw = row.get("geo")
+        if raw in (None, ""):
+            continue
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict) or data.get("type") != "Point":
+            continue
+        coords = data.get("coordinates")
+        if not isinstance(coords, list) or len(coords) < 2:
+            continue
+        lon = _safe_float(coords[0])
+        lat = _safe_float(coords[1])
+        if lon is None or lat is None:
+            continue
+        positions[int(bus_idx)] = (lon, lat)
+
+    return positions
+
+
+def _compute_geo_view(positions: dict[int, tuple[float, float]]) -> dict[str, Any]:
+    lons = [lon for lon, _ in positions.values()]
+    lats = [lat for _, lat in positions.values()]
+    west, east = min(lons), max(lons)
+    south, north = min(lats), max(lats)
+    return {
+        "center": {"lon": (west + east) / 2.0, "lat": (south + north) / 2.0},
+        "bounds": {"lon": [west, east], "lat": [south, north]},
+        "zoom": _estimate_map_zoom(west, east, south, north),
+        "focusZoom": min(_estimate_map_zoom(west, east, south, north) + 2.0, 12.5),
+    }
+
+
+def _estimate_map_zoom(west: float, east: float, south: float, north: float) -> float:
+    span = max(abs(east - west), abs(north - south))
+    if span <= 0.02:
+        return 12.0
+    if span <= 0.05:
+        return 11.0
+    if span <= 0.10:
+        return 10.0
+    if span <= 0.25:
+        return 9.0
+    if span <= 0.50:
+        return 8.0
+    if span <= 1.00:
+        return 7.0
+    if span <= 2.00:
+        return 6.0
+    if span <= 4.00:
+        return 5.0
+    if span <= 8.00:
+        return 4.5
+    if span <= 12.00:
+        return 5.0
+    return 3.0
+
+
 # ---------------------------------------------------------------------------
 # Serializacja elementów
 # ---------------------------------------------------------------------------
@@ -83,26 +179,55 @@ def _compute_bounds(positions: dict[int, tuple[float, float]]) -> dict[str, list
 def _serialize_buses(
     net: pp.pandapowerNet,
     positions: dict[int, tuple[float, float]],
+    geo_positions: dict[int, tuple[float, float]],
     has_results: bool,
 ) -> list[dict[str, Any]]:
+    slack_buses = set(net.ext_grid.bus.tolist()) if not net.ext_grid.empty else set()
+    gen_buses = set(net.gen.bus.tolist()) if not net.gen.empty else set()
+
     out: list[dict[str, Any]] = []
     for bus_idx, row in net.bus.iterrows():
         x, y = positions[bus_idx]
-        load_mw = float(net.load.loc[net.load.bus == bus_idx, "p_mw"].sum()) if not net.load.empty else 0.0
+        if not net.load.empty:
+            mask = net.load.bus == bus_idx
+            load_mw = float(net.load.loc[mask, "p_mw"].sum())
+            load_mvar = float(net.load.loc[mask, "q_mvar"].sum()) if "q_mvar" in net.load.columns else 0.0
+        else:
+            load_mw = 0.0
+            load_mvar = 0.0
         gen_mw = float(net.gen.loc[net.gen.bus == bus_idx, "p_mw"].sum()) if not net.gen.empty else 0.0
+
+        if bus_idx in slack_buses:
+            bus_type = "Slack"
+        elif bus_idx in gen_buses:
+            bus_type = "PV"
+        else:
+            bus_type = "PQ"
 
         item: dict[str, Any] = {
             "id": int(bus_idx),
             "name": str(row["name"]),
+            "type": bus_type,
             "vn_kv": float(row["vn_kv"]),
             "x": x,
             "y": y,
             "loadMw": load_mw,
+            "loadMvar": load_mvar,
             "genMw": gen_mw,
         }
+        if bus_idx in geo_positions:
+            lon, lat = geo_positions[bus_idx]
+            item["lon"] = lon
+            item["lat"] = lat
         if has_results:
             item["vmPu"] = _safe_float(net.res_bus.at[bus_idx, "vm_pu"])
             item["vaDeg"] = _safe_float(net.res_bus.at[bus_idx, "va_degree"])
+            if bus_idx in gen_buses and not net.res_gen.empty:
+                gen_mask = net.gen.bus == bus_idx
+                gen_indices = net.gen.index[gen_mask]
+                q_values = net.res_gen.loc[gen_indices, "q_mvar"].dropna()
+                if not q_values.empty:
+                    item["genMvar"] = float(q_values.sum())
         out.append(item)
     return out
 

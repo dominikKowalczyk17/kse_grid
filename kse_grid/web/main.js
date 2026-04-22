@@ -8,6 +8,10 @@ import {
 const FOCUS_ZOOM_RATIO = 0.12;
 const HIGHLIGHT_SCALE = 2.2;
 
+function coordKeys(viewMode) {
+    return viewMode === 'geo' ? { x: 'lon', y: 'lat' } : { x: 'x', y: 'y' };
+}
+
 function voltageColorVar(kv) {
     if (kv >= 380) return 'var(--grid-400)';
     if (kv >= 200) return 'var(--grid-220)';
@@ -36,8 +40,10 @@ const Sidebar = {
         selectedTypes: Array,
         buses: Array,
         hasResults: Boolean,
+        viewMode: String,
+        geoAvailable: Boolean,
     },
-    emits: ['update:selectedVoltages', 'update:selectedTypes', 'reset-view', 'select-bus'],
+    emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'reset-view', 'select-bus'],
     setup(props, { emit }) {
         const search = ref('');
         const showSuggestions = ref(false);
@@ -46,7 +52,10 @@ const Sidebar = {
             const q = search.value.trim().toLowerCase();
             if (!q) return [];
             return props.buses
-                .filter(b => b.name.toLowerCase().includes(q))
+                .filter(b =>
+                    b.name.toLowerCase().includes(q) &&
+                    (props.viewMode !== 'geo' || (b.lat != null && b.lon != null))
+                )
                 .slice(0, 30)
                 .sort((a, b) => b.vn_kv - a.vn_kv);
         });
@@ -96,10 +105,15 @@ const Sidebar = {
             setTimeout(() => { showSuggestions.value = false; }, 200);
         }
 
+        function setViewMode(mode) {
+            if (mode === 'geo' && !props.geoAvailable) return;
+            emit('update:viewMode', mode);
+        }
+
         return {
             search, showSuggestions, suggestions,
             isCore, isAll, isNone,
-            applyPreset, toggleVoltage, toggleType, pickSuggestion, blurLater,
+            applyPreset, toggleVoltage, toggleType, pickSuggestion, blurLater, setViewMode,
             voltageColorVar,
         };
     },
@@ -168,13 +182,31 @@ const Sidebar = {
             </div>
         </section>
 
+        <section class="section-card">
+            <h3 class="section-title">Widok</h3>
+            <div class="chip-row">
+                <button class="chip" :class="{ active: viewMode === 'graph' }" @click="setViewMode('graph')">Graf</button>
+                <button
+                    class="chip"
+                    :class="{ active: viewMode === 'geo' }"
+                    :disabled="!geoAvailable"
+                    @click="setViewMode('geo')">
+                    OpenStreetMap
+                </button>
+            </div>
+            <p class="helper">
+                {{ geoAvailable
+                    ? 'Tryb mapowy używa współrzędnych WGS84 z datasetu.'
+                    : 'Tryb mapowy włączy się automatycznie, gdy case dostarczy geometrię WGS84.' }}
+            </p>
+        </section>
+
         <!-- Voltage levels -->
         <section class="section-card">
             <h3 class="section-title">Poziomy napięć</h3>
             <div class="chip-row">
-                <button class="chip" :class="{ active: isCore }" @click="applyPreset('core')">RDZEŃ 400/220</button>
-                <button class="chip" :class="{ active: isAll }"  @click="applyPreset('all')">ALL</button>
-                <button class="chip" :class="{ active: isNone }" @click="applyPreset('none')">NONE</button>
+                <button class="chip" :class="{ active: isCore }" @click="applyPreset('core')">400/220 kV</button>
+                <button class="chip" :class="{ active: isAll }"  @click="applyPreset('all')">WSZYSTKO</button>
             </div>
             <div class="check-list">
                 <label class="check-row" v-for="v in voltageLevels" :key="v">
@@ -191,17 +223,14 @@ const Sidebar = {
             <div class="check-list">
                 <label class="check-row">
                     <input type="checkbox" :checked="selectedTypes.includes('line')" @change="toggleType('line')" />
-                    <IconCable />
                     <span class="label">Linie</span>
                 </label>
                 <label class="check-row">
                     <input type="checkbox" :checked="selectedTypes.includes('trafo')" @change="toggleType('trafo')" />
-                    <IconZap />
                     <span class="label">Transformatory</span>
                 </label>
                 <label class="check-row">
                     <input type="checkbox" :checked="selectedTypes.includes('bus')" @change="toggleType('bus')" />
-                    <IconCircleDot />
                     <span class="label">Szyny</span>
                 </label>
             </div>
@@ -214,6 +243,18 @@ const Sidebar = {
             <div class="legend-scale">
                 <span>0%</span><span>50%</span><span>100%</span><span>150%</span>
             </div>
+        </section>
+
+        <!-- Bus voltage legend -->
+        <section class="section-card">
+            <h3 class="section-title">Napięcie szyn (Um)</h3>
+            <ul class="legend-list">
+                <li><span class="dot" style="background:#6A1B9A"></span>&lt; 0.90 p.u.</li>
+                <li><span class="dot" style="background:#1E88E5"></span>0.90 – 0.95</li>
+                <li><span class="dot" style="background:#43A047"></span>0.95 – 1.05 (OK)</li>
+                <li><span class="dot" style="background:#FB8C00"></span>1.05 – 1.10</li>
+                <li><span class="dot" style="background:#D32F2F"></span>&gt; 1.10 p.u.</li>
+            </ul>
         </section>
 
     </aside>
@@ -234,15 +275,17 @@ const SelectionCard = {
             const sel = props.selection;
             if (sel.kind === 'bus') {
                 const bus = sel.payload;
-                const items = [
-                    { label: 'Un',  value: `${bus.vn_kv.toFixed(0)} kV` },
-                ];
+                const items = [];
+                if (bus.type) items.push({ label: 'Type', value: bus.type });
+                items.push({ label: 'Vn', value: `${bus.vn_kv.toFixed(0)} kV` });
                 if (props.hasResults && bus.vmPu != null) {
-                    items.push({ label: 'Um',  value: `${bus.vmPu.toFixed(4)} p.u.`, status: voltageStatus(bus.vmPu) });
-                    items.push({ label: 'Kąt', value: `${bus.vaDeg.toFixed(2)}°` });
+                    items.push({ label: 'Vm', value: `${bus.vmPu.toFixed(4)} p.u.`, status: voltageStatus(bus.vmPu) });
+                    items.push({ label: 'Va', value: `${bus.vaDeg.toFixed(2)} °` });
                 }
-                if (bus.genMw > 0)  items.push({ label: 'P gen',  value: `${bus.genMw.toFixed(1)} MW`, status: 'good' });
-                if (bus.loadMw > 0) items.push({ label: 'P load', value: `${bus.loadMw.toFixed(1)} MW` });
+                if (bus.genMw > 0)        items.push({ label: 'P gen',  value: `${bus.genMw.toFixed(1)} MW`, status: 'good' });
+                if (bus.genMvar != null)  items.push({ label: 'Q gen',  value: `${bus.genMvar.toFixed(1)} Mvar`, status: 'good' });
+                if (bus.loadMw > 0)       items.push({ label: 'P load', value: `${bus.loadMw.toFixed(1)} MW` });
+                if (bus.loadMvar)         items.push({ label: 'Q load', value: `${bus.loadMvar.toFixed(1)} Mvar` });
                 return items;
             }
             if (sel.kind === 'line') {
@@ -273,6 +316,15 @@ const SelectionCard = {
         });
 
         const title = computed(() => props.selection?.payload?.name || '');
+        const subtitle = computed(() => {
+            const sel = props.selection;
+            if (!sel) return '';
+            const id = sel.payload?.id;
+            if (id == null) return '';
+            return sel.kind === 'bus' ? `Bus #${id}`
+                 : sel.kind === 'line' ? `Line #${id}`
+                 : sel.kind === 'trafo' ? `Trafo #${id}` : '';
+        });
         const kindLabel = computed(() => {
             const k = props.selection?.kind;
             return k === 'bus' ? 'Szyna'
@@ -280,7 +332,7 @@ const SelectionCard = {
                  : k === 'trafo' ? 'Transformator' : '';
         });
 
-        return { rows, title, kindLabel };
+        return { rows, title, subtitle, kindLabel };
     },
     template: `
     <div v-if="selection" class="selection-card">
@@ -288,6 +340,7 @@ const SelectionCard = {
             <div>
                 <div class="selection-kind">{{ kindLabel }}</div>
                 <div class="selection-title">{{ title }}</div>
+                <div v-if="subtitle" class="selection-subtitle">{{ subtitle }}</div>
             </div>
             <button class="card-close" @click="$emit('close')" aria-label="Zamknij">
                 <IconClose />
@@ -335,6 +388,7 @@ const GraphPanel = {
         network: Object,
         selectedVoltages: Array,
         selectedTypes: Array,
+        viewMode: String,
     },
     emits: ['stats-changed'],
     setup(props, { emit }) {
@@ -343,39 +397,84 @@ const GraphPanel = {
         const allTraces = ref([]);
         const selection = ref(null);
         const defaultRange = ref(null);
+        const defaultMapView = ref(null);
         const focusHalf = ref({ x: 1, y: 1 });
         const ready = ref(false);
+        const onMouseDown = () => graphEl.value?.classList.add('is-dragging');
+        const onMouseUp = () => graphEl.value?.classList.remove('is-dragging');
 
         const visibleCounts = computed(() => {
             const vSet = new Set(props.selectedVoltages);
             const tSet = new Set(props.selectedTypes);
             const total = { bus: props.network.buses.length, line: props.network.lines.length };
-            const buses = tSet.has('bus')  ? props.network.buses.filter(b => vSet.has(b.vn_kv)).length : 0;
-            const lines = tSet.has('line') ? props.network.lines.filter(l => vSet.has(l.voltage)).length : 0;
+            const buses = tSet.has('bus')
+                ? props.network.buses.filter(b => vSet.has(b.vn_kv) && (props.viewMode !== 'geo' || (b.lat != null && b.lon != null))).length
+                : 0;
+            const lines = tSet.has('line')
+                ? props.network.lines.filter(l => vSet.has(l.voltage)).length
+                : 0;
             return { buses, lines, totalBuses: total.bus, totalLines: total.line };
         });
 
         function initialLayout() {
+            if (props.viewMode === 'geo' && props.network.geoView) {
+                return {
+                    ...PLOT_LAYOUT_BASE,
+                    mapbox: {
+                        style: 'carto-positron',
+                        center: { ...props.network.geoView.center },
+                        zoom: props.network.geoView.zoom,
+                        layers: [
+                            {
+                                sourcetype: 'geojson',
+                                source: 'poland_border.geojson',
+                                type: 'line',
+                                color: '#1f2937',
+                                line: { width: 2 },
+                                below: 'traces',
+                            },
+                        ],
+                    },
+                };
+            }
             return {
                 ...PLOT_LAYOUT_BASE,
-                xaxis: { ...PLOT_LAYOUT_BASE.xaxis, range: props.network.bounds.x },
-                yaxis: { ...PLOT_LAYOUT_BASE.yaxis, range: props.network.bounds.y },
+                xaxis: { ...PLOT_LAYOUT_BASE.xaxis, range: props.network.graphBounds.x },
+                yaxis: { ...PLOT_LAYOUT_BASE.yaxis, range: props.network.graphBounds.y },
             };
         }
 
         async function buildPlot() {
-            const { traces, meta } = buildTraces(props.network);
+            ready.value = false;
+            selection.value = null;
+            traceMeta.value = [];
+            allTraces.value = [];
+
+            Plotly.purge(graphEl.value);
+
+            const { traces, meta } = buildTraces(props.network, props.viewMode);
             allTraces.value = traces;
             traceMeta.value = meta;
 
             const layout = initialLayout();
-            defaultRange.value = { x: [...layout.xaxis.range], y: [...layout.yaxis.range] };
-            const dx = defaultRange.value.x[1] - defaultRange.value.x[0];
-            const dy = defaultRange.value.y[1] - defaultRange.value.y[0];
-            focusHalf.value = { x: dx * FOCUS_ZOOM_RATIO, y: dy * FOCUS_ZOOM_RATIO };
+            if (props.viewMode === 'geo' && layout.mapbox) {
+                defaultMapView.value = {
+                    center: { ...layout.mapbox.center },
+                    zoom: layout.mapbox.zoom,
+                };
+                defaultRange.value = null;
+            } else {
+                defaultRange.value = { x: [...layout.xaxis.range], y: [...layout.yaxis.range] };
+                defaultMapView.value = null;
+                const dx = defaultRange.value.x[1] - defaultRange.value.x[0];
+                const dy = defaultRange.value.y[1] - defaultRange.value.y[0];
+                focusHalf.value = { x: dx * FOCUS_ZOOM_RATIO, y: dy * FOCUS_ZOOM_RATIO };
+            }
 
             await Plotly.newPlot(graphEl.value, traces, layout, PLOT_CONFIG);
             graphEl.value.on('plotly_click', onPlotClick);
+            graphEl.value.on('plotly_hover', () => graphEl.value.classList.add('is-hovering-target'));
+            graphEl.value.on('plotly_unhover', () => graphEl.value.classList.remove('is-hovering-target'));
             applyVisibility();
             ready.value = true;
         }
@@ -393,23 +492,37 @@ const GraphPanel = {
             Plotly.restyle(graphEl.value, { visible: values }, indices);
         }
 
-        function selectionTraceIndex() {
-            return traceMeta.value.findIndex(m => m.kind === 'selection');
+        function selectionTraceIndices() {
+            const out = [];
+            traceMeta.value.forEach((m, i) => { if (m.kind === 'selection') out.push(i); });
+            return out;
         }
 
         function clearHighlight() {
-            const idx = selectionTraceIndex();
-            if (idx < 0) return;
-            Plotly.restyle(graphEl.value, { x: [[]], y: [[]] }, [idx]);
+            const idxs = selectionTraceIndices();
+            if (!idxs.length) return;
+            const keys = coordKeys(props.viewMode);
+            Plotly.restyle(graphEl.value, {
+                [keys.x]: idxs.map(() => []),
+                [keys.y]: idxs.map(() => []),
+            }, idxs);
         }
 
         function highlightAt(x, y, baseSize) {
-            const idx = selectionTraceIndex();
-            if (idx < 0) return;
+            const idxs = selectionTraceIndices();
+            if (!idxs.length) return;
+            const outerRingSize = Math.max(baseSize * 1.3, 16);
+            const innerRingSize = Math.max(baseSize * 0.9, 10);
+            const sizes = idxs.map((_, i) =>
+                i === 0 ? outerRingSize :
+                innerRingSize
+            );
+            const keys = coordKeys(props.viewMode);
             Plotly.restyle(graphEl.value, {
-                x: [[x]], y: [[y]],
-                'marker.size': baseSize * HIGHLIGHT_SCALE,
-            }, [idx]);
+                [keys.x]: idxs.map(() => [x]),
+                [keys.y]: idxs.map(() => [y]),
+                'marker.size': sizes,
+            }, idxs);
         }
 
         function onPlotClick(evt) {
@@ -423,11 +536,13 @@ const GraphPanel = {
             } else if (meta.kind === 'line') {
                 const id = meta.ids[point.pointIndex];
                 const ln = props.network.lines.find(l => l.id === id);
-                if (ln) { selection.value = { kind: 'line', payload: ln }; highlightAt(point.x, point.y, 14); }
+                const keys = coordKeys(props.viewMode);
+                if (ln) { selection.value = { kind: 'line', payload: ln }; highlightAt(point[keys.x], point[keys.y], 14); }
             } else if (meta.kind === 'trafo') {
                 const id = meta.ids[point.pointIndex];
                 const tr = props.network.trafos.find(t => t.id === id);
-                if (tr) { selection.value = { kind: 'trafo', payload: tr }; highlightAt(point.x, point.y, 14); }
+                const keys = coordKeys(props.viewMode);
+                if (tr) { selection.value = { kind: 'trafo', payload: tr }; highlightAt(point[keys.x], point[keys.y], 14); }
             }
         }
 
@@ -442,22 +557,41 @@ const GraphPanel = {
 
             const traceIdx = findBusTraceIndex(bus.vn_kv);
             const baseSize = traceIdx >= 0 ? allTraces.value[traceIdx].marker.size : 12;
-            highlightAt(bus.x, bus.y, baseSize);
+            const keys = coordKeys(props.viewMode);
+            const targetX = bus[keys.x];
+            const targetY = bus[keys.y];
+            if (targetX == null || targetY == null) return;
+            highlightAt(targetX, targetY, baseSize);
 
             if (focus) {
-                Plotly.relayout(graphEl.value, {
-                    'xaxis.range': [bus.x - focusHalf.value.x, bus.x + focusHalf.value.x],
-                    'yaxis.range': [bus.y - focusHalf.value.y, bus.y + focusHalf.value.y],
-                });
+                if (props.viewMode === 'geo' && props.network.geoView) {
+                    Plotly.relayout(graphEl.value, {
+                        'mapbox.center': { lon: bus.lon, lat: bus.lat },
+                        'mapbox.zoom': props.network.geoView.focusZoom,
+                    });
+                } else {
+                    Plotly.relayout(graphEl.value, {
+                        'xaxis.range': [bus.x - focusHalf.value.x, bus.x + focusHalf.value.x],
+                        'yaxis.range': [bus.y - focusHalf.value.y, bus.y + focusHalf.value.y],
+                    });
+                }
             }
         }
 
         function resetView() {
-            if (!defaultRange.value) return;
-            Plotly.relayout(graphEl.value, {
-                'xaxis.range': defaultRange.value.x,
-                'yaxis.range': defaultRange.value.y,
-            });
+            if (props.viewMode === 'geo') {
+                if (!defaultMapView.value) return;
+                Plotly.relayout(graphEl.value, {
+                    'mapbox.center': defaultMapView.value.center,
+                    'mapbox.zoom': defaultMapView.value.zoom,
+                });
+            } else {
+                if (!defaultRange.value) return;
+                Plotly.relayout(graphEl.value, {
+                    'xaxis.range': defaultRange.value.x,
+                    'yaxis.range': defaultRange.value.y,
+                });
+            }
             clearSelection();
         }
 
@@ -469,6 +603,9 @@ const GraphPanel = {
         watch(() => [props.selectedVoltages, props.selectedTypes], () => {
             if (ready.value) applyVisibility();
         }, { deep: true });
+        watch(() => props.viewMode, async () => {
+            await buildPlot();
+        });
 
         function onKey(e) {
             if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
@@ -478,8 +615,10 @@ const GraphPanel = {
 
         onMounted(async () => {
             await nextTick();
+            graphEl.value.addEventListener('mousedown', onMouseDown);
             await buildPlot();
             window.addEventListener('keydown', onKey);
+            window.addEventListener('mouseup', onMouseUp);
             window.addEventListener('resize', () => {
                 if (ready.value) Plotly.Plots.resize(graphEl.value);
             });
@@ -514,6 +653,7 @@ const App = {
         const error = ref(null);
         const selectedVoltages = ref([]);
         const selectedTypes = ref(['line', 'trafo', 'bus']);
+        const viewMode = ref('graph');
         const graphPanelRef = ref(null);
 
         fetch('/api/network')
@@ -521,20 +661,20 @@ const App = {
             .then(data => {
                 network.value = data;
                 selectedVoltages.value = [...data.defaultVoltageFilter];
+                viewMode.value = data.defaultViewMode || 'graph';
                 document.title = `${data.name} – kse_grid`;
             })
             .catch(e => { error.value = String(e); });
 
         const stats = computed(() => network.value?.stats || {});
-        const statusLabel = computed(() => network.value?.hasResults ? 'Zbieżny' : 'Brak wyników');
         const statusClass = computed(() => network.value?.hasResults ? 'good' : 'warn');
 
         function onSelectBus(busId) { graphPanelRef.value?.selectBus(busId, true); }
         function onResetView() { graphPanelRef.value?.resetView(); }
 
         return {
-            network, error, stats, statusLabel, statusClass,
-            selectedVoltages, selectedTypes, graphPanelRef,
+            network, error, stats, statusClass,
+            selectedVoltages, selectedTypes, viewMode, graphPanelRef,
             onSelectBus, onResetView,
         };
     },
@@ -555,9 +695,6 @@ const App = {
                 <span class="header-stat"><span class="v tabular">{{ stats.nLine }}</span> linii</span>
                 <span class="header-stat"><span class="v tabular">{{ stats.nTrafo }}</span> trafo</span>
             </div>
-            <span class="status-pill" :class="statusClass">
-                <span class="dot"></span>{{ statusLabel }}
-            </span>
         </header>
         <div class="app-body">
             <Sidebar
@@ -566,13 +703,17 @@ const App = {
                 :default-voltage-filter="network.defaultVoltageFilter"
                 :buses="network.buses"
                 :has-results="network.hasResults"
+                :view-mode="viewMode"
+                :geo-available="network.geoAvailable"
                 v-model:selected-voltages="selectedVoltages"
                 v-model:selected-types="selectedTypes"
+                v-model:view-mode="viewMode"
                 @reset-view="onResetView"
                 @select-bus="onSelectBus" />
             <GraphPanel
                 ref="graphPanelRef"
                 :network="network"
+                :view-mode="viewMode"
                 :selected-voltages="selectedVoltages"
                 :selected-types="selectedTypes" />
         </div>

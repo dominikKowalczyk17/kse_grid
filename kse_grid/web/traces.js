@@ -3,6 +3,19 @@
  * Zachowuje wzorzec dwóch traces na grupę (polyline + niewidoczne markery do hovera).
  */
 
+const BUS_BINS = [
+    { label: '< 0.90 (krytycznie niskie)', test: v => v < 0.90,                color: '#6A1B9A' },
+    { label: '0.90–0.95 (niskie)',          test: v => v >= 0.90 && v < 0.95,  color: '#1E88E5' },
+    { label: '0.95–1.05 (OK)',              test: v => v >= 0.95 && v <= 1.05, color: '#43A047' },
+    { label: '1.05–1.10 (wysokie)',         test: v => v > 1.05  && v <= 1.10, color: '#FB8C00' },
+    { label: '> 1.10 (krytycznie wysokie)', test: v => v > 1.10,                color: '#D32F2F' },
+];
+
+function busColor(vmPu) {
+    for (const bin of BUS_BINS) if (bin.test(vmPu)) return bin.color;
+    return '#9aa4b2';
+}
+
 const LINE_BINS = [
     { label: '0-40%',   lower: 0,   upper: 40,       color: '#43A047' },
     { label: '40-70%',  lower: 40,  upper: 70,       color: '#F9A825' },
@@ -76,9 +89,26 @@ function busHover(bus, hasResults) {
     return lines.join('<br>');
 }
 
-export function buildTraces(network) {
+function isGeoMode(viewMode) {
+    return viewMode === 'geo';
+}
+
+function pointKeys(viewMode) {
+    return isGeoMode(viewMode) ? { x: 'lon', y: 'lat', traceType: 'scattermapbox' }
+                               : { x: 'x', y: 'y', traceType: 'scattergl' };
+}
+
+function busCoords(bus, viewMode) {
+    const keys = pointKeys(viewMode);
+    const x = bus[keys.x];
+    const y = bus[keys.y];
+    return x == null || y == null ? null : { x, y };
+}
+
+export function buildTraces(network, viewMode = 'graph') {
     const { buses, lines, trafos, voltageLevels, hasResults } = network;
     const busById = Object.fromEntries(buses.map(b => [b.id, b]));
+    const keys = pointKeys(viewMode);
 
     const traces = [];
     const meta = [];
@@ -93,17 +123,20 @@ export function buildTraces(network) {
             const xs = [], ys = [], midX = [], midY = [], hovers = [], ids = [];
             for (const ln of inBin) {
                 const f = busById[ln.fromBus], t = busById[ln.toBus];
-                if (!f || !t) continue;
-                xs.push(f.x, t.x, null);
-                ys.push(f.y, t.y, null);
-                midX.push((f.x + t.x) / 2);
-                midY.push((f.y + t.y) / 2);
+                const from = f ? busCoords(f, viewMode) : null;
+                const to = t ? busCoords(t, viewMode) : null;
+                if (!from || !to) continue;
+                xs.push(from.x, to.x, null);
+                ys.push(from.y, to.y, null);
+                midX.push((from.x + to.x) / 2);
+                midY.push((from.y + to.y) / 2);
                 hovers.push(lineHover({ ...ln }, hasResults));
                 ids.push(ln.id);
             }
+            if (!ids.length) continue;
 
             traces.push({
-                type: 'scattergl', x: xs, y: ys, mode: 'lines',
+                type: keys.traceType, [keys.x]: xs, [keys.y]: ys, mode: 'lines',
                 line: { color: bin.color, width: lineWidth(level) },
                 hoverinfo: 'skip',
                 showlegend: false,
@@ -111,7 +144,7 @@ export function buildTraces(network) {
             meta.push({ kind: 'line', voltage: level, ids: [] });
 
             traces.push({
-                type: 'scattergl', x: midX, y: midY, mode: 'markers',
+                type: keys.traceType, [keys.x]: midX, [keys.y]: midY, mode: 'markers',
                 marker: { size: Math.max(lineWidth(level) * 2.5, 8), color: bin.color, opacity: 0.25 },
                 text: hovers,
                 hovertemplate: '%{text}<extra></extra>',
@@ -132,17 +165,20 @@ export function buildTraces(network) {
             const xs = [], ys = [], midX = [], midY = [], hovers = [], ids = [];
             for (const tr of inBin) {
                 const hv = busById[tr.hvBus], lvBus = busById[tr.lvBus];
-                if (!hv || !lvBus) continue;
-                xs.push(hv.x, lvBus.x, null);
-                ys.push(hv.y, lvBus.y, null);
-                midX.push((hv.x + lvBus.x) / 2);
-                midY.push((hv.y + lvBus.y) / 2);
+                const from = hv ? busCoords(hv, viewMode) : null;
+                const to = lvBus ? busCoords(lvBus, viewMode) : null;
+                if (!from || !to) continue;
+                xs.push(from.x, to.x, null);
+                ys.push(from.y, to.y, null);
+                midX.push((from.x + to.x) / 2);
+                midY.push((from.y + to.y) / 2);
                 hovers.push(trafoHover(tr, hasResults));
                 ids.push(tr.id);
             }
+            if (!ids.length) continue;
 
             traces.push({
-                type: 'scatter', x: xs, y: ys, mode: 'lines',
+                type: keys.traceType, [keys.x]: xs, [keys.y]: ys, mode: 'lines',
                 line: { color: bin.color, width: 2.2, dash: 'dot' },
                 hoverinfo: 'skip',
                 showlegend: false,
@@ -150,7 +186,7 @@ export function buildTraces(network) {
             meta.push({ kind: 'trafo', voltage: lv, ids: [] });
 
             traces.push({
-                type: 'scatter', x: midX, y: midY, mode: 'markers',
+                type: keys.traceType, [keys.x]: midX, [keys.y]: midY, mode: 'markers',
                 marker: { size: 9, color: bin.color, opacity: 0.35, symbol: 'diamond' },
                 text: hovers,
                 hovertemplate: '%{text}<extra></extra>',
@@ -163,42 +199,25 @@ export function buildTraces(network) {
     // ----- szyny
     let firstBusTrace = true;
     for (const level of voltageLevels) {
-        const busesAtLevel = buses.filter(b => b.vn_kv === level);
+        const busesAtLevel = buses.filter(b => b.vn_kv === level && busCoords(b, viewMode));
         if (!busesAtLevel.length) continue;
 
-        const xs = busesAtLevel.map(b => b.x);
-        const ys = busesAtLevel.map(b => b.y);
-        const colors = busesAtLevel.map(b => hasResults ? (b.vmPu ?? 1.0) : 1.0);
+        const xs = busesAtLevel.map(b => b[keys.x]);
+        const ys = busesAtLevel.map(b => b[keys.y]);
+        const colors = busesAtLevel.map(b => hasResults ? busColor(b.vmPu ?? 1.0) : '#5b6472');
         const hovers = busesAtLevel.map(b => busHover(b, hasResults));
         const ids = busesAtLevel.map(b => b.id);
 
         const marker = {
             size: busSize(level),
             color: colors,
-            colorscale: 'Turbo',
-            cmin: 0.9,
-            cmax: 1.1,
-            showscale: firstBusTrace && hasResults,
-            line: { color: '#0e1116', width: 1.0 },
+            line: { color: '#0e1116', width: 1.2 },
         };
 
-        if (firstBusTrace && hasResults) {
-            marker.colorbar = {
-                title: { text: 'Um [p.u.]', font: { color: '#e6edf3' } },
-                tickfont: { color: '#e6edf3' },
-                bgcolor: 'rgba(22,27,34,0.7)',
-                bordercolor: '#30363d',
-                borderwidth: 1,
-                outlinewidth: 0,
-                thickness: 14,
-                len: 0.6,
-                x: 1.0,
-            };
-        }
         firstBusTrace = false;
 
         traces.push({
-            type: 'scatter', x: xs, y: ys, mode: 'markers',
+            type: keys.traceType, [keys.x]: xs, [keys.y]: ys, mode: 'markers',
             text: hovers,
             hovertemplate: '%{text}<extra></extra>',
             marker,
@@ -208,9 +227,27 @@ export function buildTraces(network) {
     }
 
     // ----- ślad podświetlenia selekcji (na końcu = na wierzchu)
+    // 1) zewnętrzny krzyż w kolorze chłodnego akcentu
     traces.push({
-        type: 'scatter', x: [], y: [], mode: 'markers',
-        marker: { size: 24, color: 'rgba(255,255,255,0.12)', line: { color: '#4ea1ff', width: 3 } },
+        type: keys.traceType, [keys.x]: [], [keys.y]: [], mode: 'markers',
+        marker: {
+            size: 18,
+            color: '#8fc7ea',
+            symbol: 'cross',
+        },
+        hoverinfo: 'skip',
+        showlegend: false,
+    });
+    meta.push({ kind: 'selection', voltage: 0, ids: [] });
+
+    // 2) wewnętrzny krzyż akcentowy
+    traces.push({
+        type: keys.traceType, [keys.x]: [], [keys.y]: [], mode: 'markers',
+        marker: {
+            size: 12,
+            color: '#4ea1ff',
+            symbol: 'x',
+        },
         hoverinfo: 'skip',
         showlegend: false,
     });

@@ -374,6 +374,15 @@ body {
     color: var(--primary);
     border-color: var(--primary);
 }
+.chip:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+.chip:disabled:hover {
+    background: var(--muted-40);
+    color: var(--muted-foreground);
+    border-color: var(--border);
+}
 
 .helper {
     font-size: 0.625rem;
@@ -487,6 +496,18 @@ body {
     inset: 0;
 }
 
+.graph-canvas .nsewdrag,
+.graph-canvas .nsewdrag.drag {
+    cursor: grab !important;
+}
+.graph-canvas.is-dragging .nsewdrag,
+.graph-canvas .nsewdrag:active {
+    cursor: grabbing !important;
+}
+.graph-canvas.is-hovering-target .nsewdrag {
+    cursor: pointer !important;
+}
+
 /* HUD */
 .graph-hud {
     position: absolute;
@@ -566,6 +587,14 @@ body {
     line-height: 1.25;
 }
 
+.selection-subtitle {
+    margin-top: 0.15rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--muted-foreground);
+    letter-spacing: 0.04em;
+}
+
 .selection-kind {
     font-family: var(--font-mono);
     font-size: 0.625rem;
@@ -642,3 +671,25 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .overlay .err { color: var(--bad); }
+
+.legend-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--fg-muted);
+}
+.legend-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.legend-list .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}

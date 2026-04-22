@@ -1,6 +1,6 @@
 # kse_grid – Interaktywny plotter sieci elektroenergetycznej
 
-Narzędzie do wizualizacji i analizy rozpływu mocy z plików MATPOWER (`.m`), oparte o [pandapower](https://www.pandapower.org/), Dash i Plotly.
+Narzędzie do wizualizacji i analizy rozpływu mocy z plików MATPOWER (`.m`), oparte o [pandapower](https://www.pandapower.org/), FastAPI i Plotly (frontend Vue 3 bez bundlera).
 
 - Wczytuje dowolny plik `.m` (format MATPOWER)
 - Liczy rozpływ mocy (algorytm Iwamoto-NR, start AC)
@@ -103,10 +103,10 @@ uv run python main.py
 
 Co się dzieje po uruchomieniu:
 
-1. Wczytanie pliku `.m`
+1. Wczytanie pliku `.m` (+ ewentualnego sidecara z geometrią)
 2. Obliczenia load flow – Newton-Raphson Iwamoto, start AC (U=1 p.u., kąt=0°)
-3. Wygenerowanie układu grafu (spring layout, jeśli plik nie zawiera geodanych)
-4. Start dashboardu Dash pod `http://127.0.0.1:8050/` i otwarcie przeglądarki
+3. Wygenerowanie widoku sieci: spring layout albo OpenStreetMap, jeśli case dostarczy współrzędne WGS84
+4. Start serwera FastAPI pod `http://127.0.0.1:8050/` i otwarcie przeglądarki
 
 Serwer działa do `Ctrl+C`.
 
@@ -117,10 +117,9 @@ Serwer działa do `Ctrl+C`.
 ### Podstawowe użycie
 
 ```python
-from pathlib import Path
 import kse_grid
 
-kse_grid.KSEGrid.from_matpower_case("data/case3120sp.m").run_powerflow().serve_dash()
+kse_grid.KSEGrid.from_matpower_case("data/case3120sp.m").run_powerflow().serve()
 ```
 
 ### Z raportem tekstowym
@@ -129,8 +128,8 @@ kse_grid.KSEGrid.from_matpower_case("data/case3120sp.m").run_powerflow().serve_d
 import kse_grid
 
 grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
-grid.report()            # bilans mocy, napięcia, top 10 linii – w terminalu
-grid.serve_dash()        # dashboard Dash w przeglądarce
+grid.report()    # bilans mocy, napięcia, top 10 linii – w terminalu
+grid.serve()     # dashboard w przeglądarce
 ```
 
 ### Dostęp do danych pandapower
@@ -157,21 +156,46 @@ grid.run_powerflow(
 
 Po wejściu na `http://127.0.0.1:8050/`:
 
-- **Lewy panel** – podsumowanie sieci, wyszukiwarka szyn, reset widoku, filtry napięć i typów elementów oraz legenda obciążenia linii.
-- **Wykres** – graf sieci. Kolor linii = obciążenie (zielony 0–40% -> czerwony >100%). Kolor węzłów = `Um` w p.u.
+- **Lewy panel** – podsumowanie sieci, wyszukiwarka szyn, reset widoku, przełącznik trybu (Graf / OpenStreetMap), filtry napięć i typów elementów oraz legendy.
+- **Tryb Graf** – spring layout w dwuwymiarowej przestrzeni abstrakcyjnej.
+- **Tryb OpenStreetMap** – sieć nałożona na szarą mapę (`carto-positron`) z zaznaczonym konturem Polski. Aktywny tylko jeśli case ma geometrię WGS84.
+- **Kolor linii i transformatorów** = obciążenie prądowe:
+  - 🟢 0–40 % → 🟡 40–70 % → 🟠 70–100 % → 🔴 > 100 % (przeciążenie).
+- **Kolor węzłów (szyn)** = napięcie `Um` w binach traffic-light:
+  - 🟣 < 0.90 p.u. (krytycznie niskie)
+  - 🔵 0.90 – 0.95 (niskie)
+  - 🟢 0.95 – 1.05 (OK)
+  - 🟠 1.05 – 1.10 (wysokie)
+  - 🔴 > 1.10 p.u. (krytycznie wysokie)
 - **Domyślny widok** – startowo pokazywany jest **rdzeń 400/220 kV**, żeby duże przypadki były czytelniejsze.
-- **Presety filtrów napięć:**
-  - `Rdzeń 400/220` – tylko sieć przesyłowa 400 i 220 kV
-  - `Wszystkie` – pełna sieć
-  - `Żadne` – szybkie wyłączenie wszystkich poziomów napięć
-- **Checklisty** – pozwalają niezależnie włączać poziomy napięć oraz typy elementów (`Linie`, `Transformatory`, `Szyny`).
-- **Interakcja:**
-  - klik na węzeł lub element pokazuje kartę szczegółów w prawym górnym rogu wykresu,
-  - klik w puste tło usuwa zaznaczenie,
-  - wyszukiwarka szyn centruje widok na wybranym węźle,
-  - scroll = zoom, drag = pan.
+- **Presety filtrów napięć:** `Rdzeń 400/220`, `Wszystkie`, `Żadne`.
+- **Checklisty** – niezależne włączanie poziomów napięć i typów elementów (`Linie`, `Transformatory`, `Szyny`).
+- **Interakcja:** klik = karta szczegółów, klik w tło = usunięcie zaznaczenia, wyszukiwarka = centrowanie, scroll = zoom, drag = pan.
 
-> Jeśli plik `.m` nie zawiera danych geograficznych (GPS), węzły są rozmieszczane automatycznie (spring layout).
+> Jeśli case zawiera geometrię WGS84 (bezpośrednio albo przez sidecar GeoJSON o tej samej nazwie), aplikacja startuje od razu w trybie OpenStreetMap.
+
+### Tryb mapowy z paczek TAMU
+
+Pliki `.m` od [TAMU Polish Grid](https://electricgrids.engr.tamu.edu/electric-grid-test-cases/polish-grid/) **nie zawierają geo** w samym MATPOWER. Współrzędne stacji 400/220 kV znajdują się w pliku PowerWorld `.EPC` z paczki TAMU. Konwertujemy je do GeoJSON sidecara:
+
+```bash
+uv run python -m kse_grid.convert_tamu_geo "/path/case.EPC" --out data/case.geojson
+```
+
+Sidecar musi mieć ten sam stem co `.m` (np. `case2746wop_TAMU_Updated.m` ↔ `case2746wop_TAMU_Updated.geojson`). Po konwersji:
+
+```bash
+uv run python main.py data/case2746wop_TAMU_Updated.m
+```
+
+### Obsługiwane sidecary GeoJSON
+
+- `data/<stem>.geojson`
+- `data/<stem>.json`
+- `data/<stem>_wgs84.geojson`
+- `data/<stem>_geo.geojson`
+
+Format: `FeatureCollection` z punktami `Point` dla szyn. Dopasowanie po `properties.bus`, `bus_id`, `pp_index`, `id` albo po nazwie (`name`, `bus_name`, `station`).
 
 ---
 
@@ -179,21 +203,27 @@ Po wejściu na `http://127.0.0.1:8050/`:
 
 ```
 kse_grid/
-├── main.py              # punkt startowy – ładuje .m i uruchamia dashboard Dash
+├── main.py                        # punkt startowy – ładuje .m i uruchamia serwer
 ├── data/
-│   └── case3120sp.m     # przykładowy plik MATPOWER (3120 węzłów)
+│   ├── case3120sp.m               # przykładowy plik MATPOWER (3120 węzłów)
+│   └── case2746wop_TAMU_Updated.* # case TAMU + sidecar .geojson
 ├── docs/
 │   └── preview.png
 └── kse_grid/
-    ├── __init__.py      # publiczne API pakietu
-    ├── grid.py          # KSEGrid – główna klasa (ładowanie, obliczenia, wizualizacja)
-    ├── matpower.py      # wczytywanie plików .m
-    ├── runner.py        # obliczenia load flow + raport tekstowy
-    ├── plotting.py      # budowa figury Plotly i logika kolorowania elementów
-    ├── dash_app.py      # layout dashboardu Dash i callbacki UI
-    └── assets/
-        ├── global.css   # style dashboardu
-        └── graph_interactions.js  # dodatkowe interakcje po stronie przeglądarki
+    ├── __init__.py                # publiczne API pakietu
+    ├── grid.py                    # KSEGrid – główna klasa
+    ├── matpower.py                # wczytywanie .m + sidecar GeoJSON
+    ├── runner.py                  # obliczenia load flow + raport tekstowy
+    ├── serializer.py              # net → JSON dla frontendu
+    ├── web_server.py              # FastAPI + statyczne pliki frontendu
+    ├── convert_tamu_geo.py        # konwerter PowerWorld .EPC → GeoJSON sidecar
+    └── web/
+        ├── index.html
+        ├── main.js                # Vue 3 app (sidebar, wykres, interakcje)
+        ├── traces.js              # builder śladów Plotly (graph + scattermapbox)
+        ├── icons.js
+        ├── style.css
+        └── poland_border.geojson  # nakładka konturu Polski w trybie OSM
 ```
 
 ---
@@ -203,10 +233,13 @@ kse_grid/
 | Problem | Rozwiązanie |
 |---|---|
 | `ModuleNotFoundError: matpowercaseframes` | Środowisko nie aktywne lub `uv sync` nie wykonany. Aktywuj venv i powtórz. |
-| Port 8050 zajęty | Uruchom `serve_dash(port=...)` albo zwolnij port 8050. |
+| Port 8050 zajęty | Uruchom `serve(port=...)` albo zwolnij port 8050. |
 | `pandapower` zgłasza ostrzeżenia o `BR_B` lub „fake transformers" | Normalne dla `case3120sp.m` – artefakt pliku MATPOWER, wynik PF jest poprawny. |
 | Naruszenia napięcia i przeciążenia w `case3120sp` | To celowe – publiczny przypadek jest naciskiem stresowym, nie odwzorowaniem rzeczywistego stanu sieci. |
-| Spring layout trwa długo | ~7 s przy 3120 węzłach to norma; jednorazowo per uruchomienie. |
+| Layout grafu trwa długo | Spring layout dla 3120 węzłów to ~7 s, jednorazowo per uruchomienie. W trybie OSM nie ma kosztu layoutu, ale potrzebne są współrzędne WGS84. |
+| Chip „OpenStreetMap" jest zablokowany | Case nie ma geometrii. Dla case'ów TAMU wygeneruj sidecar z `.EPC`: `uv run python -m kse_grid.convert_tamu_geo path/do/case.EPC --out data/case.geojson`. |
+| TAMU `.m` wywala `IndexError` na `gencost` | Loader automatycznie usuwa blok `mpc.gencost` jeśli pandapower nie potrafi go zaimportować (poly cost > 2nd order). To bezpieczny fallback – PF nadal się liczy. |
+| TAMU `.m` wywala `No reference bus` | Loader automatycznie reaktywuje pierwszy `ext_grid` lub ustawia `slack=True` na pierwszym aktywnym generatorze. |
 | Windows: PowerShell odmawia aktywacji venv | `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`, potem ponownie aktywuj. |
 | Brak `python3.13` w systemie | Linux: `uv python install 3.13`. Windows: pobierz z [python.org](https://www.python.org/downloads/). |
 
