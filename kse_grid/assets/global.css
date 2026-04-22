@@ -42,6 +42,10 @@ html, body {
   background: #0e1116;
 }
 
+.selection-card {
+  scrollbar-width: thin;
+}
+
 /* Plotly graph musi wypełniać cały panel, inaczej pojawia się pusty obszar */
 #graph,
 #graph .js-plotly-plot,
@@ -52,9 +56,10 @@ html, body {
   height: 100% !important;
 }
 
-/* Pointer cursor na markerach Plotly */
-.js-plotly-plot .scatter .point path,
-.js-plotly-plot .scatter .point circle {
+/* Pointer cursor na interaktywnych elementach Plotly */
+#graph .scatterlayer .point,
+#graph .scatterlayer .js-line,
+#graph .scatterlayer .trace {
   cursor: pointer !important;
 }
 

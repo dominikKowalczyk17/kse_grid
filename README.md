@@ -1,10 +1,10 @@
 # kse_grid – Interaktywny plotter sieci elektroenergetycznej
 
-Narzędzie do wizualizacji i analizy rozpływu mocy z plików MATPOWER (`.m`), oparte o [pandapower](https://www.pandapower.org/) i Plotly.
+Narzędzie do wizualizacji i analizy rozpływu mocy z plików MATPOWER (`.m`), oparte o [pandapower](https://www.pandapower.org/), Dash i Plotly.
 
 - Wczytuje dowolny plik `.m` (format MATPOWER)
 - Liczy rozpływ mocy (algorytm Iwamoto-NR, start AC)
-- Otwiera interaktywny dashboard w przeglądarce, filtrami napięć i kolorowaniem obciążenia
+- Otwiera interaktywny dashboard w przeglądarce z filtrami napięć, wyszukiwaniem szyn i kartą szczegółów na wykresie
 
 ![dashboard preview](docs/preview.png)
 
@@ -105,8 +105,8 @@ Co się dzieje po uruchomieniu:
 
 1. Wczytanie pliku `.m`
 2. Obliczenia load flow – Newton-Raphson Iwamoto, start AC (U=1 p.u., kąt=0°)
-3. Wygenerowanie układu grafu (spring layout – jeśli plik nie zawiera geodanych)
-4. Start serwera HTTP pod `http://127.0.0.1:8000/` i otwarcie przeglądarki
+3. Wygenerowanie układu grafu (spring layout, jeśli plik nie zawiera geodanych)
+4. Start dashboardu Dash pod `http://127.0.0.1:8050/` i otwarcie przeglądarki
 
 Serwer działa do `Ctrl+C`.
 
@@ -120,7 +120,7 @@ Serwer działa do `Ctrl+C`.
 from pathlib import Path
 import kse_grid
 
-kse_grid.KSEGrid.from_matpower_case("data/case3120sp.m").run_powerflow().serve_interactive()
+kse_grid.KSEGrid.from_matpower_case("data/case3120sp.m").run_powerflow().serve_dash()
 ```
 
 ### Z raportem tekstowym
@@ -130,13 +130,7 @@ import kse_grid
 
 grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
 grid.report()            # bilans mocy, napięcia, top 10 linii – w terminalu
-grid.serve_interactive() # dashboard w przeglądarce
-```
-
-### Eksport do pliku HTML
-
-```python
-grid.plot_interactive("output.html")  # zapisuje plik, działa bez serwera
+grid.serve_dash()        # dashboard Dash w przeglądarce
 ```
 
 ### Dostęp do danych pandapower
@@ -161,17 +155,21 @@ grid.run_powerflow(
 
 ## Dashboard
 
-Po wejściu na `http://127.0.0.1:8000/`:
+Po wejściu na `http://127.0.0.1:8050/`:
 
-- **Lewy panel** – liczba szyn, linii, transformatorów, generatorów; maks. obciążenie linii (kolor: zielony/żółty/czerwony), liczba naruszeń napięcia, lista poziomów napięć
-- **Wykres** – graf sieci. Kolor linii = obciążenie (zielony 0–40% → czerwony >100%). Kolor węzłów = `Um` w p.u.
-- **Filtry:**
-  - `Wszystko` – pełna sieć
-  - `Bez 110 kV` – tylko 220 i 400 kV
-  - `Tylko 400 kV` – sieć najwyższych napięć
-  - `Tylko transformatory`
-
-Hover na element → szczegóły (kV, Um, P, obciążenie). Scroll = zoom, drag = pan.
+- **Lewy panel** – podsumowanie sieci, wyszukiwarka szyn, reset widoku, filtry napięć i typów elementów oraz legenda obciążenia linii.
+- **Wykres** – graf sieci. Kolor linii = obciążenie (zielony 0–40% -> czerwony >100%). Kolor węzłów = `Um` w p.u.
+- **Domyślny widok** – startowo pokazywany jest **rdzeń 400/220 kV**, żeby duże przypadki były czytelniejsze.
+- **Presety filtrów napięć:**
+  - `Rdzeń 400/220` – tylko sieć przesyłowa 400 i 220 kV
+  - `Wszystkie` – pełna sieć
+  - `Żadne` – szybkie wyłączenie wszystkich poziomów napięć
+- **Checklisty** – pozwalają niezależnie włączać poziomy napięć oraz typy elementów (`Linie`, `Transformatory`, `Szyny`).
+- **Interakcja:**
+  - klik na węzeł lub element pokazuje kartę szczegółów w prawym górnym rogu wykresu,
+  - klik w puste tło usuwa zaznaczenie,
+  - wyszukiwarka szyn centruje widok na wybranym węźle,
+  - scroll = zoom, drag = pan.
 
 > Jeśli plik `.m` nie zawiera danych geograficznych (GPS), węzły są rozmieszczane automatycznie (spring layout).
 
@@ -181,9 +179,9 @@ Hover na element → szczegóły (kV, Um, P, obciążenie). Scroll = zoom, drag 
 
 ```
 kse_grid/
-├── main.py              # punkt startowy – przyjmuje ścieżkę do .m jako argument
+├── main.py              # punkt startowy – ładuje .m i uruchamia dashboard Dash
 ├── data/
-│   └── case3120sp.m     # przykładowy plik MATPOWER (polska sieć, 3120 węzłów)
+│   └── case3120sp.m     # przykładowy plik MATPOWER (3120 węzłów)
 ├── docs/
 │   └── preview.png
 └── kse_grid/
@@ -191,7 +189,11 @@ kse_grid/
     ├── grid.py          # KSEGrid – główna klasa (ładowanie, obliczenia, wizualizacja)
     ├── matpower.py      # wczytywanie plików .m
     ├── runner.py        # obliczenia load flow + raport tekstowy
-    └── plotting.py      # dashboard HTML + wykres Plotly + serwer HTTP
+    ├── plotting.py      # budowa figury Plotly i logika kolorowania elementów
+    ├── dash_app.py      # layout dashboardu Dash i callbacki UI
+    └── assets/
+        ├── global.css   # style dashboardu
+        └── graph_interactions.js  # dodatkowe interakcje po stronie przeglądarki
 ```
 
 ---
@@ -201,7 +203,7 @@ kse_grid/
 | Problem | Rozwiązanie |
 |---|---|
 | `ModuleNotFoundError: matpowercaseframes` | Środowisko nie aktywne lub `uv sync` nie wykonany. Aktywuj venv i powtórz. |
-| Port 8000 zajęty | Skrypt automatycznie wybiera kolejny wolny port – sprawdź log w terminalu. |
+| Port 8050 zajęty | Uruchom `serve_dash(port=...)` albo zwolnij port 8050. |
 | `pandapower` zgłasza ostrzeżenia o `BR_B` lub „fake transformers" | Normalne dla `case3120sp.m` – artefakt pliku MATPOWER, wynik PF jest poprawny. |
 | Naruszenia napięcia i przeciążenia w `case3120sp` | To celowe – publiczny przypadek jest naciskiem stresowym, nie odwzorowaniem rzeczywistego stanu sieci. |
 | Spring layout trwa długo | ~7 s przy 3120 węzłach to norma; jednorazowo per uruchomienie. |

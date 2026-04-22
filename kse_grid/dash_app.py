@@ -9,6 +9,7 @@ from threading import Timer
 
 import dash
 import pandapower as pp
+import plotly.graph_objects as go
 from dash import Input, Output, Patch, State, dcc, html
 
 from kse_grid.plotting import _compute_stats, build_figure_for_dash
@@ -84,11 +85,6 @@ _EMPTY_INFO = html.Div(
     style={"color": _C["dim"], "fontSize": 12, "fontStyle": "italic"},
 )
 
-_EMPTY_HOVER = html.Div(
-    "Najedź kursorem na element, aby zobaczyć podgląd.",
-    style={"color": _C["dim"], "fontSize": 12, "fontStyle": "italic"},
-)
-
 
 # ---------------------------------------------------------------------------
 # Tworzenie aplikacji Dash
@@ -128,6 +124,18 @@ def create_dash_app(net: pp.pandapowerNet) -> dash.Dash:
             "label": f"{bus_name} ({int(row['vn_kv'])} kV)",
             "value": int(bus_idx),
         })
+
+    def _filter_button_style(active: bool) -> dict[str, object]:
+        return {
+            "fontSize": 11,
+            "padding": "3px 8px",
+            "cursor": "pointer",
+            "borderRadius": 4,
+            "border": f"1px solid {(_C['accent'] if active else _C['border'])}",
+            "background": ("rgba(78,161,255,0.16)" if active else _C["panel2"]),
+            "color": (_C["text"] if active else _C["dim"]),
+            "boxShadow": ("inset 0 0 0 1px rgba(78,161,255,0.25)" if active else "none"),
+        }
 
     def _bus_info(bus_idx: int, voltage: float) -> html.Div:
         row = net.bus.loc[bus_idx]
@@ -174,6 +182,23 @@ def create_dash_app(net: pp.pandapowerNet) -> dash.Dash:
         update_title=None,
     )
 
+    selection_trace_index = len(fig.data)
+    fig.add_trace(
+        go.Scatter(
+            x=[],
+            y=[],
+            mode="markers",
+            hoverinfo="skip",
+            showlegend=False,
+            visible=False,
+            marker=dict(
+                size=24,
+                color="rgba(255,255,255,0.12)",
+                line=dict(color=_C["accent"], width=3),
+            ),
+        )
+    )
+
     # ------------------------------------------------------------------ layout
     _sidebar_children = [
         # Statystyki
@@ -217,21 +242,9 @@ def create_dash_app(net: pp.pandapowerNet) -> dash.Dash:
         html.Div([
             _h2("Filtr napięć"),
             html.Div(style={"display": "flex", "gap": 6, "marginBottom": 8}, children=[
-                html.Button("Rdzeń 400/220", id="btn-core", n_clicks=0, style={
-                    "fontSize": 11, "padding": "3px 8px", "cursor": "pointer",
-                    "background": _C["panel2"], "color": _C["text"],
-                    "border": f"1px solid {_C['border']}", "borderRadius": 4,
-                }),
-                html.Button("Wszystkie", id="btn-all", n_clicks=0, style={
-                    "fontSize": 11, "padding": "3px 8px", "cursor": "pointer",
-                    "background": _C["panel2"], "color": _C["dim"],
-                    "border": f"1px solid {_C['border']}", "borderRadius": 4,
-                }),
-                html.Button("Żadne", id="btn-none", n_clicks=0, style={
-                    "fontSize": 11, "padding": "3px 8px", "cursor": "pointer",
-                    "background": _C["panel2"], "color": _C["dim"],
-                    "border": f"1px solid {_C['border']}", "borderRadius": 4,
-                }),
+                html.Button("Rdzeń 400/220", id="btn-core", n_clicks=0, style=_filter_button_style(True)),
+                html.Button("Wszystkie", id="btn-all", n_clicks=0, style=_filter_button_style(False)),
+                html.Button("Żadne", id="btn-none", n_clicks=0, style=_filter_button_style(False)),
             ]),
             html.Div(
                 "Domyślnie pokazany jest rdzeń 400/220 kV, żeby sieć była czytelna przy dużych case'ach.",
@@ -285,30 +298,6 @@ def create_dash_app(net: pp.pandapowerNet) -> dash.Dash:
             ]),
         ]),
 
-        # Szczegóły elementu
-        html.Div([
-            _h2("Pod kursorem"),
-            html.Div(
-                id="hover-info",
-                style={
-                    "background": _C["panel2"], "border": f"1px solid {_C['border']}",
-                    "borderRadius": 8, "padding": "10px 12px", "minHeight": 60,
-                },
-                children=_EMPTY_HOVER,
-            ),
-        ]),
-
-        html.Div([
-            _h2("Wybrany element"),
-            html.Div(
-                id="element-info",
-                style={
-                    "background": _C["panel2"], "border": f"1px solid {_C['border']}",
-                    "borderRadius": 8, "padding": "10px 12px", "minHeight": 60,
-                },
-                children=_EMPTY_INFO,
-            ),
-        ]),
     ]
 
     app.layout = html.Div(
@@ -321,6 +310,7 @@ def create_dash_app(net: pp.pandapowerNet) -> dash.Dash:
             # hidden store dla zaznaczonego punktu
             dcc.Store(id="sel-store", data=None),
             dcc.Store(id="view-store", data=default_view),
+            html.Button(id="clear-selection", n_clicks=0, style={"display": "none"}),
 
             # ── Header ────────────────────────────────────────────────
             html.Div(className="app-header", style={
@@ -374,16 +364,23 @@ def create_dash_app(net: pp.pandapowerNet) -> dash.Dash:
                 # ── Graf (Plotly) ─────────────────────────────────────
                 html.Div(
                     className="graph-panel",
-                    style={"overflow": "hidden", "minWidth": 0, "minHeight": 0},
-                    children=dcc.Graph(
-                        id="graph",
-                        className="graph-canvas",
-                        figure=fig,
-                        clear_on_unhover=True,
-                        responsive=True,
-                        config={"displayModeBar": False, "scrollZoom": True},
-                        style={"width": "100%", "height": "100%"},
-                    ),
+                    style={"overflow": "hidden", "minWidth": 0, "minHeight": 0, "position": "relative"},
+                    children=[
+                        dcc.Graph(
+                            id="graph",
+                            className="graph-canvas",
+                            figure=fig,
+                            responsive=True,
+                            config={"displayModeBar": False, "scrollZoom": True},
+                            style={"width": "100%", "height": "100%"},
+                        ),
+                        html.Div(
+                            id="selection-card",
+                            className="selection-card",
+                            style={"display": "none"},
+                            children=_EMPTY_INFO,
+                        ),
+                    ],
                 ),
             ]),
         ],
@@ -421,16 +418,17 @@ def create_dash_app(net: pp.pandapowerNet) -> dash.Dash:
             else:
                 pf["data"][i]["visible"] = kind in st and voltage in sv
 
-        # podświetlenie zaznaczonego węzła
         sel_curve = selection.get("c") if selection else None
         sel_point = selection.get("p") if selection else None
-        for i, meta in enumerate(trace_meta):
-            if meta["kind"] != "bus":
-                continue
-            if i == sel_curve and sel_point is not None and i in visible_bus_traces:
-                pf["data"][i]["selectedpoints"] = [sel_point]
-            else:
-                pf["data"][i]["selectedpoints"] = None
+        if isinstance(sel_curve, int) and isinstance(sel_point, int) and sel_curve in visible_bus_traces:
+            pf["data"][selection_trace_index]["x"] = [fig.data[sel_curve].x[sel_point]]
+            pf["data"][selection_trace_index]["y"] = [fig.data[sel_curve].y[sel_point]]
+            pf["data"][selection_trace_index]["marker"]["size"] = float(fig.data[sel_curve].marker.size) * 2.2
+            pf["data"][selection_trace_index]["visible"] = True
+        else:
+            pf["data"][selection_trace_index]["x"] = []
+            pf["data"][selection_trace_index]["y"] = []
+            pf["data"][selection_trace_index]["visible"] = False
 
         if view_state:
             if isinstance(view_state.get("x"), list) and len(view_state["x"]) == 2:
@@ -456,63 +454,71 @@ def create_dash_app(net: pp.pandapowerNet) -> dash.Dash:
         return []
 
     @app.callback(
-        Output("hover-info", "children"),
-        Input("graph", "hoverData"),
+        Output("btn-core", "style"),
+        Output("btn-all", "style"),
+        Output("btn-none", "style"),
+        Input("voltage-filter", "value"),
     )
-    def on_hover(hover_data: dict | None):
-        if not hover_data:
-            return _EMPTY_HOVER
-
-        points = hover_data.get("points") or []
-        if not points:
-            return _EMPTY_HOVER
-
-        point = points[0]
-        curve_num = point.get("curveNumber")
-        point_idx = point.get("pointIndex")
-        if not isinstance(curve_num, int) or not isinstance(point_idx, int):
-            return _EMPTY_HOVER
-
-        meta = trace_meta[curve_num] if 0 <= curve_num < len(trace_meta) else {}
-        kind = str(meta.get("kind", ""))
-        voltage = float(meta.get("voltage", 0.0))
-
-        if kind == "bus":
-            bus_indices = net.bus.index[net.bus.vn_kv == voltage].tolist()
-            if point_idx >= len(bus_indices):
-                return _EMPTY_HOVER
-            return _bus_info(bus_indices[point_idx], voltage)
-
-        raw_text = point.get("text", "")
-        info = _tooltip_info(raw_text) if raw_text else None
-        return info or _EMPTY_HOVER
+    def update_filter_button_styles(sel_voltages: list[float] | None):
+        selected = set(sel_voltages or [])
+        all_set = set(voltage_levels)
+        core_set = set(default_voltage_filter)
+        return (
+            _filter_button_style(selected == core_set),
+            _filter_button_style(selected == all_set),
+            _filter_button_style(not selected),
+        )
 
     @app.callback(
-        Output("element-info", "children"),
-        Output("sel-store",    "data"),
-        Output("view-store",   "data"),
-        Output("bus-search",   "value"),
-        Input("graph",         "clickData"),
-        Input("bus-search",    "value"),
-        Input("btn-reset-view", "n_clicks"),
-        State("view-store",    "data"),
+        Output("selection-card", "children"),
+        Output("selection-card", "style"),
+        Output("sel-store",      "data"),
+        Output("view-store",     "data"),
+        Output("bus-search",     "value"),
+        Input("graph",           "clickData"),
+        Input("bus-search",      "value"),
+        Input("btn-reset-view",  "n_clicks"),
+        Input("clear-selection", "n_clicks"),
+        State("view-store",      "data"),
     )
     def on_select(
         click_data: dict | None,
         bus_value: int | None,
         reset_clicks: int,
+        clear_clicks: int,
         current_view: dict | None,
     ):
         from dash import ctx as _ctx
 
+        card_style = {
+            "display": "block",
+            "position": "absolute",
+            "top": 16,
+            "right": 16,
+            "width": 320,
+            "maxWidth": "calc(100% - 32px)",
+            "maxHeight": "calc(100% - 32px)",
+            "overflowY": "auto",
+            "background": "rgba(17,22,29,0.94)",
+            "backdropFilter": "blur(8px)",
+            "border": f"1px solid {_C['border']}",
+            "borderRadius": 10,
+            "padding": "12px 14px",
+            "boxShadow": "0 12px 28px rgba(0,0,0,0.35)",
+            "zIndex": 10,
+        }
+
         trigger = _ctx.triggered_id
-        if trigger == "btn-reset-view":
-            return _EMPTY_INFO, None, default_view, None
+        if trigger in {"btn-reset-view", "clear-selection"}:
+            return _EMPTY_INFO, {"display": "none"}, None, current_view or default_view, None
+
+        if trigger == "bus-search" and bus_value is None:
+            return _EMPTY_INFO, {"display": "none"}, None, current_view or default_view, None
 
         if trigger == "bus-search" and bus_value is not None:
             lookup = bus_lookup.get(int(bus_value))
             if lookup is None:
-                return _EMPTY_INFO, None, current_view or default_view, bus_value
+                return _EMPTY_INFO, {"display": "none"}, None, current_view or default_view, bus_value
             curve_num = int(lookup["curve"])
             point_idx = int(lookup["point"])
             voltage = float(lookup["voltage"])
@@ -522,20 +528,20 @@ def create_dash_app(net: pp.pandapowerNet) -> dash.Dash:
                 "x": [bus_x - focus_view["x"], bus_x + focus_view["x"]],
                 "y": [bus_y - focus_view["y"], bus_y + focus_view["y"]],
             }
-            return _bus_info(int(bus_value), voltage), {"c": curve_num, "p": point_idx}, view, bus_value
+            return _bus_info(int(bus_value), voltage), card_style, {"c": curve_num, "p": point_idx}, view, bus_value
 
         if not click_data:
-            return _EMPTY_INFO, None, current_view or default_view, bus_value
+            return _EMPTY_INFO, {"display": "none"}, None, current_view or default_view, bus_value
 
         points = click_data.get("points") or []
         if not points:
-            return _EMPTY_INFO, None, current_view or default_view, bus_value
+            return _EMPTY_INFO, {"display": "none"}, None, current_view or default_view, bus_value
 
         point = points[0]
         curve_num = point.get("curveNumber")
         point_idx = point.get("pointIndex")
         if not isinstance(curve_num, int) or not isinstance(point_idx, int):
-            return _EMPTY_INFO, None, current_view or default_view, bus_value
+            return _EMPTY_INFO, {"display": "none"}, None, current_view or default_view, bus_value
 
         meta = trace_meta[curve_num] if 0 <= curve_num < len(trace_meta) else {}
         kind = str(meta.get("kind", ""))
@@ -544,18 +550,17 @@ def create_dash_app(net: pp.pandapowerNet) -> dash.Dash:
         if kind == "bus":
             bus_indices = net.bus.index[net.bus.vn_kv == voltage].tolist()
             if point_idx >= len(bus_indices):
-                return _EMPTY_INFO, None, current_view or default_view, bus_value
+                return _EMPTY_INFO, {"display": "none"}, None, current_view or default_view, bus_value
             bus_idx = int(bus_indices[point_idx])
-            return _bus_info(bus_idx, voltage), {"c": curve_num, "p": point_idx}, current_view or default_view, bus_idx
+            return _bus_info(bus_idx, voltage), card_style, {"c": curve_num, "p": point_idx}, current_view or default_view, bus_idx
 
-        # Linie i trafo – midpoint markers mają text tooltipa
         raw_text = point.get("text", "")
         if raw_text:
             info = _tooltip_info(raw_text)
             if info is not None:
-                return info, None, current_view or default_view, bus_value
+                return info, card_style, None, current_view or default_view, bus_value
 
-        return _EMPTY_INFO, None, current_view or default_view, bus_value
+        return _EMPTY_INFO, {"display": "none"}, None, current_view or default_view, bus_value
 
     return app
 

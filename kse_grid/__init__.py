@@ -6,8 +6,7 @@ Użycie
     import kse_grid
 
     grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
-    grid.serve_interactive()          # podgląd w przeglądarce
-    grid.plot_interactive("out.html") # eksport do pliku HTML
+    grid.serve_dash()                 # dashboard w przeglądarce
 """
 
 from kse_grid.matpower import load_matpower_case
