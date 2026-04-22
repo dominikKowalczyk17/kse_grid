@@ -1,50 +1,21 @@
 """
-kse_grid – model polskiej sieci przesyłowej 400/220 kV (KSE PSE S.A.)
+kse_grid – plotter sieciowy dla plików MATPOWER (.m)
 
 Użycie
 ------
     import kse_grid
 
-    # Standardowe uruchomienie:
-    kse_grid.KSEGrid().build().run_powerflow().report()
-
-    # Dostęp do surowej sieci pandapower:
-    grid = kse_grid.KSEGrid().build().run_powerflow()
-    net  = grid.net
-
-    # Custom topologia:
-    topo = kse_grid.KSETopology()
-    topo.LINES_400KV.append(
-        kse_grid.LineConfig("Żarnowiec 400kV", "Dunowo 400kV", 80,
-                            kse_grid.KSETopology.LT400, "LNN Offshore Bałtyk 400kV")
-    )
-    kse_grid.KSEGrid(topo).build().run_powerflow().report()
+    grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
+    grid.serve_interactive()          # podgląd w przeglądarce
+    grid.plot_interactive("out.html") # eksport do pliku HTML
 """
 
-from kse_grid.models import (
-    BusConfig,
-    LineConfig,
-    TrafoConfig,
-    GenConfig,
-    LoadConfig,
-    ShuntConfig,
-)
-from kse_grid.topology import KSETopology
-from kse_grid.builder import GridBuilder
 from kse_grid.matpower import load_matpower_case
 from kse_grid.runner import PowerFlowRunner
 from kse_grid.grid import KSEGrid
 
 __all__ = [
     "KSEGrid",
-    "KSETopology",
-    "GridBuilder",
     "load_matpower_case",
     "PowerFlowRunner",
-    "BusConfig",
-    "LineConfig",
-    "TrafoConfig",
-    "GenConfig",
-    "LoadConfig",
-    "ShuntConfig",
 ]

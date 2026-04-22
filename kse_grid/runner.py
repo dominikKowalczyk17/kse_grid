@@ -14,7 +14,7 @@ class PowerFlowRunner:
             max_iteration: int = 100,
             tolerance_mva: float = 1.0) -> bool:
         """
-        Uruchamia load flow z inicjalizacją DC.
+        Uruchamia load flow z inicjalizacją AC (flat start: U=1 p.u., kąt=0°).
         Zwraca True jeśli zbieżny, False jeśli nie.
         """
         try:
@@ -23,7 +23,7 @@ class PowerFlowRunner:
                 algorithm=algorithm,
                 calculate_voltage_angles=True,
                 max_iteration=max_iteration,
-                init="dc",
+                init="flat",
                 tolerance_mva=tolerance_mva,
             )
             return True
@@ -61,7 +61,7 @@ class PowerFlowRunner:
         bus_res["vn_kv"] = net.bus["vn_kv"]
         bus_res["odchylenie"] = (bus_res["vm_pu"] - 1.0).abs()
         print(f"\n⚡ NAPIĘCIA – największe odchylenia:")
-        print(f"   {'Stacja':<35} {'kV':>6}  {'U [p.u.]':>8}  {'δ [°]':>8}")
+        print(f"   {'Stacja':<35} {'kV':>6}  {'Um [p.u.]':>9}  {'δ [°]':>8}")
         print(f"   {'-'*35} {'-'*8}  {'-'*8}")
         for _, row in bus_res.sort_values("odchylenie", ascending=False).head(10).iterrows():
             flag = " ⚠️" if row.vm_pu < 0.95 or row.vm_pu > 1.05 else ""

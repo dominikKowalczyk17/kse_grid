@@ -139,7 +139,7 @@ _DASHBOARD_TEMPLATE = """<!DOCTYPE html>
 </div>
 <script>
   const figure = {fig_json};
-  Plotly.newPlot('plot', figure.data, figure.layout, {{responsive: true, displaylogo: false, scrollZoom: true}});
+  Plotly.newPlot('plot', figure.data, figure.layout, {{responsive: true, displaylogo: false, scrollZoom: true, modeBarButtonsToRemove: ['select2d', 'lasso2d', 'toImage']}});
   window.addEventListener('resize', () => Plotly.Plots.resize('plot'));
 </script>
 </body>
@@ -206,7 +206,7 @@ def render_dashboard_html(
         net_name=net_name,
         layout_note=layout_note,
         meta_line=meta_line,
-        data_source="MATPOWER case3120sp" if "3120" in str(net_name) else "user-provided",
+        data_source=net_name or "user-provided",
         fig_json=fig.to_json(),
         **stats,
     )
@@ -252,7 +252,7 @@ def build_interactive_figure(
         autosize=True,
         legend=dict(
             orientation="h",
-            yanchor="bottom", y=1.02,
+            yanchor="bottom", y=1.05,
             xanchor="left", x=0.0,
             bgcolor="rgba(22,27,34,0.85)",
             bordercolor="#30363d",
@@ -630,7 +630,7 @@ def _bus_traces(
                 f"Napięcie znamionowe: {row['vn_kv']:.0f} kV",
             ]
             if has_results:
-                details.append(f"Vm: {net.res_bus.at[bus_idx, 'vm_pu']:.4f} p.u.")
+                details.append(f"Um: {net.res_bus.at[bus_idx, 'vm_pu']:.4f} p.u.")
                 details.append(f"Kąt: {net.res_bus.at[bus_idx, 'va_degree']:.2f}°")
             if gen_mw:
                 details.append(f"Generacja: {gen_mw:.1f} MW")
@@ -656,7 +656,7 @@ def _bus_traces(
                     cmax=1.1,
                     showscale=idx == 0 and has_results,
                     colorbar=dict(
-                        title=dict(text="Vm [p.u.]", font=dict(color="#e6edf3")),
+                        title=dict(text="Um [p.u.]", font=dict(color="#e6edf3")),
                         tickfont=dict(color="#e6edf3"),
                         bgcolor="rgba(22,27,34,0.7)",
                         bordercolor="#30363d",
@@ -695,7 +695,7 @@ def _add_filter_menu(fig: go.Figure, trace_meta: list[dict[str, object]]):
                 type="buttons",
                 direction="right",
                 x=0.0,
-                y=1.10,
+                y=1.13,
                 xanchor="left",
                 yanchor="bottom",
                 showactive=True,
