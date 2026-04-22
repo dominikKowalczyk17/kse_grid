@@ -1,10 +1,10 @@
-# KSE Grid – Polish Transmission Network Model
+# kse_grid – Interaktywny plotter sieci elektroenergetycznej
 
-Interaktywne narzędzie do analizy rozpływu mocy w polskiej sieci elektroenergetycznej, oparte o [pandapower](https://www.pandapower.org/) i Plotly. Zawiera:
+Narzędzie do wizualizacji i analizy rozpływu mocy z plików MATPOWER (`.m`), oparte o [pandapower](https://www.pandapower.org/) i Plotly.
 
-- **Importer MATPOWER** dla publicznego przypadku `case3120sp` (3120 szyn, 3487 linii, 206 trafo – polski system w lecie 2008, szczyt poranny).
-- **Ręcznie zbudowaną topologię KSE 400/220 kV** opartą na publicznych danych PSE (alternatywa do MATPOWER).
-- **Dashboard w przeglądarce** z dark theme, filtrami napięć, kolorowaniem obciążenia linii i napięcia szyn.
+- Wczytuje dowolny plik `.m` (format MATPOWER)
+- Liczy rozpływ mocy (algorytm Iwamoto-NR, start AC)
+- Otwiera interaktywny dashboard w przeglądarce z dark theme, filtrami napięć i kolorowaniem obciążenia
 
 ![dashboard preview](docs/preview.png)
 
@@ -12,45 +12,40 @@ Interaktywne narzędzie do analizy rozpływu mocy w polskiej sieci elektroenerge
 
 ## Spis treści
 
-1. [Instalacja od zera](#instalacja-od-zera)
-   - [Linux / macOS](#linux--macos)
-   - [Windows](#windows)
-2. [Pierwsze uruchomienie](#pierwsze-uruchomienie)
+1. [Instalacja](#instalacja)
+2. [Uruchomienie](#uruchomienie)
 3. [Użycie z poziomu kodu](#użycie-z-poziomu-kodu)
-4. [Dashboard – co widać i jak filtrować](#dashboard)
-5. [Modyfikacja topologii](#modyfikacja-topologii)
-6. [Struktura projektu](#struktura-projektu)
-7. [Rozwiązywanie problemów](#rozwiązywanie-problemów)
+4. [Dashboard](#dashboard)
+5. [Struktura projektu](#struktura-projektu)
+6. [Rozwiązywanie problemów](#rozwiązywanie-problemów)
 
 ---
 
-## Instalacja od zera
+## Instalacja
 
-Wymagania bazowe (te same dla Linux i Windows):
+Wymagania:
 
 - **Python 3.13** lub nowszy
 - **git**
-- Zalecany [uv](https://docs.astral.sh/uv/) – szybki menedżer pakietów (~10× szybszy od pip). Można też użyć `pip` + `venv`.
+- Zalecany [uv](https://docs.astral.sh/uv/) – szybki menedżer pakietów. Można też użyć `pip` + `venv`.
 
 ### Linux / macOS
 
 ```bash
 # 1. Zainstaluj uv (jednorazowo)
 curl -LsSf https://astral.sh/uv/install.sh | sh
-exec $SHELL          # przeładuj shell żeby PATH się zaktualizował
+exec $SHELL
 
-# 2. Sklonuj repo
+# 2. Sklonuj repo i zainstaluj zależności
 git clone https://github.com/dominikKowalczyk17/kse_grid.git
 cd kse_grid
-
-# 3. Utwórz wirtualne środowisko z Pythonem 3.13 i zainstaluj zależności
 uv sync
 
-# 4. Aktywuj venv (opcjonalnie – uv run działa bez aktywacji)
+# 3. Aktywuj venv (opcjonalnie – uv run działa bez aktywacji)
 source .venv/bin/activate
 ```
 
-Bez `uv` (czysty `pip`):
+Bez `uv`:
 
 ```bash
 python3.13 -m venv .venv
@@ -58,9 +53,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-### Windows
-
-**PowerShell** (zalecane):
+### Windows (PowerShell)
 
 ```powershell
 # 1. Zainstaluj Python 3.13 ze https://www.python.org/downloads/windows/
@@ -69,21 +62,17 @@ pip install -e .
 # 2. Zainstaluj uv
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
-# 3. Zrestartuj PowerShell żeby PATH się odświeżył, potem:
+# 3. Zrestartuj PowerShell, potem:
 git clone https://github.com/dominikKowalczyk17/kse_grid.git
 cd kse_grid
-
-# 4. Utwórz venv i zainstaluj zależności
 uv sync
-
-# 5. Aktywuj venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-> Jeśli PowerShell odmówi aktywacji skryptu, jednorazowo wykonaj:
+> Jeśli PowerShell odmówi aktywacji skryptu:
 > `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`
 
-Alternatywa bez `uv` (czysty `pip`):
+Bez `uv`:
 
 ```powershell
 py -3.13 -m venv .venv
@@ -97,30 +86,27 @@ pip install -e .
 python -c "import pandapower, plotly, matpowercaseframes; print('OK')"
 ```
 
-Powinno wypisać `OK`.
-
 ---
 
-## Pierwsze uruchomienie
-
-Najprostsze użycie – wczytuje dołączony plik `data/case3120sp.m`, liczy rozpływ mocy i otwiera dashboard:
+## Uruchomienie
 
 ```bash
-# z aktywnym venv:
+# domyślny plik (data/case3120sp.m)
 python main.py
 
-# albo bez aktywacji (z uv):
+# własny plik .m
+python main.py ścieżka/do/case.m
+
+# bez aktywacji venv (z uv)
 uv run python main.py
 ```
 
-Co się stanie:
+Co się dzieje po uruchomieniu:
 
-1. Załadowanie `data/case3120sp.m` (~1 s)
-2. Newton-Raphson Iwamoto z inicjalizacją DC (~5 s, ~3120 węzłów)
-3. Wydruk raportu w terminalu (bilans mocy, napięcia, top 10 obciążonych linii)
-4. Wygenerowanie układu (spring layout, ~7 s przy 3120 węzłach)
-5. Start lokalnego serwera HTTP pod `http://127.0.0.1:8000/` (jeśli port zajęty – kolejny wolny)
-6. Automatyczne otwarcie domyślnej przeglądarki
+1. Wczytanie pliku `.m`
+2. Obliczenia load flow – Newton-Raphson Iwamoto, start AC (U=1 p.u., kąt=0°)
+3. Wygenerowanie układu grafu (spring layout – jeśli plik nie zawiera geodanych)
+4. Start serwera HTTP pod `http://127.0.0.1:8000/` i otwarcie przeglądarki
 
 Serwer działa do `Ctrl+C`.
 
@@ -128,144 +114,85 @@ Serwer działa do `Ctrl+C`.
 
 ## Użycie z poziomu kodu
 
-### Wariant A – import z pliku MATPOWER
+### Podstawowe użycie
 
 ```python
 from pathlib import Path
 import kse_grid
 
-grid = (
-    kse_grid.KSEGrid
-    .from_matpower_case(Path("data/case3120sp.m"))
-    .run_powerflow()
-)
-
-grid.report()              # raport tekstowy w terminalu
-grid.serve_interactive()   # dashboard live na localhost
+kse_grid.KSEGrid.from_matpower_case("data/case3120sp.m").run_powerflow().serve_interactive()
 ```
 
-### Wariant B – wbudowana topologia 400/220 kV PSE
+### Z raportem tekstowym
 
 ```python
 import kse_grid
 
-grid = kse_grid.KSEGrid().build().run_powerflow()
-grid.report()
-grid.serve_interactive()
+grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
+grid.report()            # bilans mocy, napięcia, top 10 linii – w terminalu
+grid.serve_interactive() # dashboard w przeglądarce
 ```
 
-### Eksport do statycznego HTML
+### Eksport do pliku HTML
 
 ```python
-grid.plot_interactive("kse_grid.html")   # zapis do pliku, do otworzenia bez serwera
+grid.plot_interactive("output.html")  # zapisuje plik, działa bez serwera
 ```
 
-### Dostęp do surowej sieci pandapower
+### Dostęp do danych pandapower
 
 ```python
-net = grid.net   # pp.pandapowerNet – pełne API pandapower
-print(net.res_bus.head())
-print(net.res_line[net.res_line.loading_percent > 100])
+net = grid.net
+print(net.res_bus.head())                                    # wyniki napięć
+print(net.res_line[net.res_line.loading_percent > 100])      # przeciążone linie
 ```
 
 ### Parametry obliczeń
 
 ```python
 grid.run_powerflow(
-    algorithm="iwamoto_nr",   # stabilniejszy od klasycznego NR
-    init="dc",                 # ciepły start z rozpływu DC
+    algorithm="iwamoto_nr",  # stabilniejszy od klasycznego NR przy słabych sieciach
     max_iteration=100,
     tolerance_mva=1.0,
 )
 ```
 
-### Nakład na rastrową mapę Polski (tylko topologia wbudowana – ma geodane)
-
-```python
-grid = kse_grid.KSEGrid().build().run_powerflow()
-grid.serve_interactive(
-    background_image="kse_grid/poland_map_natural_earth.png",
-    background_bounds=(13.7, 24.6, 48.8, 55.1),  # lon_min, lon_max, lat_min, lat_max
-)
-```
-
-> **Uwaga:** `case3120sp.m` nie zawiera geodanych (brak lat/lon w MATPOWER), więc dla tego importu tła mapy nie da się dokładnie nałożyć. Używany jest wtedy układ poglądowy (spring layout).
-
 ---
 
 ## Dashboard
 
-Po wejściu na `http://127.0.0.1:8000/` zobaczysz:
+Po wejściu na `http://127.0.0.1:8000/`:
 
-- **Lewy panel:** liczba szyn, linii, transformatorów, generatorów; maksymalne obciążenie linii (zielone/żółte/czerwone), liczba naruszeń napięcia, lista poziomów napięć.
-- **Główny viewport:** graf sieci. Kolor linii = obciążenie (zielony 0–40 % → czerwony >100 %). Kolor szyn = `Vm` w p.u.
-- **Filtry nad wykresem:**
+- **Lewy panel** – liczba szyn, linii, transformatorów, generatorów; maks. obciążenie linii (kolor: zielony/żółty/czerwony), liczba naruszeń napięcia, lista poziomów napięć
+- **Wykres** – graf sieci. Kolor linii = obciążenie (zielony 0–40% → czerwony >100%). Kolor węzłów = `Um` w p.u.
+- **Filtry:**
   - `Wszystko` – pełna sieć
-  - `Bez 110 kV` – tylko 220 i 400 kV (część przesyłowa)
-  - `Tylko 400 kV` – sieć NN
-  - `Tylko transformatory` – wyizolowane trafa
+  - `Bez 110 kV` – tylko 220 i 400 kV
+  - `Tylko 400 kV` – sieć najwyższych napięć
+  - `Tylko transformatory`
 
-Hover na element pokazuje szczegóły (kV, Vm, P, obciążenie). Scroll = zoom, drag = pan.
+Hover na element → szczegóły (kV, Um, P, obciążenie). Scroll = zoom, drag = pan.
 
----
-
-## Modyfikacja topologii
-
-Wszystkie dane sieci ręcznej są w `kse_grid/topology.py` jako dataclass – bez logiki, łatwe do edycji.
-
-```python
-import kse_grid
-
-topo = kse_grid.KSETopology()
-topo.LINES_400KV.append(
-    kse_grid.LineConfig(
-        from_bus="Żarnowiec 400kV",
-        to_bus="Dunowo 400kV",
-        length_km=80,
-        std_type=kse_grid.KSETopology.LT400,
-        name="LNN Offshore Bałtyk 400kV",
-    )
-)
-
-kse_grid.KSEGrid(topo).build().run_powerflow().report()
-```
+> Jeśli plik `.m` nie zawiera danych geograficznych (GPS), węzły są rozmieszczane automatycznie (spring layout).
 
 ---
 
 ## Struktura projektu
 
 ```
-PowerFlow/
-├── main.py                     # entry point
+kse_grid/
+├── main.py              # punkt startowy – przyjmuje ścieżkę do .m jako argument
 ├── data/
-│   └── case3120sp.m            # publiczny przypadek MATPOWER (PL 2008)
+│   └── case3120sp.m     # przykładowy plik MATPOWER (polska sieć, 3120 węzłów)
 ├── docs/
-│   └── preview.png             # zrzut dashboard (opcjonalnie)
+│   └── preview.png
 └── kse_grid/
-    ├── __init__.py             # publiczne API pakietu
-    ├── models.py               # dataclasses (BusConfig, LineConfig, ...)
-    ├── topology.py             # KSETopology – ręcznie zbudowane dane KSE
-    ├── builder.py              # GridBuilder – buduje sieć pandapower z topologii
-    ├── matpower.py             # loader plików .m (MATPOWER)
-    ├── runner.py               # PowerFlowRunner – obliczenia + raporty
-    ├── plotting.py             # dashboard HTML + Plotly
-    └── grid.py                 # KSEGrid – fasada (fluent interface)
+    ├── __init__.py      # publiczne API pakietu
+    ├── grid.py          # KSEGrid – główna klasa (ładowanie, obliczenia, wizualizacja)
+    ├── matpower.py      # wczytywanie plików .m
+    ├── runner.py        # obliczenia load flow + raport tekstowy
+    └── plotting.py      # dashboard HTML + wykres Plotly + serwer HTTP
 ```
-
-### Model wbudowany (alternatywa do MATPOWER)
-
-| Element | Liczba |
-|---|---|
-| Szyny 400 kV | 18 |
-| Szyny 220 kV | 13 |
-| Linie 400 kV | 40 |
-| Linie 220 kV | 18 |
-| Autotransformatory 400/220 kV | 15 |
-| Generatory | 10 (+ slack) |
-| Obciążenia | 15 węzłów |
-| Kompensatory Q | 32 |
-
-Slack bus: **Kozienice 400 kV**. Główne elektrownie: Bełchatów (4500 MW), Połaniec (1800 MW), Turów (2000 MW), Pątnów (1200 MW), Kozienice (slack), Żarnowiec PSP (±500 MW), import z DE/SE.
 
 ---
 
@@ -274,12 +201,12 @@ Slack bus: **Kozienice 400 kV**. Główne elektrownie: Bełchatów (4500 MW), Po
 | Problem | Rozwiązanie |
 |---|---|
 | `ModuleNotFoundError: matpowercaseframes` | Środowisko nie aktywne lub `uv sync` nie wykonany. Aktywuj venv i powtórz. |
-| Port 8000 zajęty | Skrypt automatycznie wybiera kolejny wolny port – sprawdź log w terminalu (`Port … zajęty, używam wolnego portu N`). |
+| Port 8000 zajęty | Skrypt automatycznie wybiera kolejny wolny port – sprawdź log w terminalu. |
 | `pandapower` zgłasza ostrzeżenia o `BR_B` lub „fake transformers" | Normalne dla `case3120sp.m` – artefakt pliku MATPOWER, wynik PF jest poprawny. |
-| Naruszenia napięcia (~1600) i przeciążenia (~140) w `case3120sp` | To celowe – publiczny przypadek jest naciskiem stresowym, nie odwzorowaniem rzeczywistego stanu sieci. |
-| Spring layout trwa długo | ~7 s przy 3120 węzłach to norma; jednorazowo per uruchomienie. Zainstalowanie `python-igraph` mogłoby przyspieszyć (na razie nie używane). |
+| Naruszenia napięcia i przeciążenia w `case3120sp` | To celowe – publiczny przypadek jest naciskiem stresowym, nie odwzorowaniem rzeczywistego stanu sieci. |
+| Spring layout trwa długo | ~7 s przy 3120 węzłach to norma; jednorazowo per uruchomienie. |
 | Windows: PowerShell odmawia aktywacji venv | `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`, potem ponownie aktywuj. |
-| Brak `python3.13` w systemie | Linux: `uv python install 3.13`. Windows: pobierz instalator z [python.org](https://www.python.org/downloads/). |
+| Brak `python3.13` w systemie | Linux: `uv python install 3.13`. Windows: pobierz z [python.org](https://www.python.org/downloads/). |
 
 ---
 
