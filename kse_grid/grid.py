@@ -47,7 +47,7 @@ class KSEGrid:
     def run_powerflow(self,
                       algorithm: str = "iwamoto_nr",
                       max_iteration: int = 100,
-                      tolerance_mva: float = 1.0) -> "KSEGrid":
+                      tolerance_mva: float = 1.5) -> "KSEGrid": ## w PSE 1.5 MWA jest akceptowalne
         """Uruchamia obliczenia load flow (opcjonalnie, wzbogaca wizualizację)."""
         if self.net is None:
             raise RuntimeError("Wywołaj najpierw from_matpower_case()")

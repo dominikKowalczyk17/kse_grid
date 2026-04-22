@@ -12,11 +12,14 @@ import plotly.graph_objects as go
 type GeoBounds = tuple[float, float, float, float]
 
 
+_FAVICON_PATH = Path(__file__).parent.parent / "favicon.png"
+
 _DASHBOARD_TEMPLATE = """<!DOCTYPE html>
 <html lang="pl">
 <head>
 <meta charset="utf-8">
 <title>{title}</title>
+{favicon_link}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -106,7 +109,6 @@ _DASHBOARD_TEMPLATE = """<!DOCTYPE html>
 <div class="app">
   <header>
     <div class="brand">
-      <div class="logo">⚡</div>
       <h1>{net_name}<span class="sub">{layout_note}</span></h1>
     </div>
     <div class="meta">{meta_line}</div>
@@ -201,6 +203,12 @@ def render_dashboard_html(
     net_name = getattr(net, "name", None) or "Sieć elektroenergetyczna"
     layout_note = "" if has_real_geodata else " · układ poglądowy (brak geodanych)"
     meta_line = f"{stats['n_bus']} szyn  ·  {stats['n_line']} linii  ·  {stats['n_trafo']} trafo"
+
+    favicon_link = ""
+    if _FAVICON_PATH.exists():
+        encoded = base64.b64encode(_FAVICON_PATH.read_bytes()).decode("ascii")
+        favicon_link = f'<link rel="icon" type="image/png" href="data:image/png;base64,{encoded}">'
+
     return _DASHBOARD_TEMPLATE.format(
         title=f"{net_name} – KSE Grid",
         net_name=net_name,
@@ -208,6 +216,7 @@ def render_dashboard_html(
         meta_line=meta_line,
         data_source=net_name or "user-provided",
         fig_json=fig.to_json(),
+        favicon_link=favicon_link,
         **stats,
     )
 
