@@ -4,7 +4,7 @@ Narzędzie do wizualizacji i analizy rozpływu mocy z plików MATPOWER (`.m`), o
 
 - Wczytuje dowolny plik `.m` (format MATPOWER)
 - Liczy rozpływ mocy (algorytm Iwamoto-NR, start AC)
-- Otwiera interaktywny dashboard w przeglądarce z dark theme, filtrami napięć i kolorowaniem obciążenia
+- Otwiera interaktywny dashboard w przeglądarce, filtrami napięć i kolorowaniem obciążenia
 
 ![dashboard preview](docs/preview.png)
 
@@ -209,7 +209,3 @@ kse_grid/
 | Brak `python3.13` w systemie | Linux: `uv python install 3.13`. Windows: pobierz z [python.org](https://www.python.org/downloads/). |
 
 ---
-
-## Licencja
-
-MIT
