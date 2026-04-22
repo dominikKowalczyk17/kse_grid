@@ -61,7 +61,7 @@ def _normalize_imported_net(net: pp.pandapowerNet):
         row = net.line.loc[line_idx]
         from_name = net.bus.at[row.from_bus, "name"]
         to_name = net.bus.at[row.to_bus, "name"]
-        net.line.at[line_idx, "name"] = f"Linia {line_idx + 1}: {from_name} - {to_name}"
+        net.line.at[line_idx, "name"] = f"Line {line_idx + 1}: {from_name} -> {to_name}"
 
     trafo_names = net.trafo["name"].fillna("").astype(str).str.strip()
     empty_trafo_names = trafo_names.eq("")
@@ -69,7 +69,7 @@ def _normalize_imported_net(net: pp.pandapowerNet):
         row = net.trafo.loc[trafo_idx]
         hv_name = net.bus.at[row.hv_bus, "name"]
         lv_name = net.bus.at[row.lv_bus, "name"]
-        net.trafo.at[trafo_idx, "name"] = f"Trafo {trafo_idx + 1}: {hv_name} - {lv_name}"
+        net.trafo.at[trafo_idx, "name"] = f"Trafo {trafo_idx + 1}: {hv_name} -> {lv_name}"
 
     _ensure_reference_bus(net)
 
@@ -190,10 +190,20 @@ def _apply_geojson_sidecar(net: pp.pandapowerNet, sidecar_path: Path) -> None:
 
 
 _DEFAULT_BUS_NAME_RE = re.compile(r"^(?:Bus\s+)?\d+$", re.IGNORECASE)
-_DEFAULT_LINE_NAME_RE = re.compile(r"^Linia\s+\d+:\s")
+_DEFAULT_LINE_NAME_RE = re.compile(r"^(?:Line|Linia)\s+\d+:\s")
 _DEFAULT_TRAFO_NAME_RE = re.compile(r"^Trafo\s+\d+:\s")
 _STATION_PREFIX_RE = re.compile(r"^\s*\d+\s+")
 _STATION_NOISE_RE = re.compile(r"\s*&.*$")
+_ASCII_FALLBACK = {"ł": "l", "Ł": "L", "ø": "o", "Ø": "O", "?": ""}
+
+
+def _to_ascii(text: str) -> str:
+    import unicodedata
+    for src, dst in _ASCII_FALLBACK.items():
+        text = text.replace(src, dst)
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return text
 
 
 def _clean_station_name(raw: object) -> str:
@@ -201,6 +211,7 @@ def _clean_station_name(raw: object) -> str:
         return ""
     text = _STATION_PREFIX_RE.sub("", raw)
     text = _STATION_NOISE_RE.sub("", text)
+    text = _to_ascii(text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
@@ -212,7 +223,7 @@ def _refresh_composite_names(net: pp.pandapowerNet) -> None:
             continue
         from_name = net.bus.at[row.from_bus, "name"]
         to_name = net.bus.at[row.to_bus, "name"]
-        net.line.at[line_idx, "name"] = f"Linia {line_idx + 1}: {from_name} → {to_name}"
+        net.line.at[line_idx, "name"] = f"Line {line_idx + 1}: {from_name} -> {to_name}"
 
     for trafo_idx, row in net.trafo.iterrows():
         current = str(net.trafo.at[trafo_idx, "name"] or "").strip()
@@ -220,7 +231,7 @@ def _refresh_composite_names(net: pp.pandapowerNet) -> None:
             continue
         hv_name = net.bus.at[row.hv_bus, "name"]
         lv_name = net.bus.at[row.lv_bus, "name"]
-        net.trafo.at[trafo_idx, "name"] = f"Trafo {trafo_idx + 1}: {hv_name} → {lv_name}"
+        net.trafo.at[trafo_idx, "name"] = f"Trafo {trafo_idx + 1}: {hv_name} -> {lv_name}"
 
 
 def _match_geo_feature_to_bus(
@@ -244,12 +255,11 @@ def _match_geo_feature_to_bus(
         try:
             bus_id = int(raw)
         except (TypeError, ValueError):
-            pass
-        else:
-            if bus_id in id_lookup:
-                return id_lookup[bus_id]
-            if bus_id in one_based_lookup:
-                return one_based_lookup[bus_id]
+            continue
+        if bus_id in one_based_lookup:
+            return one_based_lookup[bus_id]
+        if bus_id in id_lookup:
+            return id_lookup[bus_id]
 
     name_candidates = [
         properties.get("name"),
