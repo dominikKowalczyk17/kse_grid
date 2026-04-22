@@ -51,7 +51,7 @@ class KSEGrid:
 
     # ------------------------------------------------------------------
     def report(self) -> "KSEGrid":
-        """Drukuje wyniki load flow. Brak efektu jeśli nie zbiegł."""
+        """Drukuje wyniki load flow. Brak efektu, jeśli nie zbiegł."""
         if not self._converged:
             print("Brak wyników – load flow nie zbiegł.")
             return self
@@ -73,7 +73,7 @@ class KSEGrid:
         """Uruchamia interaktywny dashboard Dash z grafem Plotly i filtrami."""
         if self.net is None:
             raise RuntimeError("Wywołaj najpierw from_matpower_case()")
-        from kse_grid.dash_app import serve_dash
+        from kse_grid.dash_app import serve_dash_app
         print(f"🌐 Dashboard dostępny pod: http://{host}:{port}/")
         print("   Zatrzymaj serwer skrótem Ctrl+C.")
-        serve_dash(self.net, host=host, port=port, auto_open=auto_open, debug=debug)
+        serve_dash_app(self.net, host=host, port=port, auto_open=auto_open, debug=debug)
