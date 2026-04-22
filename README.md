@@ -182,11 +182,28 @@ Pliki `.m` od [TAMU Polish Grid](https://electricgrids.engr.tamu.edu/electric-gr
 uv run python -m kse_grid.convert_tamu_geo "/path/case.EPC" --out data/case.geojson
 ```
 
+#### Lepsza dokładność z atlasem KSE (KMZ)
+
+Współrzędne TAMU z `.EPC` są przybliżone (centra stacji 400/220 kV). Jeśli masz atlas KSE w formacie KMZ (np. `KSE_2019.kmz` z OpenInfraMap / OSM), możesz dopasować nazwy stacji TAMU do polskich nazw z KMZ:
+
+```bash
+uv run python -m kse_grid.convert_kse_kmz \
+  --epc "/path/case.EPC" \
+  --kmz "/path/KSE_2019.kmz" \
+  --out data/case.geojson
+```
+
+Wynikowy sidecar zawiera w `properties.source` znacznik `"kmz"` (dokładne coords z KMZ) lub `"epc"` (fallback z TAMU EPC). Dopasowanie korzysta z normalizacji nazw (usunięcie diakrytyków, kodów PowerWorld i fuzzy match `difflib`). Stroj `--cutoff` (domyślnie 0.86) reguluje agresywność dopasowania.
+
 Sidecar musi mieć ten sam stem co `.m` (np. `case2746wop_TAMU_Updated.m` ↔ `case2746wop_TAMU_Updated.geojson`). Po konwersji:
 
 ```bash
 uv run python main.py data/case2746wop_TAMU_Updated.m
 ```
+
+#### Atlas KSE 2019 jako warstwa referencyjna
+
+W trybie OpenStreetMap dostępny jest dodatkowy chip „Atlas KSE 2019" — nakłada on 2308 stacji z atlasu KSE 2019 jako szare kropki pod traces grafu. Pozwala wzrokowo zweryfikować czy węzły datasetu TAMU pokrywają się z rzeczywistymi lokalizacjami stacji w polskiej sieci NN/110 kV. Plik `kse_grid/web/kse_atlas_points.geojson` jest wbudowany w aplikację i wygenerowany z `KSE_2019.kmz` (OpenInfraMap / OSM).
 
 ### Obsługiwane sidecary GeoJSON
 

@@ -42,8 +42,9 @@ const Sidebar = {
         hasResults: Boolean,
         viewMode: String,
         geoAvailable: Boolean,
+        showAtlas: Boolean,
     },
-    emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'reset-view', 'select-bus'],
+    emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'update:showAtlas', 'reset-view', 'select-bus'],
     setup(props, { emit }) {
         const search = ref('');
         const showSuggestions = ref(false);
@@ -198,6 +199,17 @@ const Sidebar = {
                 {{ geoAvailable
                     ? 'Tryb mapowy używa współrzędnych WGS84 z datasetu.'
                     : 'Tryb mapowy włączy się automatycznie, gdy case dostarczy geometrię WGS84.' }}
+            </p>
+            <div class="chip-row" v-if="viewMode === 'geo'">
+                <button
+                    class="chip"
+                    :class="{ active: showAtlas }"
+                    @click="$emit('update:showAtlas', !showAtlas)">
+                    Atlas KSE 2019
+                </button>
+            </div>
+            <p class="helper" v-if="viewMode === 'geo'">
+                Nakładka 2308 stacji NN/110 kV z OpenInfraMap (KSE 2019) jako referencja.
             </p>
         </section>
 
@@ -389,6 +401,7 @@ const GraphPanel = {
         selectedVoltages: Array,
         selectedTypes: Array,
         viewMode: String,
+        showAtlas: Boolean,
     },
     emits: ['stats-changed'],
     setup(props, { emit }) {
@@ -416,6 +429,30 @@ const GraphPanel = {
             return { buses, lines, totalBuses: total.bus, totalLines: total.line };
         });
 
+        function buildMapboxLayers() {
+            const layers = [
+                {
+                    sourcetype: 'geojson',
+                    source: 'poland_border.geojson',
+                    type: 'line',
+                    color: '#1f2937',
+                    line: { width: 2 },
+                    below: 'traces',
+                },
+            ];
+            if (props.showAtlas) {
+                layers.push({
+                    sourcetype: 'geojson',
+                    source: 'kse_atlas_points.geojson',
+                    type: 'circle',
+                    circle: { radius: 2.5 },
+                    color: 'rgba(120, 144, 156, 0.55)',
+                    below: 'traces',
+                });
+            }
+            return layers;
+        }
+
         function initialLayout() {
             if (props.viewMode === 'geo' && props.network.geoView) {
                 return {
@@ -424,16 +461,7 @@ const GraphPanel = {
                         style: 'carto-positron',
                         center: { ...props.network.geoView.center },
                         zoom: props.network.geoView.zoom,
-                        layers: [
-                            {
-                                sourcetype: 'geojson',
-                                source: 'poland_border.geojson',
-                                type: 'line',
-                                color: '#1f2937',
-                                line: { width: 2 },
-                                below: 'traces',
-                            },
-                        ],
+                        layers: buildMapboxLayers(),
                     },
                 };
             }
@@ -606,6 +634,11 @@ const GraphPanel = {
         watch(() => props.viewMode, async () => {
             await buildPlot();
         });
+        watch(() => props.showAtlas, () => {
+            if (ready.value && props.viewMode === 'geo') {
+                Plotly.relayout(graphEl.value, { 'mapbox.layers': buildMapboxLayers() });
+            }
+        });
 
         function onKey(e) {
             if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
@@ -654,6 +687,7 @@ const App = {
         const selectedVoltages = ref([]);
         const selectedTypes = ref(['line', 'trafo', 'bus']);
         const viewMode = ref('graph');
+        const showAtlas = ref(false);
         const graphPanelRef = ref(null);
 
         fetch('/api/network')
@@ -674,7 +708,7 @@ const App = {
 
         return {
             network, error, stats, statusClass,
-            selectedVoltages, selectedTypes, viewMode, graphPanelRef,
+            selectedVoltages, selectedTypes, viewMode, showAtlas, graphPanelRef,
             onSelectBus, onResetView,
         };
     },
@@ -705,15 +739,18 @@ const App = {
                 :has-results="network.hasResults"
                 :view-mode="viewMode"
                 :geo-available="network.geoAvailable"
+                :show-atlas="showAtlas"
                 v-model:selected-voltages="selectedVoltages"
                 v-model:selected-types="selectedTypes"
                 v-model:view-mode="viewMode"
+                v-model:show-atlas="showAtlas"
                 @reset-view="onResetView"
                 @select-bus="onSelectBus" />
             <GraphPanel
                 ref="graphPanelRef"
                 :network="network"
                 :view-mode="viewMode"
+                :show-atlas="showAtlas"
                 :selected-voltages="selectedVoltages"
                 :selected-types="selectedTypes" />
         </div>
