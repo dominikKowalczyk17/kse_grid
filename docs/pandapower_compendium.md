@@ -1,6 +1,6 @@
 # Kompendium pandapower
 
-> Wszystko co jest używane w aplikacji `kse_grid` — od podstaw, bez skrótu myślowego.
+> Wszystko co jest używane w aplikacji `kse_grid`
 
 ---
 
