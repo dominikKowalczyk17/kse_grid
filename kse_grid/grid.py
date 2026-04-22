@@ -13,9 +13,9 @@ class KSEGrid:
 
     Przykłady użycia
     ----------------
-    # Załaduj plik .m i otwórz interaktywny dashboard Dash w przeglądarce:
+    # Załaduj plik .m i otwórz interaktywny dashboard w przeglądarce:
         import kse_grid
-        kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow().serve_dash()
+        kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow().serve()
 
     # Dostęp do surowej sieci pandapower:
         grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
@@ -65,15 +65,14 @@ class KSEGrid:
                 print(f"... oraz jeszcze {len(violations) - len(preview)} kolejnych węzłów.")
         return self
 
-    def serve_dash(self,
-                   host: str = "127.0.0.1",
-                   port: int = 8050,
-                   auto_open: bool = True,
-                   debug: bool = False) -> None:
-        """Uruchamia interaktywny dashboard Dash z grafem Plotly i filtrami."""
+    def serve(self,
+              host: str = "127.0.0.1",
+              port: int = 8050,
+              auto_open: bool = True) -> None:
+        """Uruchamia serwer FastAPI + Vue z interaktywnym grafem sieci."""
         if self.net is None:
             raise RuntimeError("Wywołaj najpierw from_matpower_case()")
-        from kse_grid.dash_app import serve_dash_app
+        from kse_grid.web_server import serve
         print(f"🌐 Dashboard dostępny pod: http://{host}:{port}/")
         print("   Zatrzymaj serwer skrótem Ctrl+C.")
-        serve_dash_app(self.net, host=host, port=port, auto_open=auto_open, debug=debug)
+        serve(self.net, host=host, port=port, auto_open=auto_open)

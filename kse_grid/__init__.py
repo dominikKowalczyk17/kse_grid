@@ -6,7 +6,7 @@ Użycie
     import kse_grid
 
     grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
-    grid.serve_dash()                 # dashboard w przeglądarce
+    grid.serve()                      # dashboard FastAPI + Vue w przeglądarce
 """
 
 from kse_grid.matpower import load_matpower_case
