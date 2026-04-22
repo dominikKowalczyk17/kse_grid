@@ -543,68 +543,77 @@ def _trafo_traces(
     ]
     has_results = not net.res_trafo.empty
 
-    for bin_idx, (label, lower, upper, color) in enumerate(bins):
-        line_x: list[float | None] = []
-        line_y: list[float | None] = []
-        mid_x: list[float] = []
-        mid_y: list[float] = []
-        hover_text: list[str] = []
-        min_voltage = 9999.0
+    # Grupujemy trafo po napięciu strony LV — decyduje o tym do jakiego
+    # poziomu napięcia "należy" trafo przy filtrowaniu.
+    # Trafo 400/220 kV → lv_level=220 → zostaje przy filtrze "Bez 110 kV".
+    # Trafo 400/110 kV → lv_level=110 → znika przy filtrze "Bez 110 kV".
+    lv_levels = sorted(net.trafo["vn_lv_kv"].dropna().unique().tolist(), reverse=True)
 
-        for trafo_idx, row in net.trafo.iterrows():
-            loading = float(net.res_trafo.at[trafo_idx, "loading_percent"]) if has_results else 0.0
-            if loading < lower or loading >= upper:
+    for lv_level in lv_levels:
+        lv_rows = net.trafo.index[net.trafo["vn_lv_kv"] == lv_level]
+        legend_group = f"transformatory-{int(lv_level)}"
+
+        for bin_idx, (label, lower, upper, color) in enumerate(bins):
+            line_x: list[float | None] = []
+            line_y: list[float | None] = []
+            mid_x: list[float] = []
+            mid_y: list[float] = []
+            hover_text: list[str] = []
+
+            for trafo_idx in lv_rows:
+                row = net.trafo.loc[trafo_idx]
+                loading = float(net.res_trafo.at[trafo_idx, "loading_percent"]) if has_results else 0.0
+                if loading < lower or loading >= upper:
+                    continue
+
+                x1, y1 = positions[row.hv_bus]
+                x2, y2 = positions[row.lv_bus]
+                line_x.extend([x1, x2, None])
+                line_y.extend([y1, y2, None])
+                mid_x.append((x1 + x2) / 2)
+                mid_y.append((y1 + y2) / 2)
+
+                details = [
+                    f"<b>{row['name']}</b>",
+                    f"Trafo {row['vn_hv_kv']:.0f}/{row['vn_lv_kv']:.0f} kV",
+                    f"Moc znamionowa: {row['sn_mva']:.0f} MVA",
+                ]
+                if has_results:
+                    details.append(f"Obciążenie: {loading:.1f}%")
+                    details.append(f"P po stronie HV: {net.res_trafo.at[trafo_idx, 'p_hv_mw']:.1f} MW")
+                hover_text.append("<br>".join(details))
+
+            if not line_x:
                 continue
 
-            x1, y1 = positions[row.hv_bus]
-            x2, y2 = positions[row.lv_bus]
-            line_x.extend([x1, x2, None])
-            line_y.extend([y1, y2, None])
-            mid_x.append((x1 + x2) / 2)
-            mid_y.append((y1 + y2) / 2)
-            min_voltage = min(min_voltage, float(min(row.vn_hv_kv, row.vn_lv_kv)))
-
-            details = [
-                f"<b>{row['name']}</b>",
-                f"Trafo {row['vn_hv_kv']:.0f}/{row['vn_lv_kv']:.0f} kV",
-                f"Moc znamionowa: {row['sn_mva']:.0f} MVA",
-            ]
-            if has_results:
-                details.append(f"Obciążenie: {loading:.1f}%")
-                details.append(f"P po stronie HV: {net.res_trafo.at[trafo_idx, 'p_hv_mw']:.1f} MW")
-            hover_text.append("<br>".join(details))
-
-        if not line_x:
-            continue
-
-        traces.append(
-            go.Scatter(
-                x=line_x,
-                y=line_y,
-                mode="lines",
-                name="Transformatory",
-                legendgroup="transformatory",
-                showlegend=bin_idx == 0,
-                hoverinfo="skip",
-                line=dict(color=color, width=2.2, dash="dot"),
+            traces.append(
+                go.Scatter(
+                    x=line_x,
+                    y=line_y,
+                    mode="lines",
+                    name=f"Trafo /{int(lv_level)} kV",
+                    legendgroup=legend_group,
+                    showlegend=bin_idx == 0,
+                    hoverinfo="skip",
+                    line=dict(color=color, width=2.2, dash="dot"),
+                )
             )
-        )
-        trace_meta.append({"kind": "trafo", "voltage": min_voltage})
+            trace_meta.append({"kind": "trafo", "voltage": lv_level})
 
-        traces.append(
-            go.Scatter(
-                x=mid_x,
-                y=mid_y,
-                mode="markers",
-                name=f"Transformatory - {label}",
-                legendgroup="transformatory",
-                showlegend=False,
-                hovertemplate="%{text}<extra></extra>",
-                text=hover_text,
-                marker=dict(size=9, color=color, opacity=0.35, symbol="diamond"),
+            traces.append(
+                go.Scatter(
+                    x=mid_x,
+                    y=mid_y,
+                    mode="markers",
+                    name=f"Trafo /{int(lv_level)} kV - {label}",
+                    legendgroup=legend_group,
+                    showlegend=False,
+                    hovertemplate="%{text}<extra></extra>",
+                    text=hover_text,
+                    marker=dict(size=9, color=color, opacity=0.35, symbol="diamond"),
+                )
             )
-        )
-        trace_meta.append({"kind": "trafo", "voltage": min_voltage})
+            trace_meta.append({"kind": "trafo", "voltage": lv_level})
 
     return traces, trace_meta
 
