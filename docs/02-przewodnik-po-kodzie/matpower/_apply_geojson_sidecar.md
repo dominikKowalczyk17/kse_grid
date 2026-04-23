@@ -31,6 +31,52 @@ def _apply_geojson_sidecar(net: pp.pandapowerNet, sidecar_path: Path) -> None:
 
 Kod podpowiada, że funkcja zwraca: `None`.
 
+## Co wchodzi
+
+Na wejściu są dwie rzeczy:
+
+1. `net` - już zaimportowany `pandapowerNet`,
+2. `sidecar_path` - ścieżka do GeoJSON-a z punktami stacji.
+
+Przykład pojedynczego feature'a, jaki ta funkcja umie zjeść:
+
+```json
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [19.1778, 51.21298]
+  },
+  "properties": {
+    "bus": 1,
+    "station": "BEK Near Pajeczno"
+  }
+}
+```
+
+## Co wychodzi
+
+Funkcja nic nie zwraca jawnie, ale modyfikuje `net`:
+
+- wpisuje geometrię do `net.bus.at[bus_idx, "geo"]`,
+- czasem zmienia nazwę szyny,
+- jeśli nazwy szyn się zmieniły, odświeża też nazwy linii i traf.
+
+Realny efekt dla `case2746wop_TAMU_Updated.m`:
+
+```python
+net.bus.loc[0, ["name", "geo"]].to_dict()
+# {
+#   'name': 'BEK Near Pajeczno 220 kV',
+#   'geo': '{"type":"Point","coordinates":[19.1778,51.21298]}'
+# }
+
+net.line.loc[0, "name"]
+# 'Line 1: Belchatow -> BEK Near Pajeczno 220 kV'
+```
+
+To drugie pokazuje ważny szczegół: po zmianie nazwy szyny potrafią zmienić się też nazwy elementów złożonych.
+
 ## Co robi krok po kroku
 
 

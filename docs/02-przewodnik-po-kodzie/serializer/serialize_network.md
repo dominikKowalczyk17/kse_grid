@@ -30,6 +30,70 @@ def serialize_network(net: pp.pandapowerNet) -> dict[str, Any]:
 
 Kod podpowiada, że funkcja zwraca: `dict[str, Any]`.
 
+## Co wchodzi
+
+Na wejściu jest kompletna sieć `pandapowerNet`. Funkcja działa w dwóch trybach:
+
+1. **przed load flow** - są dane topologiczne, ale nie ma jeszcze wyników,
+2. **po load flow** - oprócz topologii są już `res_bus`, `res_line`, `res_trafo`.
+
+Przykład:
+
+```python
+net = load_matpower_case("data/case2746wop_TAMU_Updated.m")
+payload = serialize_network(net)
+```
+
+## Co wychodzi
+
+Wyjściem jest słownik, który można bezpośrednio oddać jako JSON z API.
+
+Najważniejsze elementy:
+
+```python
+payload.keys()
+# [
+#   'name', 'hasResults', 'voltageLevels', 'defaultVoltageFilter',
+#   'layoutModes', 'defaultViewMode', 'geoAvailable', 'stats',
+#   'buses', 'lines', 'trafos', 'bounds', 'graphBounds', 'geoView'
+# ]
+```
+
+Fragment realnego wyniku:
+
+```python
+payload["stats"]
+# {
+#   'nBus': 2746,
+#   'nLine': 3340,
+#   'nTrafo': 172,
+#   'nGen': 378,
+#   'maxLoading': '281.0%',
+#   'loadClass': 'bad',
+#   'nViol': 2082,
+#   'violClass': 'bad',
+#   'nOverload': 8,
+#   'ovlClass': 'bad'
+# }
+```
+
+Pojedyncza szyna po serializacji:
+
+```python
+payload["buses"][0]
+# {
+#   'id': 0,
+#   'name': 'BEK Near Pajeczno 220 kV',
+#   'type': 'PQ',
+#   'vn_kv': 220.0,
+#   'x': ...,
+#   'y': ...,
+#   'lon': 19.1778,
+#   'lat': 51.21298,
+#   'vmPu': 1.038482327420389
+# }
+```
+
 ## Co robi krok po kroku
 
 

@@ -38,6 +38,40 @@ def serve(
 
 Kod podpowiada, że funkcja zwraca: `None`.
 
+## Co wchodzi
+
+Minimalne wywołanie:
+
+```python
+serve(net)
+```
+
+Pełniejsze:
+
+```python
+serve(net, host="127.0.0.1", port=8050, auto_open=True)
+```
+
+## Co wychodzi
+
+Formalnie nic nie zwraca, ale uruchamia trzy rzeczy:
+
+1. buduje `app = create_app(net)`,
+2. opcjonalnie otwiera przeglądarkę,
+3. startuje `uvicorn.run(...)`.
+
+Czyli praktycznym wyjściem jest działający adres:
+
+```text
+http://127.0.0.1:8050/
+```
+
+oraz JSON dostępny pod:
+
+```text
+http://127.0.0.1:8050/api/network
+```
+
 ## Co robi krok po kroku
 
 

@@ -28,6 +28,36 @@ Ta funkcja nie przyjmuje własnych argumentów roboczych.
 
 Kod podpowiada, że metoda zwraca: `"KSEGrid"`.
 
+## Co wchodzi
+
+`report()` działa sensownie tylko wtedy, gdy wcześniej load flow się zbiegnie:
+
+```python
+grid = KSEGrid.from_matpower_case("data/case3120sp.m").run_powerflow()
+grid.report()
+```
+
+Jeśli `self._converged` jest `False`, metoda nie rzuca błędu - tylko wypisuje:
+
+```text
+Brak wyników – load flow nie zbiegł.
+```
+
+## Co wychodzi
+
+Ta metoda nie zwraca nowych danych. Jej prawdziwym wyjściem jest **tekst w terminalu**:
+
+1. woła `self._runner.summary()`,
+2. liczy `violations = self._runner.voltage_violations()`,
+3. jeśli są naruszenia napięcia, drukuje preview tabeli.
+
+Dla `case3120sp.m` po zbieżnym load flow liczba naruszeń to:
+
+```python
+len(grid._runner.voltage_violations())
+# 1610
+```
+
 ## Co robi krok po kroku
 
 

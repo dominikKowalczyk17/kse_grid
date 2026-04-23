@@ -28,6 +28,45 @@ Ta funkcja nie przyjmuje własnych argumentów roboczych.
 
 Kod podpowiada, że metoda zwraca: `brak`.
 
+## Co wchodzi
+
+Ta metoda zakłada, że `self.net.res_*` już istnieją, czyli wcześniej trzeba zrobić:
+
+```python
+runner.run(...)
+runner.summary()
+```
+
+## Co wychodzi
+
+Wyjściem nie jest obiekt ani tabela, tylko czytelny raport tekstowy podzielony na sekcje:
+
+1. bilans mocy,
+2. napięcia z największym odchyleniem,
+3. top 10 obciążonych linii,
+4. transformatory,
+5. licznik przeciążeń.
+
+Czyli w praktyce `summary()` zamienia surowe DataFrame'y typu:
+
+```python
+net.res_bus[["vm_pu", "va_degree"]]
+net.res_line[["p_from_mw", "loading_percent"]]
+net.res_trafo[["p_hv_mw", "loading_percent"]]
+```
+
+na raport do człowieka.
+
+Przykładowe liczby dla `case3120sp.m` po load flow:
+
+```python
+len(net.res_bus)   # 3120
+len(net.res_line)  # 3487
+len(net.res_trafo) # 206
+```
+
+To właśnie z tych tabel metoda składa wydruk.
+
 ## Co robi krok po kroku
 
 

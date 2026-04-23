@@ -31,6 +31,58 @@ def load_matpower_case(case_file: str | Path, f_hz: int = 50) -> pp.pandapowerNe
 
 Kod podpowiada, że funkcja zwraca: `pp.pandapowerNet`.
 
+## Co wchodzi
+
+Najczęściej jedna z dwóch rzeczy:
+
+1. sam plik `.m`,
+2. plik `.m`, obok którego leży sidecar `.geojson`.
+
+Przykłady:
+
+```python
+load_matpower_case("data/case3120sp.m")
+load_matpower_case("data/case2746wop_TAMU_Updated.m")
+```
+
+Drugi przypadek jest ciekawszy, bo obok istnieje plik:
+
+```text
+data/case2746wop_TAMU_Updated.geojson
+```
+
+## Co wychodzi
+
+Wyjściem jest `pandapowerNet`, ale ważne są też skutki uboczne na obiekcie:
+
+- `net.name` = nazwa case'a bez rozszerzenia,
+- `net._case_path` = pełna ścieżka do źródła,
+- opcjonalnie `net._geo_source` = pełna ścieżka do użytego sidecara,
+- nazwy elementów są uzupełnione,
+- reference bus jest dopilnowany.
+
+Przykład bez geometrii:
+
+```python
+net = load_matpower_case("data/case3120sp.m")
+net.bus.loc[0, ["name", "vn_kv"]].to_dict()
+# {'name': 'Bus 1', 'vn_kv': 220.0}
+```
+
+Przykład z geometrią:
+
+```python
+net = load_matpower_case("data/case2746wop_TAMU_Updated.m")
+getattr(net, "_geo_source")
+# '...\\data\\case2746wop_TAMU_Updated.geojson'
+
+net.bus.loc[0, ["name", "geo"]].to_dict()
+# {
+#   'name': 'BEK Near Pajeczno 220 kV',
+#   'geo': '{"type":"Point","coordinates":[19.1778,51.21298]}'
+# }
+```
+
 ## Co robi krok po kroku
 
 

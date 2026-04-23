@@ -31,6 +31,35 @@ To jest metoda klasy `KSEGrid`. Po nazwie widać, że odpowiada za fragment logi
 
 Kod podpowiada, że metoda zwraca: `"KSEGrid"`.
 
+## Co faktycznie dostaje na wejściu
+
+Najczęściej zwykłą ścieżkę do pliku `.m`:
+
+```python
+grid = KSEGrid.from_matpower_case("data/case3120sp.m")
+```
+
+Metoda nie oczekuje jeszcze gotowego `pandapowerNet`. Sama woła `load_matpower_case(...)` i dopiero wynik wkłada do `grid.net`.
+
+## Co faktycznie oddaje na wyjściu
+
+Zwraca nowy obiekt `KSEGrid`, w którym:
+
+- `grid.net` już istnieje,
+- `grid.net.name` jest ustawione na stem pliku,
+- `grid._runner` jest jeszcze `None`,
+- `grid._converged` jest jeszcze `False`.
+
+Przykład po wywołaniu:
+
+```python
+grid.net.name
+# 'case3120sp'
+
+len(grid.net.bus), len(grid.net.line), len(grid.net.trafo)
+# (3120, 3487, 206)
+```
+
 ## Co robi krok po kroku
 
 

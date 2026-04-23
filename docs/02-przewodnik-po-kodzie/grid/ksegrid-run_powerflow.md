@@ -35,6 +35,39 @@ To jest metoda klasy `KSEGrid`. Po nazwie widać, że odpowiada za fragment logi
 
 Kod podpowiada, że metoda zwraca: `"KSEGrid"`.
 
+## Co dostaje na wejściu
+
+Ta metoda zakłada, że wcześniej wykonano:
+
+```python
+grid = KSEGrid.from_matpower_case("data/case3120sp.m")
+```
+
+Na wejściu ma więc:
+
+- `self.net` - gotowy model `pandapowerNet`,
+- parametry solvera, np. `algorithm="iwamoto_nr"`.
+
+## Co zmienia i co oddaje
+
+Metoda **nie tworzy nowego obiektu**. Zwraca `self`, ale po drodze zmienia stan:
+
+- tworzy `self._runner = PowerFlowRunner(self.net)`,
+- ustawia `self._converged` na wynik `True` albo `False`,
+- jeśli solver się zbiegnie, zapełnia `self.net.res_bus`, `self.net.res_line`, `self.net.res_trafo`.
+
+Przykład:
+
+```python
+grid = KSEGrid.from_matpower_case("data/case3120sp.m").run_powerflow()
+
+grid._converged
+# True
+
+grid.net.res_bus.loc[0, ["vm_pu", "va_degree"]].to_dict()
+# {'vm_pu': 1.0535466794624884, 'va_degree': -2.543403484847102}
+```
+
 ## Co robi krok po kroku
 
 

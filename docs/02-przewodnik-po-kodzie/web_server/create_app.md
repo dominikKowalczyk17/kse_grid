@@ -30,6 +30,36 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
 
 Kod podpowiada, że funkcja zwraca: `FastAPI`.
 
+## Co wchodzi
+
+Funkcja dostaje jedno wejście: `pandapowerNet`. Nie oczekuje surowego JSON-a, bo sama robi:
+
+```python
+payload = serialize_network(net)
+```
+
+To ważne: `create_app(...)` jest bardziej adapterem niż logiką biznesową.
+
+## Co wychodzi
+
+Wyjściem jest obiekt `FastAPI` z już zamkniętym nad payloadem closurem.
+
+W praktyce powstają dwa ważne endpointy:
+
+```python
+app = create_app(net)
+
+[(route.path, sorted(route.methods)) for route in app.routes if route.path in ["/", "/api/network"]]
+# [('/api/network', ['GET']), ('/', ['GET'])]
+```
+
+Tytuł aplikacji też bierze się z serializowanego payloadu:
+
+```python
+app.title
+# 'case3120sp – KSE Grid'
+```
+
 ## Co robi krok po kroku
 
 

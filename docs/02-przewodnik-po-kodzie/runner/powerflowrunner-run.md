@@ -35,6 +35,39 @@ To jest metoda klasy `PowerFlowRunner`. Po nazwie widać, że odpowiada za fragm
 
 Kod podpowiada, że metoda zwraca: `bool`.
 
+## Co wchodzi
+
+Metoda dostaje:
+
+- `self.net` - gotowy model `pandapowerNet`,
+- nazwę algorytmu,
+- limit iteracji,
+- tolerancję mocy.
+
+Typowe wywołanie w tym projekcie:
+
+```python
+runner.run(algorithm="iwamoto_nr", max_iteration=100, tolerance_mva=1.5)
+```
+
+## Co wychodzi
+
+Z punktu widzenia Pythona wynik to tylko `True` albo `False`, ale ważniejsze są skutki w `self.net`:
+
+- gdy wynik to `True`, pandapower zapisuje wyniki do `res_bus`, `res_line`, `res_trafo`,
+- gdy wynik to `False`, metoda łapie `LoadflowNotConverged`, drukuje komunikat i nie przerywa programu wyjątkiem.
+
+Przykład:
+
+```python
+ok = runner.run(algorithm="iwamoto_nr", max_iteration=100, tolerance_mva=1.5)
+ok
+# True
+
+runner.net.res_bus.loc[0, ["vm_pu", "va_degree"]].to_dict()
+# {'vm_pu': 1.0535466794624884, 'va_degree': -2.543403484847102}
+```
+
 ## Co robi krok po kroku
 
 

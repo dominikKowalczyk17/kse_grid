@@ -1,11 +1,51 @@
 # `matpower.py`
 
+To jest warstwa importu. Bierze plik MATPOWER i zamienia go na `pandapowerNet`, a potem dopina brakujące rzeczy potrzebne dalej w aplikacji: sensowne nazwy, slack/reference bus i geometrię.
 
-Ten katalog zawiera proste opisy elementów z pliku `kse_grid\matpower.py`.
+## Co wchodzi, co wychodzi
 
+| Wejście | Wyjście |
+|---|---|
+| `data/case3120sp.m` | `pandapowerNet` bez geometrii zewnętrznej |
+| `data/case2746wop_TAMU_Updated.m` + `data/case2746wop_TAMU_Updated.geojson` | `pandapowerNet` z geometrią w `net.bus["geo"]` |
+
+## Co dokładnie robi ten moduł
+
+1. Importuje `.m` przez `pandapower.converter.matpower.from_mpc`.
+2. Jeśli import wywala się na `gencost`, usuwa blok `mpc.gencost` i próbuje jeszcze raz.
+3. Uzupełnia brakujące nazwy szyn, linii i traf.
+4. Pilnuje, żeby istniał aktywny punkt odniesienia (`ext_grid` albo generator slack).
+5. Szuka sidecara GeoJSON obok case'a.
+6. Jeśli znajdzie pasujące punkty, wpisuje współrzędne do `net.bus["geo"]`.
+
+## Realny przykład z repo
+
+Wejście:
+
+```python
+from kse_grid.matpower import load_matpower_case
+
+net = load_matpower_case("data/case2746wop_TAMU_Updated.m")
+```
+
+Wybrane efekty:
+
+```python
+net.name
+# 'case2746wop_TAMU_Updated'
+
+getattr(net, "_geo_source")
+# '...\\data\\case2746wop_TAMU_Updated.geojson'
+
+net.bus.loc[0, ["name", "vn_kv", "geo"]].to_dict()
+# {
+#   'name': 'BEK Near Pajeczno 220 kV',
+#   'vn_kv': 220.0,
+#   'geo': '{"type":"Point","coordinates":[19.1778,51.21298]}'
+# }
+```
 
 ## Pliki w tym katalogu
-
 
 - [`_apply_geojson_sidecar`](_apply_geojson_sidecar.md)
 - [`_candidate_geo_sidecars`](_candidate_geo_sidecars.md)
@@ -21,7 +61,3 @@ Ten katalog zawiera proste opisy elementów z pliku `kse_grid\matpower.py`.
 - [`_to_float`](_to_float.md)
 - [`_to_int`](_to_int.md)
 - [`load_matpower_case`](load_matpower_case.md)
-
-## Co jest w tym pliku ogólnie
-
-Ten plik zawiera fragment logiki projektu. W osobnych plikach `.md` obok są opisane poszczególne funkcje i metody prostym językiem.
