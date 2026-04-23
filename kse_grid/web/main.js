@@ -18,6 +18,41 @@ const ATLAS_DEFAULT_VIEW = {
     focusZoom: 8,
 };
 
+const ATLAS_LINE_STYLES = {
+    osp: { color: 'rgba(255, 80,  80,  0.95)', width: 2.4 },
+    osd: { color: 'rgba(120, 200, 255, 0.85)', width: 1.2 },
+    jw: { color: 'rgba(255, 220, 120, 0.85)', width: 1.0, dash: '4,3' },
+};
+const ATLAS_POINT_STYLES = {
+    osp: { color: 'rgba(255, 80,  80,  1.0)', radius: 4.5, stroke: { color: 'rgba(20, 20, 20, 0.9)', radius: 5.6 } },
+    osd: { color: 'rgba(120, 200, 255, 1.0)', radius: 3.0, stroke: { color: 'rgba(20, 20, 20, 0.9)', radius: 3.9 } },
+    jw: { color: 'rgba(255, 220, 120, 1.0)', radius: 3.2, stroke: { color: 'rgba(20, 20, 20, 0.9)', radius: 4.1 } },
+};
+const ATLAS_CATEGORIES = ['osd', 'osp', 'jw'];
+
+let _atlasCache = null;
+async function loadAtlas () {
+    if (_atlasCache) return _atlasCache;
+    const [points, lines] = await Promise.all([
+        fetch('/kse_atlas_points.geojson').then(r => r.json()),
+        fetch('/kse_atlas_lines.geojson').then(r => r.json()),
+    ]);
+    const splitByCategory = (fc) => {
+        const out = { osp: [], osd: [], jw: [] };
+        for (const f of fc.features || []) {
+            const cat = f.properties?.category;
+            if (out[cat]) out[cat].push(f);
+        }
+        const wrap = (features) => ({ type: 'FeatureCollection', features });
+        return { osp: wrap(out.osp), osd: wrap(out.osd), jw: wrap(out.jw) };
+    };
+    _atlasCache = {
+        points: splitByCategory(points),
+        lines: splitByCategory(lines),
+    };
+    return _atlasCache;
+}
+
 function voltageColorVar (kv) {
     if (kv >= 380) return 'var(--grid-400)';
     if (kv >= 200) return 'var(--grid-220)';
@@ -48,8 +83,9 @@ const Sidebar = {
         hasResults: Boolean,
         viewMode: String,
         geoAvailable: Boolean,
+        atlasCategories: Array,
     },
-    emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'reset-view', 'select-bus'],
+    emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'update:atlasCategories', 'reset-view', 'select-bus'],
     setup (props, { emit }) {
         const search = ref('');
         const showSuggestions = ref(false);
@@ -119,10 +155,17 @@ const Sidebar = {
             emit('update:viewMode', mode);
         }
 
+        function toggleAtlasCategory (cat) {
+            const set = new Set(props.atlasCategories);
+            if (set.has(cat)) set.delete(cat); else set.add(cat);
+            emit('update:atlasCategories', [...set]);
+        }
+
         return {
             search, showSuggestions, suggestions,
             isCore, isAll, isMediumVoltage, isNone,
             applyPreset, toggleVoltage, toggleType, pickSuggestion, blurLater, setViewMode,
+            toggleAtlasCategory,
             voltageColorVar,
         };
     },
@@ -211,11 +254,31 @@ const Sidebar = {
             </div>
             <p class="helper">
                 {{ viewMode === 'atlas'
-                    ? 'Widok referencyjny: 2308 stacji NN/110 kV z OpenInfraMap (KSE 2019). Bez modelu pandapower.'
+                    ? 'Widok referencyjny KSE 2019: stacje i linie z OpenInfraMap (przesył NN czerwony, dystrybucja 110 kV niebieska, JW szara). Bez modelu pandapower.'
                     : geoAvailable
                         ? 'Tryb mapowy używa współrzędnych WGS84 z datasetu.'
                         : 'Tryb mapowy włączy się automatycznie, gdy case dostarczy geometrię WGS84.' }}
             </p>
+            <div v-if="viewMode === 'atlas'" class="chip-row" style="margin-top:8px;">
+                <button
+                    class="chip"
+                    :class="{ active: atlasCategories.includes('osp') }"
+                    @click="toggleAtlasCategory('osp')"
+                    title="Sieć przesyłowa NN (PSE) – 220/400 kV"
+                ><span class="v-dot" style="background:#ff5050"></span>NN przesył</button>
+                <button
+                    class="chip"
+                    :class="{ active: atlasCategories.includes('osd') }"
+                    @click="toggleAtlasCategory('osd')"
+                    title="Sieć dystrybucyjna 110 kV (OSD)"
+                ><span class="v-dot" style="background:#78c8ff"></span>110 kV</button>
+                <button
+                    class="chip"
+                    :class="{ active: atlasCategories.includes('jw') }"
+                    @click="toggleAtlasCategory('jw')"
+                    title="Linie blokowe / jednostki wytwórcze"
+                ><span class="v-dot" style="background:#ffdc78"></span>JW</button>
+            </div>
         </section>
 
         <!-- Voltage levels -->
@@ -407,6 +470,7 @@ const GraphPanel = {
         selectedVoltages: Array,
         selectedTypes: Array,
         viewMode: String,
+        atlasCategories: Array,
     },
     emits: ['stats-changed'],
     setup (props, { emit }) {
@@ -434,26 +498,64 @@ const GraphPanel = {
             return { buses, lines, totalBuses: total.bus, totalLines: total.line };
         });
 
+        const atlasData = ref(null);
+
         function buildMapboxLayers () {
-            const layers = [
-                {
-                    sourcetype: 'geojson',
-                    source: 'poland_border.geojson',
-                    type: 'line',
-                    color: '#1f2937',
-                    line: { width: 2 },
-                    below: 'traces',
-                },
-            ];
+            const layers = [];
             if (props.viewMode === 'atlas') {
                 layers.push({
-                    sourcetype: 'geojson',
-                    source: 'kse_atlas_points.geojson',
-                    type: 'circle',
-                    circle: { radius: 3.5 },
-                    color: 'rgba(120, 144, 156, 0.75)',
+                    sourcetype: 'raster',
+                    sourceattribution: 'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+                    source: [
+                        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                    ],
+                    minzoom: 0,
+                    maxzoom: 19,
                     below: 'traces',
                 });
+            }
+            layers.push({
+                sourcetype: 'geojson',
+                source: 'poland_border.geojson',
+                type: 'line',
+                color: props.viewMode === 'atlas' ? 'rgba(255,255,255,0.85)' : '#1f2937',
+                line: { width: 2 },
+                below: 'traces',
+            });
+            if (props.viewMode === 'atlas' && atlasData.value) {
+                const enabled = new Set(props.atlasCategories || ATLAS_CATEGORIES);
+                for (const cat of ATLAS_CATEGORIES) {
+                    if (!enabled.has(cat)) continue;
+                    const lineStyle = ATLAS_LINE_STYLES[cat];
+                    const lineFc = atlasData.value.lines[cat];
+                    if (lineFc?.features?.length) {
+                        const lineSpec = { width: lineStyle.width };
+                        if (lineStyle.dash) lineSpec.dash = lineStyle.dash;
+                        layers.push({
+                            sourcetype: 'geojson',
+                            source: lineFc,
+                            type: 'line',
+                            color: lineStyle.color,
+                            line: lineSpec,
+                            below: 'traces',
+                        });
+                    }
+                }
+                for (const cat of ATLAS_CATEGORIES) {
+                    if (!enabled.has(cat)) continue;
+                    const pointStyle = ATLAS_POINT_STYLES[cat];
+                    const pointFc = atlasData.value.points[cat];
+                    if (pointFc?.features?.length && pointStyle.stroke) {
+                        layers.push({
+                            sourcetype: 'geojson',
+                            source: pointFc,
+                            type: 'circle',
+                            circle: { radius: pointStyle.stroke.radius },
+                            color: pointStyle.stroke.color,
+                            below: 'traces',
+                        });
+                    }
+                }
             }
             return layers;
         }
@@ -469,7 +571,7 @@ const GraphPanel = {
                 return {
                     ...PLOT_LAYOUT_BASE,
                     mapbox: {
-                        style: 'carto-positron',
+                        style: props.viewMode === 'atlas' ? 'open-street-map' : 'carto-positron',
                         center: { ...view.center },
                         zoom: view.zoom,
                         layers: buildMapboxLayers(),
@@ -483,6 +585,40 @@ const GraphPanel = {
             };
         }
 
+        function buildAtlasTraces () {
+            if (!atlasData.value) return { traces: [], meta: [] };
+            const enabled = new Set(props.atlasCategories || ATLAS_CATEGORIES);
+            const traces = [];
+            const meta = [];
+            const labelMap = { osp: 'NN przesył', osd: '110 kV', jw: 'JW / blokowe' };
+            for (const cat of ATLAS_CATEGORIES) {
+                const fc = atlasData.value.points[cat];
+                if (!fc?.features?.length) continue;
+                const ps = ATLAS_POINT_STYLES[cat];
+                const lon = [], lat = [], text = [];
+                for (const f of fc.features) {
+                    const c = f.geometry?.coordinates;
+                    if (!c) continue;
+                    lon.push(c[0]);
+                    lat.push(c[1]);
+                    text.push(f.properties?.name || '');
+                }
+                traces.push({
+                    type: 'scattermapbox',
+                    mode: 'markers',
+                    lon, lat, text,
+                    name: labelMap[cat],
+                    marker: { size: ps.radius * 2, color: ps.color, opacity: 1 },
+                    hovertemplate: '<b>%{text}</b><br>' + labelMap[cat] + '<extra></extra>',
+                    visible: enabled.has(cat) ? true : 'legendonly',
+                    showlegend: false,
+                    meta: { kind: 'atlas-station', category: cat },
+                });
+                meta.push({ kind: 'atlas-station', category: cat });
+            }
+            return { traces, meta };
+        }
+
         async function buildPlot () {
             ready.value = false;
             selection.value = null;
@@ -491,8 +627,16 @@ const GraphPanel = {
 
             Plotly.purge(graphEl.value);
 
+            if (props.viewMode === 'atlas' && !atlasData.value) {
+                try {
+                    atlasData.value = await loadAtlas();
+                } catch (e) {
+                    console.error('Atlas KSE load failed', e);
+                }
+            }
+
             const { traces, meta } = props.viewMode === 'atlas'
-                ? { traces: [], meta: [] }
+                ? buildAtlasTraces()
                 : buildTraces(props.network, props.viewMode);
             allTraces.value = traces;
             traceMeta.value = meta;
@@ -525,12 +669,12 @@ const GraphPanel = {
             const vSet = new Set(props.selectedVoltages);
             const tSet = new Set(props.selectedTypes);
             const update = traceMeta.value.map(m => {
-                if (m.kind === 'selection') return undefined;
+                if (m.kind === 'selection' || m.kind === 'atlas-station') return undefined;
                 return tSet.has(m.kind) && vSet.has(m.voltage);
             });
             const indices = update.map((_, i) => i).filter(i => update[i] !== undefined);
             const values = indices.map(i => update[i]);
-            Plotly.restyle(graphEl.value, { visible: values }, indices);
+            if (indices.length) Plotly.restyle(graphEl.value, { visible: values }, indices);
         }
 
         function selectionTraceIndices () {
@@ -647,6 +791,17 @@ const GraphPanel = {
         watch(() => props.viewMode, async () => {
             await buildPlot();
         });
+        watch(() => props.atlasCategories, () => {
+            if (ready.value && props.viewMode === 'atlas') {
+                const enabled = new Set(props.atlasCategories || ATLAS_CATEGORIES);
+                traceMeta.value.forEach((m, idx) => {
+                    if (m.kind === 'atlas-station') {
+                        Plotly.restyle(graphEl.value, { visible: enabled.has(m.category) ? true : 'legendonly' }, [idx]);
+                    }
+                });
+                Plotly.relayout(graphEl.value, { 'mapbox.layers': buildMapboxLayers() });
+            }
+        }, { deep: true });
 
         function onKey (e) {
             if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
@@ -695,6 +850,7 @@ const App = {
         const selectedVoltages = ref([]);
         const selectedTypes = ref(['line', 'trafo', 'bus']);
         const viewMode = ref('graph');
+        const atlasCategories = ref(['osp', 'osd', 'jw']);
         const graphPanelRef = ref(null);
 
         fetch('/api/network')
@@ -715,7 +871,7 @@ const App = {
 
         return {
             network, error, stats, statusClass,
-            selectedVoltages, selectedTypes, viewMode, graphPanelRef,
+            selectedVoltages, selectedTypes, viewMode, atlasCategories, graphPanelRef,
             onSelectBus, onResetView,
         };
     },
@@ -749,12 +905,14 @@ const App = {
                 v-model:selected-voltages="selectedVoltages"
                 v-model:selected-types="selectedTypes"
                 v-model:view-mode="viewMode"
+                v-model:atlas-categories="atlasCategories"
                 @reset-view="onResetView"
                 @select-bus="onSelectBus" />
             <GraphPanel
                 ref="graphPanelRef"
                 :network="network"
                 :view-mode="viewMode"
+                :atlas-categories="atlasCategories"
                 :selected-voltages="selectedVoltages"
                 :selected-types="selectedTypes" />
         </div>
