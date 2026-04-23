@@ -882,14 +882,11 @@ const App = {
     <div class="app-shell" v-if="network">
         <header class="app-header">
             <div class="brand">
-                <div class="brand-mark"><IconActivity /></div>
-                <span class="brand-title"><span class="accent">kse</span><span class="sep">_</span>grid</span>
+                <span class="case-name brand-title">{{ network.name }}</span>
             </div>
+
             <div class="header-divider"></div>
-            <span class="case-name">{{ network.name }}</span>
-
-            <div class="header-spacer"></div>
-
+            
             <div class="header-stats">
                 <span class="header-stat"><span class="v tabular">{{ stats.nBus }}</span> szyn</span>
                 <span class="header-stat"><span class="v tabular">{{ stats.nLine }}</span> linii</span>
