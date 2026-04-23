@@ -159,6 +159,7 @@ Po wejściu na `http://127.0.0.1:8050/`:
 - **Lewy panel** – podsumowanie sieci, wyszukiwarka szyn, reset widoku, przełącznik trybu (Graf / OpenStreetMap), filtry napięć i typów elementów oraz legendy.
 - **Tryb Graf** – spring layout w dwuwymiarowej przestrzeni abstrakcyjnej.
 - **Tryb OpenStreetMap** – sieć nałożona na szarą mapę (`carto-positron`) z zaznaczonym konturem Polski. Aktywny tylko jeśli case ma geometrię WGS84.
+- **Tryb Atlas KSE** – osobny widok referencyjny (ciekawostka): 2308 stacji NN/110 kV z OpenInfraMap (KSE 2019) jako szare kropki. Bez modelu pandapower – służy do wzrokowej weryfikacji pokrycia datasetu.
 - **Kolor linii i transformatorów** = obciążenie prądowe:
   - 🟢 0–40 % → 🟡 40–70 % → 🟠 70–100 % → 🔴 > 100 % (przeciążenie).
 - **Kolor węzłów (szyn)** = napięcie `Um` w binach traffic-light:
@@ -203,7 +204,9 @@ uv run python main.py data/case2746wop_TAMU_Updated.m
 
 #### Atlas KSE 2019 jako warstwa referencyjna
 
-W trybie OpenStreetMap dostępny jest dodatkowy chip „Atlas KSE 2019" — nakłada on 2308 stacji z atlasu KSE 2019 jako szare kropki pod traces grafu. Pozwala wzrokowo zweryfikować czy węzły datasetu TAMU pokrywają się z rzeczywistymi lokalizacjami stacji w polskiej sieci NN/110 kV. Plik `kse_grid/web/kse_atlas_points.geojson` jest wbudowany w aplikację i wygenerowany z `KSE_2019.kmz` (OpenInfraMap / OSM).
+#### Atlas KSE 2019 jako osobny widok
+
+Niezależnie od tego, czy case ma geometrię, w sidebarze dostępny jest tryb **Atlas KSE** — pokazuje on 2308 stacji z atlasu KSE 2019 jako szare kropki na mapie Polski, bez modelu pandapower. To ciekawostka referencyjna, pozwala wzrokowo zweryfikować, czy węzły datasetu TAMU pokrywają się z rzeczywistymi lokalizacjami stacji w polskiej sieci NN/110 kV. Plik `kse_grid/web/kse_atlas_points.geojson` jest wbudowany w aplikację i wygenerowany z `KSE_2019.kmz` (OpenInfraMap / OSM).
 
 ### Obsługiwane sidecary GeoJSON
 
