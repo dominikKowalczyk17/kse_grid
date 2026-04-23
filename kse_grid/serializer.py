@@ -43,7 +43,7 @@ def serialize_network(net: pp.pandapowerNet) -> dict[str, Any]:
         "geoAvailable": geo_view is not None,
         "stats": _compute_stats(net),
         "buses": _serialize_buses(net, positions, geo_positions, has_bus_results),
-        "lines": _serialize_lines(net, has_line_results),
+        "lines": _serialize_lines(net, has_line_results, geo_positions),
         "trafos": _serialize_trafos(net, has_trafo_results),
         "bounds": graph_bounds,
         "graphBounds": graph_bounds,
@@ -75,6 +75,10 @@ def _compute_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, float]]:
     Liczy pozycje szyn algorytmem spring layout (Fruchterman-Reingold) na grafie
     topologii sieci. Geodane (`net.bus.geo`) są celowo ignorowane — siatka jest
     renderowana jako abstrakcyjny graf, nie jako mapa.
+
+    Krawędzie transformatorów dostają znacznie większą wagę niż linie — fizycznie
+    łączą szyny tej samej stacji (różne poziomy napięć), więc na grafie powinny być
+    rysowane bardzo blisko, a nie rozciągnięte przez połowę sieci.
     """
     graph = create_nxgraph(
         net,
@@ -86,6 +90,25 @@ def _compute_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, float]]:
         if bus_idx not in graph:
             graph.add_node(bus_idx)
 
+    _LINE_WEIGHT = 1.0
+    _TRAFO_WEIGHT = 50.0
+    for u, v, data in graph.edges(data=True):
+        data["weight"] = _LINE_WEIGHT
+    for _, trow in net.trafo.iterrows():
+        hv = _to_int(trow.hv_bus)
+        lv = _to_int(trow.lv_bus)
+        if graph.has_edge(hv, lv):
+            graph[hv][lv]["weight"] = _TRAFO_WEIGHT
+    if hasattr(net, "trafo3w") and not net.trafo3w.empty:
+        for _, trow in net.trafo3w.iterrows():
+            for a, b in (
+                (_to_int(trow.hv_bus), _to_int(trow.mv_bus)),
+                (_to_int(trow.hv_bus), _to_int(trow.lv_bus)),
+                (_to_int(trow.mv_bus), _to_int(trow.lv_bus)),
+            ):
+                if graph.has_edge(a, b):
+                    graph[a][b]["weight"] = _TRAFO_WEIGHT
+
     components = list(nx.connected_components(graph))
     positions: dict[int, tuple[float, float]] = {}
 
@@ -94,7 +117,7 @@ def _compute_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, float]]:
         if len(comp) == 1:
             sub_layout = {next(iter(comp)): (0.0, 0.0)}
         else:
-            sub_layout = nx.spring_layout(subgraph, seed=42, iterations=50)
+            sub_layout = nx.spring_layout(subgraph, seed=42, iterations=80, weight="weight")
 
         offset_x = (i % 4) * 2.5
         offset_y = (i // 4) * 2.5
@@ -249,20 +272,45 @@ def _serialize_buses(
     return out
 
 
-def _serialize_lines(net: pp.pandapowerNet, has_results: bool) -> list[dict[str, Any]]:
+def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
+    lon1, lat1 = a
+    lon2, lat2 = b
+    r = 6371.0088
+    p1 = math.radians(lat1)
+    p2 = math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(min(1.0, math.sqrt(h)))
+
+
+def _serialize_lines(
+    net: pp.pandapowerNet,
+    has_results: bool,
+    geo_positions: dict[int, tuple[float, float]],
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for line_idx, row in net.line.iterrows():
         line_id = _to_int(line_idx)
         from_bus = _to_int(row.from_bus)
         to_bus = _to_int(row.to_bus)
         voltage = _to_float(net.bus.at[from_bus, "vn_kv"])
+        model_length = _to_float(row["length_km"])
+        geo_length = None
+        a = geo_positions.get(from_bus)
+        b = geo_positions.get(to_bus)
+        if a and b:
+            geo_length = round(_haversine_km(a, b), 3)
         item: dict[str, Any] = {
             "id": line_id,
             "name": str(row["name"]),
             "fromBus": from_bus,
             "toBus": to_bus,
             "voltage": voltage,
-            "lengthKm": _to_float(row["length_km"]),
+            "lengthKm": geo_length if geo_length is not None else model_length,
+            "modelLengthKm": model_length,
+            "geoLengthKm": geo_length,
+            "lengthSource": "geo" if geo_length is not None else "model",
         }
         if has_results:
             item["loading"] = _safe_float(net.res_line.at[line_id, "loading_percent"])

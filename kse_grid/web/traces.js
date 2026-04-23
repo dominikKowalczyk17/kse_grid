@@ -53,7 +53,7 @@ function lineHover(line, hasResults) {
     const lines = [
         `<b>${line.name}</b>`,
         `Napięcie: ${line.voltage.toFixed(0)} kV`,
-        `Długość: ${fmt(line.lengthKm)} km`,
+        `Długość: ${fmt(line.lengthKm)} km${line.lengthSource === 'model' ? ' (model)' : ''}`,
     ];
     if (hasResults) {
         lines.push(`Obciążenie: ${fmt(line.loading)}%`);

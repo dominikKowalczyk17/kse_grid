@@ -371,9 +371,12 @@ const SelectionCard = {
             }
             if (sel.kind === 'line') {
                 const ln = sel.payload;
+                const lengthLabel = ln.lengthSource === 'geo'
+                    ? `${ln.lengthKm.toFixed(1)} km (geo)`
+                    : `${ln.lengthKm.toFixed(1)} km (model)`;
                 const items = [
                     { label: 'Un', value: `${ln.voltage.toFixed(0)} kV` },
-                    { label: 'Długość', value: `${ln.lengthKm.toFixed(1)} km` },
+                    { label: 'Długość', value: lengthLabel },
                 ];
                 if (props.hasResults) {
                     items.push({ label: 'Obciążenie', value: `${(ln.loading ?? 0).toFixed(1)}%` });
