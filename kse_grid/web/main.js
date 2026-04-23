@@ -8,18 +8,18 @@ import {
 const FOCUS_ZOOM_RATIO = 0.12;
 const HIGHLIGHT_SCALE = 2.2;
 
-function coordKeys(viewMode) {
+function coordKeys (viewMode) {
     return viewMode === 'geo' ? { x: 'lon', y: 'lat' } : { x: 'x', y: 'y' };
 }
 
-function voltageColorVar(kv) {
+function voltageColorVar (kv) {
     if (kv >= 380) return 'var(--grid-400)';
     if (kv >= 200) return 'var(--grid-220)';
     if (kv >= 100) return 'var(--grid-110)';
     return 'var(--grid-mv)';
 }
 
-function voltageStatus(vmPu) {
+function voltageStatus (vmPu) {
     if (vmPu == null) return '';
     if (vmPu >= 0.95 && vmPu <= 1.05) return 'good';
     if (vmPu >= 0.9 && vmPu <= 1.1) return 'warn';
@@ -45,7 +45,7 @@ const Sidebar = {
         showAtlas: Boolean,
     },
     emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'update:showAtlas', 'reset-view', 'select-bus'],
-    setup(props, { emit }) {
+    setup (props, { emit }) {
         const search = ref('');
         const showSuggestions = ref(false);
 
@@ -62,6 +62,7 @@ const Sidebar = {
         });
 
         const corePreset = computed(() => new Set(props.defaultVoltageFilter));
+        const mediumPreset = computed(() => new Set(props.voltageLevels.filter(v => v <= 110)));
         const allPreset = computed(() => new Set(props.voltageLevels));
         const selectedSet = computed(() => new Set(props.selectedVoltages));
 
@@ -73,47 +74,49 @@ const Sidebar = {
             selectedSet.value.size === allPreset.value.size &&
             [...selectedSet.value].every(v => allPreset.value.has(v))
         );
+        const isMediumVoltage = computed(() => props.selectedVoltages.some(v => v <= 110));
         const isNone = computed(() => selectedSet.value.size === 0);
 
-        function applyPreset(name) {
+        function applyPreset (name) {
             const next = name === 'core' ? [...props.defaultVoltageFilter]
-                       : name === 'all'  ? [...props.voltageLevels]
-                       : [];
+                : name === 'all' ? [...props.voltageLevels]
+                    : name === 'medium' ? [...props.voltageLevels.filter(v => v <= 110)]
+                        : [];
             emit('update:selectedVoltages', next);
         }
 
-        function toggleVoltage(v) {
+        function toggleVoltage (v) {
             const next = selectedSet.value.has(v)
                 ? props.selectedVoltages.filter(x => x !== v)
                 : [...props.selectedVoltages, v];
             emit('update:selectedVoltages', next);
         }
 
-        function toggleType(t) {
+        function toggleType (t) {
             const next = props.selectedTypes.includes(t)
                 ? props.selectedTypes.filter(x => x !== t)
                 : [...props.selectedTypes, t];
             emit('update:selectedTypes', next);
         }
 
-        function pickSuggestion(bus) {
+        function pickSuggestion (bus) {
             search.value = '';
             showSuggestions.value = false;
             emit('select-bus', bus.id);
         }
 
-        function blurLater() {
+        function blurLater () {
             setTimeout(() => { showSuggestions.value = false; }, 200);
         }
 
-        function setViewMode(mode) {
+        function setViewMode (mode) {
             if (mode === 'geo' && !props.geoAvailable) return;
             emit('update:viewMode', mode);
         }
 
         return {
             search, showSuggestions, suggestions,
-            isCore, isAll, isNone,
+            isCore, isAll, isMediumVoltage, isNone,
             applyPreset, toggleVoltage, toggleType, pickSuggestion, blurLater, setViewMode,
             voltageColorVar,
         };
@@ -218,6 +221,7 @@ const Sidebar = {
             <h3 class="section-title">Poziomy napięć</h3>
             <div class="chip-row">
                 <button class="chip" :class="{ active: isCore }" @click="applyPreset('core')">400/220 kV</button>
+                <button class="chip" :class="{ active: isMediumVoltage }" @click="applyPreset('medium')">110 kV</button>
                 <button class="chip" :class="{ active: isAll }"  @click="applyPreset('all')">WSZYSTKO</button>
             </div>
             <div class="check-list">
@@ -281,7 +285,7 @@ const SelectionCard = {
     components: { IconClose },
     props: { selection: Object, hasResults: Boolean },
     emits: ['close'],
-    setup(props) {
+    setup (props) {
         const rows = computed(() => {
             if (!props.selection) return [];
             const sel = props.selection;
@@ -294,16 +298,16 @@ const SelectionCard = {
                     items.push({ label: 'Vm', value: `${bus.vmPu.toFixed(4)} p.u.`, status: voltageStatus(bus.vmPu) });
                     items.push({ label: 'Va', value: `${bus.vaDeg.toFixed(2)} °` });
                 }
-                if (bus.genMw > 0)        items.push({ label: 'P gen',  value: `${bus.genMw.toFixed(1)} MW`, status: 'good' });
-                if (bus.genMvar != null)  items.push({ label: 'Q gen',  value: `${bus.genMvar.toFixed(1)} Mvar`, status: 'good' });
-                if (bus.loadMw > 0)       items.push({ label: 'P load', value: `${bus.loadMw.toFixed(1)} MW` });
-                if (bus.loadMvar)         items.push({ label: 'Q load', value: `${bus.loadMvar.toFixed(1)} Mvar` });
+                if (bus.genMw > 0) items.push({ label: 'P gen', value: `${bus.genMw.toFixed(1)} MW`, status: 'good' });
+                if (bus.genMvar != null) items.push({ label: 'Q gen', value: `${bus.genMvar.toFixed(1)} Mvar`, status: 'good' });
+                if (bus.loadMw > 0) items.push({ label: 'P load', value: `${bus.loadMw.toFixed(1)} MW` });
+                if (bus.loadMvar) items.push({ label: 'Q load', value: `${bus.loadMvar.toFixed(1)} Mvar` });
                 return items;
             }
             if (sel.kind === 'line') {
                 const ln = sel.payload;
                 const items = [
-                    { label: 'Un',     value: `${ln.voltage.toFixed(0)} kV` },
+                    { label: 'Un', value: `${ln.voltage.toFixed(0)} kV` },
                     { label: 'Długość', value: `${ln.lengthKm.toFixed(1)} km` },
                 ];
                 if (props.hasResults) {
@@ -315,8 +319,8 @@ const SelectionCard = {
             if (sel.kind === 'trafo') {
                 const tr = sel.payload;
                 const items = [
-                    { label: 'Trafo',    value: `${tr.vnHvKv.toFixed(0)}/${tr.vnLvKv.toFixed(0)} kV` },
-                    { label: 'Sn',       value: `${tr.snMva.toFixed(0)} MVA` },
+                    { label: 'Trafo', value: `${tr.vnHvKv.toFixed(0)}/${tr.vnLvKv.toFixed(0)} kV` },
+                    { label: 'Sn', value: `${tr.snMva.toFixed(0)} MVA` },
                 ];
                 if (props.hasResults) {
                     items.push({ label: 'Obciążenie', value: `${(tr.loading ?? 0).toFixed(1)}%` });
@@ -334,14 +338,14 @@ const SelectionCard = {
             const id = sel.payload?.id;
             if (id == null) return '';
             return sel.kind === 'bus' ? `Bus #${id}`
-                 : sel.kind === 'line' ? `Line #${id}`
-                 : sel.kind === 'trafo' ? `Trafo #${id}` : '';
+                : sel.kind === 'line' ? `Line #${id}`
+                    : sel.kind === 'trafo' ? `Trafo #${id}` : '';
         });
         const kindLabel = computed(() => {
             const k = props.selection?.kind;
             return k === 'bus' ? 'Szyna'
-                 : k === 'line' ? 'Linia'
-                 : k === 'trafo' ? 'Transformator' : '';
+                : k === 'line' ? 'Linia'
+                    : k === 'trafo' ? 'Transformator' : '';
         });
 
         return { rows, title, subtitle, kindLabel };
@@ -404,7 +408,7 @@ const GraphPanel = {
         showAtlas: Boolean,
     },
     emits: ['stats-changed'],
-    setup(props, { emit }) {
+    setup (props, { emit }) {
         const graphEl = ref(null);
         const traceMeta = ref([]);
         const allTraces = ref([]);
@@ -429,7 +433,7 @@ const GraphPanel = {
             return { buses, lines, totalBuses: total.bus, totalLines: total.line };
         });
 
-        function buildMapboxLayers() {
+        function buildMapboxLayers () {
             const layers = [
                 {
                     sourcetype: 'geojson',
@@ -453,7 +457,7 @@ const GraphPanel = {
             return layers;
         }
 
-        function initialLayout() {
+        function initialLayout () {
             if (props.viewMode === 'geo' && props.network.geoView) {
                 return {
                     ...PLOT_LAYOUT_BASE,
@@ -472,7 +476,7 @@ const GraphPanel = {
             };
         }
 
-        async function buildPlot() {
+        async function buildPlot () {
             ready.value = false;
             selection.value = null;
             traceMeta.value = [];
@@ -507,7 +511,7 @@ const GraphPanel = {
             ready.value = true;
         }
 
-        function applyVisibility() {
+        function applyVisibility () {
             if (!ready.value && allTraces.value.length === 0) return;
             const vSet = new Set(props.selectedVoltages);
             const tSet = new Set(props.selectedTypes);
@@ -520,13 +524,13 @@ const GraphPanel = {
             Plotly.restyle(graphEl.value, { visible: values }, indices);
         }
 
-        function selectionTraceIndices() {
+        function selectionTraceIndices () {
             const out = [];
             traceMeta.value.forEach((m, i) => { if (m.kind === 'selection') out.push(i); });
             return out;
         }
 
-        function clearHighlight() {
+        function clearHighlight () {
             const idxs = selectionTraceIndices();
             if (!idxs.length) return;
             const keys = coordKeys(props.viewMode);
@@ -536,14 +540,14 @@ const GraphPanel = {
             }, idxs);
         }
 
-        function highlightAt(x, y, baseSize) {
+        function highlightAt (x, y, baseSize) {
             const idxs = selectionTraceIndices();
             if (!idxs.length) return;
             const outerRingSize = Math.max(baseSize * 1.3, 16);
             const innerRingSize = Math.max(baseSize * 0.9, 10);
             const sizes = idxs.map((_, i) =>
                 i === 0 ? outerRingSize :
-                innerRingSize
+                    innerRingSize
             );
             const keys = coordKeys(props.viewMode);
             Plotly.restyle(graphEl.value, {
@@ -553,7 +557,7 @@ const GraphPanel = {
             }, idxs);
         }
 
-        function onPlotClick(evt) {
+        function onPlotClick (evt) {
             const point = evt?.points?.[0];
             if (!point) return;
             const meta = traceMeta.value[point.curveNumber];
@@ -574,11 +578,11 @@ const GraphPanel = {
             }
         }
 
-        function findBusTraceIndex(voltage) {
+        function findBusTraceIndex (voltage) {
             return traceMeta.value.findIndex(m => m.kind === 'bus' && m.voltage === voltage);
         }
 
-        function selectBus(busId, focus) {
+        function selectBus (busId, focus) {
             const bus = props.network.buses.find(b => b.id === busId);
             if (!bus) return;
             selection.value = { kind: 'bus', payload: bus };
@@ -606,7 +610,7 @@ const GraphPanel = {
             }
         }
 
-        function resetView() {
+        function resetView () {
             if (props.viewMode === 'geo') {
                 if (!defaultMapView.value) return;
                 Plotly.relayout(graphEl.value, {
@@ -623,7 +627,7 @@ const GraphPanel = {
             clearSelection();
         }
 
-        function clearSelection() {
+        function clearSelection () {
             selection.value = null;
             clearHighlight();
         }
@@ -640,7 +644,7 @@ const GraphPanel = {
             }
         });
 
-        function onKey(e) {
+        function onKey (e) {
             if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
             if (e.key === 'Escape') clearSelection();
             if (e.key.toLowerCase() === 'r') resetView();
@@ -681,7 +685,7 @@ const GraphPanel = {
 
 const App = {
     components: { Sidebar, GraphPanel, IconActivity },
-    setup() {
+    setup () {
         const network = ref(null);
         const error = ref(null);
         const selectedVoltages = ref([]);
@@ -703,8 +707,8 @@ const App = {
         const stats = computed(() => network.value?.stats || {});
         const statusClass = computed(() => network.value?.hasResults ? 'good' : 'warn');
 
-        function onSelectBus(busId) { graphPanelRef.value?.selectBus(busId, true); }
-        function onResetView() { graphPanelRef.value?.resetView(); }
+        function onSelectBus (busId) { graphPanelRef.value?.selectBus(busId, true); }
+        function onResetView () { graphPanelRef.value?.resetView(); }
 
         return {
             network, error, stats, statusClass,

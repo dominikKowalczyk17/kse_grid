@@ -55,6 +55,8 @@ class KSEGrid:
         if not self._converged:
             print("Brak wyników – load flow nie zbiegł.")
             return self
+        if self._runner is None:
+            raise RuntimeError("Brak runnera load flow")
         self._runner.summary()
         violations = self._runner.voltage_violations()
         if not violations.empty:

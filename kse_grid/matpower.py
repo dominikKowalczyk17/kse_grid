@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import tempfile
+from numbers import Integral, Real
 from pathlib import Path
 
 import pandapower as pp
@@ -53,23 +54,23 @@ def _normalize_imported_net(net: pp.pandapowerNet):
     bus_names = net.bus["name"].fillna("").astype(str).str.strip()
     empty_bus_names = bus_names.eq("")
     for bus_idx in net.bus.index[empty_bus_names]:
-        net.bus.at[bus_idx, "name"] = f"Bus {bus_idx + 1}"
+        net.bus.at[bus_idx, "name"] = f"Bus {_to_int(bus_idx) + 1}"
 
     line_names = net.line["name"].fillna("").astype(str).str.strip()
     empty_line_names = line_names.eq("")
     for line_idx in net.line.index[empty_line_names]:
         row = net.line.loc[line_idx]
-        from_name = net.bus.at[row.from_bus, "name"]
-        to_name = net.bus.at[row.to_bus, "name"]
-        net.line.at[line_idx, "name"] = f"Line {line_idx + 1}: {from_name} -> {to_name}"
+        from_name = net.bus.at[_to_int(row.from_bus), "name"]
+        to_name = net.bus.at[_to_int(row.to_bus), "name"]
+        net.line.at[line_idx, "name"] = f"Line {_to_int(line_idx) + 1}: {from_name} -> {to_name}"
 
     trafo_names = net.trafo["name"].fillna("").astype(str).str.strip()
     empty_trafo_names = trafo_names.eq("")
     for trafo_idx in net.trafo.index[empty_trafo_names]:
         row = net.trafo.loc[trafo_idx]
-        hv_name = net.bus.at[row.hv_bus, "name"]
-        lv_name = net.bus.at[row.lv_bus, "name"]
-        net.trafo.at[trafo_idx, "name"] = f"Trafo {trafo_idx + 1}: {hv_name} -> {lv_name}"
+        hv_name = net.bus.at[_to_int(row.hv_bus), "name"]
+        lv_name = net.bus.at[_to_int(row.lv_bus), "name"]
+        net.trafo.at[trafo_idx, "name"] = f"Trafo {_to_int(trafo_idx) + 1}: {hv_name} -> {lv_name}"
 
     _ensure_reference_bus(net)
 
@@ -164,8 +165,8 @@ def _apply_geojson_sidecar(net: pp.pandapowerNet, sidecar_path: Path) -> None:
         if bus_idx is None:
             continue
 
-        lon = float(coordinates[0])
-        lat = float(coordinates[1])
+        lon = _to_float(coordinates[0])
+        lat = _to_float(coordinates[1])
         net.bus.at[bus_idx, "geo"] = json.dumps(
             {"type": "Point", "coordinates": [lon, lat]},
             separators=(",", ":"),
@@ -176,7 +177,7 @@ def _apply_geojson_sidecar(net: pp.pandapowerNet, sidecar_path: Path) -> None:
         if station:
             current = str(net.bus.at[bus_idx, "name"]).strip()
             if not current or _DEFAULT_BUS_NAME_RE.match(current):
-                vn = float(net.bus.at[bus_idx, "vn_kv"])
+                vn = _to_float(net.bus.at[bus_idx, "vn_kv"])
                 net.bus.at[bus_idx, "name"] = f"{station} {vn:g} kV"
                 renamed += 1
 
@@ -221,17 +222,17 @@ def _refresh_composite_names(net: pp.pandapowerNet) -> None:
         current = str(net.line.at[line_idx, "name"] or "").strip()
         if current and not _DEFAULT_LINE_NAME_RE.match(current):
             continue
-        from_name = net.bus.at[row.from_bus, "name"]
-        to_name = net.bus.at[row.to_bus, "name"]
-        net.line.at[line_idx, "name"] = f"Line {line_idx + 1}: {from_name} -> {to_name}"
+        from_name = net.bus.at[_to_int(row.from_bus), "name"]
+        to_name = net.bus.at[_to_int(row.to_bus), "name"]
+        net.line.at[line_idx, "name"] = f"Line {_to_int(line_idx) + 1}: {from_name} -> {to_name}"
 
     for trafo_idx, row in net.trafo.iterrows():
         current = str(net.trafo.at[trafo_idx, "name"] or "").strip()
         if current and not _DEFAULT_TRAFO_NAME_RE.match(current):
             continue
-        hv_name = net.bus.at[row.hv_bus, "name"]
-        lv_name = net.bus.at[row.lv_bus, "name"]
-        net.trafo.at[trafo_idx, "name"] = f"Trafo {trafo_idx + 1}: {hv_name} -> {lv_name}"
+        hv_name = net.bus.at[_to_int(row.hv_bus), "name"]
+        lv_name = net.bus.at[_to_int(row.lv_bus), "name"]
+        net.trafo.at[trafo_idx, "name"] = f"Trafo {_to_int(trafo_idx) + 1}: {hv_name} -> {lv_name}"
 
 
 def _match_geo_feature_to_bus(
@@ -273,3 +274,21 @@ def _match_geo_feature_to_bus(
         if bus_idx is not None:
             return bus_idx
     return None
+
+
+def _to_int(value: object) -> int:
+    if isinstance(value, Integral):
+        return int(value)
+    if isinstance(value, str):
+        return int(value)
+    raise TypeError(f"Expected integer-like value, got {type(value).__name__}")
+
+
+def _to_float(value: object) -> float:
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, Real):
+        return float(value)
+    if isinstance(value, str):
+        return float(value)
+    raise TypeError(f"Expected float-like value, got {type(value).__name__}")

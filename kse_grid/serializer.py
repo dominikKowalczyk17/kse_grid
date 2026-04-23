@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from numbers import Integral, Real
 from typing import Any
 
 import networkx as nx
@@ -48,6 +49,21 @@ def serialize_network(net: pp.pandapowerNet) -> dict[str, Any]:
         "graphBounds": graph_bounds,
         "geoView": geo_view,
     }
+
+
+def _to_int(value: object) -> int:
+    if isinstance(value, Integral):
+        return int(value)
+    if isinstance(value, str):
+        return int(value)
+    raise TypeError(f"Expected integer-like value, got {type(value).__name__}")
+
+
+def _to_float(value: object) -> float:
+    result = _safe_float(value)
+    if result is None:
+        raise TypeError(f"Expected float-like value, got {value!r}")
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +123,7 @@ def _extract_geo_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, floa
             y = _safe_float(row.get("y"))
             if x is None or y is None:
                 continue
-            positions[int(bus_idx)] = (x, y)
+            positions[_to_int(bus_idx)] = (x, y)
 
     if "geo" not in net.bus.columns:
         return positions
@@ -129,7 +145,7 @@ def _extract_geo_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, floa
         lat = _safe_float(coords[1])
         if lon is None or lat is None:
             continue
-        positions[int(bus_idx)] = (lon, lat)
+        positions[_to_int(bus_idx)] = (lon, lat)
 
     return positions
 
@@ -187,43 +203,44 @@ def _serialize_buses(
 
     out: list[dict[str, Any]] = []
     for bus_idx, row in net.bus.iterrows():
-        x, y = positions[bus_idx]
+        bus_id = _to_int(bus_idx)
+        x, y = positions[bus_id]
         if not net.load.empty:
-            mask = net.load.bus == bus_idx
+            mask = net.load.bus == bus_id
             load_mw = float(net.load.loc[mask, "p_mw"].sum())
             load_mvar = float(net.load.loc[mask, "q_mvar"].sum()) if "q_mvar" in net.load.columns else 0.0
         else:
             load_mw = 0.0
             load_mvar = 0.0
-        gen_mw = float(net.gen.loc[net.gen.bus == bus_idx, "p_mw"].sum()) if not net.gen.empty else 0.0
+        gen_mw = float(net.gen.loc[net.gen.bus == bus_id, "p_mw"].sum()) if not net.gen.empty else 0.0
 
-        if bus_idx in slack_buses:
+        if bus_id in slack_buses:
             bus_type = "Slack"
-        elif bus_idx in gen_buses:
+        elif bus_id in gen_buses:
             bus_type = "PV"
         else:
             bus_type = "PQ"
 
         item: dict[str, Any] = {
-            "id": int(bus_idx),
+            "id": bus_id,
             "name": str(row["name"]),
             "type": bus_type,
-            "vn_kv": float(row["vn_kv"]),
+            "vn_kv": _to_float(row["vn_kv"]),
             "x": x,
             "y": y,
             "loadMw": load_mw,
             "loadMvar": load_mvar,
             "genMw": gen_mw,
         }
-        if bus_idx in geo_positions:
-            lon, lat = geo_positions[bus_idx]
+        if bus_id in geo_positions:
+            lon, lat = geo_positions[bus_id]
             item["lon"] = lon
             item["lat"] = lat
         if has_results:
-            item["vmPu"] = _safe_float(net.res_bus.at[bus_idx, "vm_pu"])
-            item["vaDeg"] = _safe_float(net.res_bus.at[bus_idx, "va_degree"])
-            if bus_idx in gen_buses and not net.res_gen.empty:
-                gen_mask = net.gen.bus == bus_idx
+            item["vmPu"] = _safe_float(net.res_bus.at[bus_id, "vm_pu"])
+            item["vaDeg"] = _safe_float(net.res_bus.at[bus_id, "va_degree"])
+            if bus_id in gen_buses and not net.res_gen.empty:
+                gen_mask = net.gen.bus == bus_id
                 gen_indices = net.gen.index[gen_mask]
                 q_values = net.res_gen.loc[gen_indices, "q_mvar"].dropna()
                 if not q_values.empty:
@@ -235,20 +252,21 @@ def _serialize_buses(
 def _serialize_lines(net: pp.pandapowerNet, has_results: bool) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for line_idx, row in net.line.iterrows():
-        from_bus = int(row.from_bus)
-        to_bus = int(row.to_bus)
-        voltage = float(net.bus.at[from_bus, "vn_kv"])
+        line_id = _to_int(line_idx)
+        from_bus = _to_int(row.from_bus)
+        to_bus = _to_int(row.to_bus)
+        voltage = _to_float(net.bus.at[from_bus, "vn_kv"])
         item: dict[str, Any] = {
-            "id": int(line_idx),
+            "id": line_id,
             "name": str(row["name"]),
             "fromBus": from_bus,
             "toBus": to_bus,
             "voltage": voltage,
-            "lengthKm": float(row["length_km"]),
+            "lengthKm": _to_float(row["length_km"]),
         }
         if has_results:
-            item["loading"] = _safe_float(net.res_line.at[line_idx, "loading_percent"])
-            item["pFromMw"] = _safe_float(net.res_line.at[line_idx, "p_from_mw"])
+            item["loading"] = _safe_float(net.res_line.at[line_id, "loading_percent"])
+            item["pFromMw"] = _safe_float(net.res_line.at[line_id, "p_from_mw"])
         else:
             item["loading"] = 0.0
         out.append(item)
@@ -258,18 +276,19 @@ def _serialize_lines(net: pp.pandapowerNet, has_results: bool) -> list[dict[str,
 def _serialize_trafos(net: pp.pandapowerNet, has_results: bool) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for trafo_idx, row in net.trafo.iterrows():
+        trafo_id = _to_int(trafo_idx)
         item: dict[str, Any] = {
-            "id": int(trafo_idx),
+            "id": trafo_id,
             "name": str(row["name"]),
-            "hvBus": int(row.hv_bus),
-            "lvBus": int(row.lv_bus),
-            "vnHvKv": float(row["vn_hv_kv"]),
-            "vnLvKv": float(row["vn_lv_kv"]),
-            "snMva": float(row["sn_mva"]),
+            "hvBus": _to_int(row.hv_bus),
+            "lvBus": _to_int(row.lv_bus),
+            "vnHvKv": _to_float(row["vn_hv_kv"]),
+            "vnLvKv": _to_float(row["vn_lv_kv"]),
+            "snMva": _to_float(row["sn_mva"]),
         }
         if has_results:
-            item["loading"] = _safe_float(net.res_trafo.at[trafo_idx, "loading_percent"])
-            item["pHvMw"] = _safe_float(net.res_trafo.at[trafo_idx, "p_hv_mw"])
+            item["loading"] = _safe_float(net.res_trafo.at[trafo_id, "loading_percent"])
+            item["pHvMw"] = _safe_float(net.res_trafo.at[trafo_id, "p_hv_mw"])
         else:
             item["loading"] = 0.0
         out.append(item)
@@ -277,9 +296,16 @@ def _serialize_trafos(net: pp.pandapowerNet, has_results: bool) -> list[dict[str
 
 
 def _safe_float(value: Any) -> float | None:
-    try:
+    if isinstance(value, bool):
         f = float(value)
-    except (TypeError, ValueError):
+    elif isinstance(value, Real):
+        f = float(value)
+    elif isinstance(value, str):
+        try:
+            f = float(value)
+        except ValueError:
+            return None
+    else:
         return None
     if math.isnan(f) or math.isinf(f):
         return None

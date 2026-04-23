@@ -1,5 +1,11 @@
+from collections.abc import Callable
+
 import pandapower as pp
+import pandapower.auxiliary as pp_aux
 import pandas as pd
+
+
+_RUNPP: Callable[..., None] = pp.runpp
 
 
 class PowerFlowRunner:
@@ -18,7 +24,7 @@ class PowerFlowRunner:
         Zwraca True jeśli zbieżny, False jeśli nie.
         """
         try:
-            pp.runpp(
+            _RUNPP(
                 self.net,
                 algorithm=algorithm,
                 calculate_voltage_angles=True,
@@ -27,7 +33,7 @@ class PowerFlowRunner:
                 tolerance_mva=tolerance_mva,
             )
             return True
-        except pp.auxiliary.LoadflowNotConverged:
+        except pp_aux.LoadflowNotConverged:
             print(f"❌ Load flow nie zbiegł po {max_iteration} iteracjach!")
             return False
 
