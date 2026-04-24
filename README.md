@@ -6,7 +6,7 @@ Narzędzie do wizualizacji i analizy rozpływu mocy z plików MATPOWER (`.m`), o
 - Liczy rozpływ mocy (algorytm Iwamoto-NR, start AC)
 - Otwiera interaktywny dashboard w przeglądarce z filtrami napięć, wyszukiwaniem szyn i kartą szczegółów na wykresie
 
-![dashboard preview](docs/preview.png)
+![dashboard preview](docs/03-materialy-zrodlowe/kse-atlas/preview.png)
 
 ---
 
@@ -256,17 +256,17 @@ kse_grid/
 
 ## Rozwiązywanie problemów
 
-| Problem | Rozwiązanie |
-|---|---|
-| `ModuleNotFoundError: matpowercaseframes` | Środowisko nie aktywne lub `uv sync` nie wykonany. Aktywuj venv i powtórz. |
-| Port 8050 zajęty | Uruchom `serve(port=...)` albo zwolnij port 8050. |
-| `pandapower` zgłasza ostrzeżenia o `BR_B` lub „fake transformers" | Normalne dla `case3120sp.m` – artefakt pliku MATPOWER, wynik PF jest poprawny. |
-| Naruszenia napięcia i przeciążenia w `case3120sp` | To celowe – publiczny przypadek jest naciskiem stresowym, nie odwzorowaniem rzeczywistego stanu sieci. |
-| Layout grafu trwa długo | Spring layout dla 3120 węzłów to ~7 s, jednorazowo per uruchomienie. W trybie OSM nie ma kosztu layoutu, ale potrzebne są współrzędne WGS84. |
-| Chip „OpenStreetMap" jest zablokowany | Case nie ma geometrii. Dla case'ów TAMU wygeneruj sidecar z `.EPC`: `uv run python -m kse_grid.convert_tamu_geo path/do/case.EPC --out data/case.geojson`. |
-| TAMU `.m` wywala `IndexError` na `gencost` | Loader automatycznie usuwa blok `mpc.gencost` jeśli pandapower nie potrafi go zaimportować (poly cost > 2nd order). To bezpieczny fallback – PF nadal się liczy. |
-| TAMU `.m` wywala `No reference bus` | Loader automatycznie reaktywuje pierwszy `ext_grid` lub ustawia `slack=True` na pierwszym aktywnym generatorze. |
-| Windows: PowerShell odmawia aktywacji venv | `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`, potem ponownie aktywuj. |
-| Brak `python3.13` w systemie | Linux: `uv python install 3.13`. Windows: pobierz z [python.org](https://www.python.org/downloads/). |
+| Problem                                                           | Rozwiązanie                                                                                                                                                      |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModuleNotFoundError: matpowercaseframes`                         | Środowisko nie aktywne lub `uv sync` nie wykonany. Aktywuj venv i powtórz.                                                                                       |
+| Port 8050 zajęty                                                  | Uruchom `serve(port=...)` albo zwolnij port 8050.                                                                                                                |
+| `pandapower` zgłasza ostrzeżenia o `BR_B` lub „fake transformers" | Normalne dla `case3120sp.m` – artefakt pliku MATPOWER, wynik PF jest poprawny.                                                                                   |
+| Naruszenia napięcia i przeciążenia w `case3120sp`                 | To celowe – publiczny przypadek jest naciskiem stresowym, nie odwzorowaniem rzeczywistego stanu sieci.                                                           |
+| Layout grafu trwa długo                                           | Spring layout dla 3120 węzłów to ~7 s, jednorazowo per uruchomienie. W trybie OSM nie ma kosztu layoutu, ale potrzebne są współrzędne WGS84.                     |
+| Chip „OpenStreetMap" jest zablokowany                             | Case nie ma geometrii. Dla case'ów TAMU wygeneruj sidecar z `.EPC`: `uv run python -m kse_grid.convert_tamu_geo path/do/case.EPC --out data/case.geojson`.       |
+| TAMU `.m` wywala `IndexError` na `gencost`                        | Loader automatycznie usuwa blok `mpc.gencost` jeśli pandapower nie potrafi go zaimportować (poly cost > 2nd order). To bezpieczny fallback – PF nadal się liczy. |
+| TAMU `.m` wywala `No reference bus`                               | Loader automatycznie reaktywuje pierwszy `ext_grid` lub ustawia `slack=True` na pierwszym aktywnym generatorze.                                                  |
+| Windows: PowerShell odmawia aktywacji venv                        | `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`, potem ponownie aktywuj.                                                                  |
+| Brak `python3.13` w systemie                                      | Linux: `uv python install 3.13`. Windows: pobierz z [python.org](https://www.python.org/downloads/).                                                             |
 
 ---
