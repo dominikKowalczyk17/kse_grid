@@ -3,7 +3,7 @@ fuzzy-matching station names against a KSE KMZ atlas (e.g. KSE_2019.kmz).
 
 Inputs:
   --epc   PowerWorld .EPC from the TAMU pack (provides bus -> substation
-          name mapping). Required.
+          name mapping). Required.main
   --kmz   KMZ archive containing Placemarks with <Point> coordinates and
           Polish substation names. Required.
   --out   Output GeoJSON sidecar path. Required.

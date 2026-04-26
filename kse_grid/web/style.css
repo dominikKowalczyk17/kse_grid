@@ -316,6 +316,189 @@ body {
     color: var(--bad);
 }
 
+.diag-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.diag-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 2.2rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: var(--radius-sm);
+    background: var(--muted-40);
+}
+
+.diag-row-button {
+    width: 100%;
+    border: 1px solid transparent;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.diag-row-button:hover:not(:disabled) {
+    background: var(--accent-soft);
+    border-color: var(--primary-30);
+}
+
+.diag-row-button:disabled {
+    cursor: default;
+    opacity: 0.9;
+}
+
+.diag-main,
+.diag-values {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.diag-label {
+    color: var(--muted-foreground);
+    font-size: 0.72rem;
+}
+
+.diag-sub {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    color: var(--muted-foreground);
+}
+
+.diag-values {
+    align-items: flex-end;
+    text-align: right;
+}
+
+.diag-value {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--foreground);
+}
+
+.diag-value.good {
+    color: var(--good);
+}
+
+.diag-value.warn {
+    color: var(--warn);
+}
+
+.diag-value.bad {
+    color: var(--bad);
+}
+
+.histogram-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.histogram-chart {
+    position: relative;
+    height: 6rem;
+    overflow: hidden;
+    border-radius: var(--radius-sm);
+    background: var(--muted-40);
+    box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.histogram-band {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.histogram-band-good {
+    background: oklch(0.75 0.18 145 / 0.08);
+}
+
+.histogram-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    pointer-events: none;
+}
+
+.histogram-line-nominal {
+    background: oklch(0.95 0.01 240 / 0.28);
+    border-left: 1px dashed oklch(0.95 0.01 240 / 0.32);
+}
+
+.histogram-bars {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    padding: 0.35rem 0.25rem 0.25rem;
+}
+
+.histogram-bar-button {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: default;
+}
+
+.histogram-bar-button.clickable {
+    cursor: pointer;
+}
+
+.histogram-bar {
+    width: 100%;
+    min-height: 2px;
+    border-radius: 2px 2px 0 0;
+    opacity: 0.85;
+    transition: opacity 0.15s, transform 0.15s;
+}
+
+.histogram-bar-button.active .histogram-bar,
+.histogram-bar-button:hover .histogram-bar {
+    opacity: 1;
+}
+
+.histogram-bar.good {
+    background: #43A047;
+}
+
+.histogram-bar.warn {
+    background: #F9A825;
+}
+
+.histogram-bar.bad {
+    background: #D32F2F;
+}
+
+.histogram-axis {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    color: var(--muted-foreground);
+}
+
+.histogram-readout {
+    min-height: 2rem;
+    padding: 0.45rem 0.55rem;
+    border-radius: var(--radius-sm);
+    background: var(--muted-40);
+    font-size: 0.67rem;
+    color: var(--muted-foreground);
+    line-height: 1.45;
+}
+
 /* ---------- Search bus ----------------------------------------------- */
 
 .search-wrap {

@@ -156,7 +156,7 @@ grid.run_powerflow(
 
 Po wejściu na `http://127.0.0.1:8050/`:
 
-- **Lewy panel** – podsumowanie sieci, wyszukiwarka szyn, reset widoku, przełącznik trybu (Graf / OpenStreetMap), filtry napięć i typów elementów oraz legendy.
+- **Lewy panel** – bilans mocy, profil napięciowy, diagnostyka obciążenia gałęzi, histogram rozkładu `U`, podsumowanie sieci, wyszukiwarka szyn, reset widoku, przełącznik trybu (Graf / OpenStreetMap / Atlas KSE), filtry napięć i typów elementów oraz legendy.
 - **Tryb Graf** – spring layout w dwuwymiarowej przestrzeni abstrakcyjnej.
 - **Tryb OpenStreetMap** – sieć nałożona na szarą mapę (`carto-positron`) z zaznaczonym konturem Polski. Aktywny tylko jeśli case ma geometrię WGS84.
 - **Tryb Atlas KSE** – osobny widok referencyjny: **stacje + linie** z atlasu KSE 2019 (OpenInfraMap / OSM), pokolorowane wg roli: przesył NN (PSE) – czerwony, dystrybucja 110 kV (OSD) – niebieski, linie blokowe / JW – szary kreskowany. Bez modelu pandapower; służy do wzrokowej weryfikacji geometrii sieci.
