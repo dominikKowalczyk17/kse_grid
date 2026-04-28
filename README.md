@@ -5,6 +5,7 @@ Narzędzie do wizualizacji i analizy rozpływu mocy z plików MATPOWER (`.m`), o
 - Wczytuje dowolny plik `.m` (format MATPOWER)
 - Liczy rozpływ mocy (algorytm Iwamoto-NR, start AC)
 - Otwiera interaktywny dashboard w przeglądarce z filtrami napięć, wyszukiwaniem szyn i kartą szczegółów na wykresie
+- Dodatkowo udostępnia `KSEGrid.report()` – tekstowy raport (bilans mocy, top przeciążenia, naruszenia napięcia ±5 % `Un`) drukowany w terminalu
 
 ![dashboard preview](docs/03-materialy-zrodlowe/kse-atlas/preview.png)
 
@@ -12,12 +13,41 @@ Narzędzie do wizualizacji i analizy rozpływu mocy z plików MATPOWER (`.m`), o
 
 ## Spis treści
 
-1. [Instalacja](#instalacja)
-2. [Uruchomienie](#uruchomienie)
-3. [Użycie z poziomu kodu](#użycie-z-poziomu-kodu)
-4. [Dashboard](#dashboard)
-5. [Struktura projektu](#struktura-projektu)
-6. [Rozwiązywanie problemów](#rozwiązywanie-problemów)
+1. [Szybki start na macOS](#szybki-start-na-macos)
+2. [Instalacja](#instalacja)
+3. [Uruchomienie](#uruchomienie)
+4. [Użycie z poziomu kodu](#użycie-z-poziomu-kodu)
+5. [Dashboard](#dashboard)
+6. [Struktura projektu](#struktura-projektu)
+7. [Rozwiązywanie problemów](#rozwiązywanie-problemów)
+
+---
+
+## Szybki start na macOS
+
+```bash
+# 1. Zainstaluj menedżer pakietów uv (jednorazowo)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. Po zakończeniu instalacji ZRESTARTUJ Terminal (zamknij i otwórz ponownie),
+#    żeby polecenie `uv` było widoczne. Sprawdź:
+uv --version
+
+# 3. Pobierz projekt z GitHuba
+git clone https://github.com/dominikKowalczyk17/kse_grid.git
+cd kse_grid
+
+# 4. Uruchom aplikację (uv samo zainstaluje Python 3.13 i wszystkie zależności)
+uv run python main.py
+```
+
+Po chwili w Terminalu pojawi się komunikat `Uvicorn running on http://127.0.0.1:8050` i automatycznie otworzy się Safari/Chrome z dashboardem. Aby zatrzymać serwer: `Ctrl + C` w Terminalu.
+
+> metoda `KSEGrid.report()` drukuje bilans mocy, top przeciążenia i naruszenia napięcia bezpośrednio w terminalu.
+
+> **Jeśli macOS poprosi o instalację narzędzi developerskich („command line developer tools")** przy `git clone` — kliknij **Install** i poczekaj kilka minut. Jeśli `curl` lub `git` nie działają w ogóle, uruchom `xcode-select --install`.
+
+Dalsze szczegóły (Linux, Windows, instalacja bez `uv`, własne pliki `.m`) — w sekcjach poniżej.
 
 ---
 
@@ -92,61 +122,38 @@ python -c "import pandapower, plotly, matpowercaseframes; print('OK')"
 
 ```bash
 # domyślny plik (data/case3120sp.m)
-python main.py
+uv run python main.py
 
 # własny plik .m
-python main.py ścieżka/do/case.m
-
-# bez aktywacji venv (z uv)
-uv run python main.py
+uv run python main.py ścieżka/do/case.m
 ```
 
-Co się dzieje po uruchomieniu:
-
-1. Wczytanie pliku `.m` (+ ewentualnego sidecara z geometrią)
-2. Obliczenia load flow – Newton-Raphson Iwamoto, start AC (U=1 p.u., kąt=0°)
-3. Wygenerowanie widoku sieci: spring layout albo OpenStreetMap, jeśli case dostarczy współrzędne WGS84
-4. Start serwera FastAPI pod `http://127.0.0.1:8050/` i otwarcie przeglądarki
-
-Serwer działa do `Ctrl+C`.
+Uruchomienie inicjuje load flow (Iwamoto-NR, start AC), generuje layout sieci (spring layout albo geometryczny WGS84 jeśli case go dostarcza) i startuje serwer FastAPI pod `http://127.0.0.1:8050/`. Przeglądarka otwiera się automatycznie. Stop: `Ctrl+C`.
 
 ---
 
 ## Użycie z poziomu kodu
 
-### Podstawowe użycie
-
 ```python
 import kse_grid
 
+# minimum: dashboard w przeglądarce
 kse_grid.KSEGrid.from_matpower_case("data/case3120sp.m").run_powerflow().serve()
-```
 
-### Z raportem tekstowym
-
-```python
-import kse_grid
-
+# z raportem tekstowym (bilans mocy, top 10 linii, naruszenia ±5% Un)
 grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
-grid.report()    # bilans mocy, napięcia, top 10 linii – w terminalu
-grid.serve()     # dashboard w przeglądarce
-```
+grid.report()
+grid.serve()
 
-### Dostęp do danych pandapower
+# bezpośredni dostęp do pandapower
+print(grid.net.res_bus.head())
+print(grid.net.res_line[grid.net.res_line.loading_percent > 100])
 
-```python
-net = grid.net
-print(net.res_bus.head())                                    # wyniki napięć
-print(net.res_line[net.res_line.loading_percent > 100])      # przeciążone linie
-```
-
-### Parametry obliczeń
-
-```python
+# parametry obliczeń
 grid.run_powerflow(
-    algorithm="iwamoto_nr",  # stabilniejszy od klasycznego NR przy słabych sieciach
+    algorithm="nr",
     max_iteration=100,
-    tolerance_mva=1.0,
+    tolerance_mva=1.5,
 )
 ```
 
@@ -156,28 +163,30 @@ grid.run_powerflow(
 
 Po wejściu na `http://127.0.0.1:8050/`:
 
-- **Lewy panel** – bilans mocy, profil napięciowy, diagnostyka obciążenia gałęzi, histogram rozkładu `U`, podsumowanie sieci, wyszukiwarka szyn, reset widoku, przełącznik trybu (Graf / OpenStreetMap / Atlas KSE), filtry napięć i typów elementów oraz legendy.
-- **Tryb Graf** – spring layout w dwuwymiarowej przestrzeni abstrakcyjnej.
-- **Tryb OpenStreetMap** – sieć nałożona na szarą mapę (`carto-positron`) z zaznaczonym konturem Polski. Aktywny tylko jeśli case ma geometrię WGS84.
-- **Tryb Atlas KSE** – osobny widok referencyjny: **stacje + linie** z atlasu KSE 2019 (OpenInfraMap / OSM), pokolorowane wg roli: przesył NN (PSE) – czerwony, dystrybucja 110 kV (OSD) – niebieski, linie blokowe / JW – szary kreskowany. Bez modelu pandapower; służy do wzrokowej weryfikacji geometrii sieci.
-- **Kolor linii i transformatorów** = obciążenie prądowe:
-  - 🟢 0–40 % → 🟡 40–70 % → 🟠 70–100 % → 🔴 > 100 % (przeciążenie).
+- **Lewy panel** – bilans mocy, profil napięciowy, diagnostyka obciążenia gałęzi, histogram rozkładu `U`, podsumowanie sieci, wyszukiwarka szyn, reset widoku, przełącznik trybu (Graf / OpenStreetMap / Atlas KSE), **filtry mocy i obciążenia**, filtry napięć i typów elementów oraz legendy.
+- **Tryb Graf** (domyślny) – spring layout w dwuwymiarowej przestrzeni abstrakcyjnej.
+- **Tryb OpenStreetMap** – sieć nałożona na szarą mapę (`carto-positron` / `carto-darkmatter`) z zaznaczonym konturem Polski. Aktywny tylko jeśli case ma geometrię WGS84.
+- **Tryb Atlas KSE** – widok referencyjny: stacje + linie z atlasu KSE 2019 (OpenInfraMap / OSM), bez modelu pandapower. Pozwala wzrokowo zweryfikować, czy dataset TAMU pokrywa się z rzeczywistą topologią KSE. Kolory: przesył NN (PSE) – czerwony, dystrybucja 110 kV (OSD) – niebieski, linie blokowe / JW – szary kreskowany.
+- **Motyw jasny / ciemny** – przełącznik 🌞 / 🌙 w prawym górnym rogu nagłówka. Ustawienie zapamiętywane w `localStorage`.
+- **Filtry mocy i obciążenia** (sekcja w sidebarze):
+  - **Min. obciążenie linii / trafo** – ukrywa gałęzie poniżej zadanego procenta. Szyny pozostawione bez żadnej widocznej linii też znikają.
+  - **Min. moc na szynie** – pokazuje tylko szyny, gdzie `max(|P obc.|, |P gen.|)` przekracza próg (MW). Linie do ukrytych szyn również znikają.
+- **Kolor linii i transformatorów** = obciążenie prądowe wg progu PSE 150 %:
+  - 🟢 0–60 % → 🟡 60–100 % → 🟠 100–150 % → 🔴 > 150 % (przeciążenie).
+- **Symbol transformatora** – zgodny z normą **IEC 60417-5156** (dwa przecinające się okręgi).
 - **Kolor węzłów (szyn)** = napięcie `Um` w binach traffic-light:
   - 🟣 < 0.90 p.u. (krytycznie niskie)
   - 🔵 0.90 – 0.95 (niskie)
   - 🟢 0.95 – 1.05 (OK)
   - 🟠 1.05 – 1.10 (wysokie)
   - 🔴 > 1.10 p.u. (krytycznie wysokie)
-- **Domyślny widok** – startowo pokazywany jest **rdzeń 400/220 kV**, żeby duże przypadki były czytelniejsze.
-- **Presety filtrów napięć:** `Rdzeń 400/220`, `Wszystkie`, `Żadne`.
-- **Checklisty** – niezależne włączanie poziomów napięć i typów elementów (`Linie`, `Transformatory`, `Szyny`).
-- **Interakcja:** klik = karta szczegółów, klik w tło = usunięcie zaznaczenia, wyszukiwarka = centrowanie, scroll = zoom, drag = pan.
-
-> Jeśli case zawiera geometrię WGS84 (bezpośrednio albo przez sidecar GeoJSON o tej samej nazwie), aplikacja startuje od razu w trybie OpenStreetMap.
+- **Filtry napięć** – presety (`Rdzeń 400/220`, `110 kV`, `Wszystkie`) + checklisty per poziom. Domyślnie startujemy z rdzeniem 400/220 kV.
+- **Checklisty elementów** – `Linie`, `Transformatory`, `Szyny`.
+- **Interakcja:** klik = karta szczegółów, klik w tło = usunięcie zaznaczenia, wyszukiwarka = centrowanie, scroll = zoom, drag = pan. Skróty: `R` reset widoku, `Esc` wyczyść zaznaczenie.
 
 ### Tryb mapowy z paczek TAMU
 
-Pliki `.m` od [TAMU Polish Grid](https://electricgrids.engr.tamu.edu/electric-grid-test-cases/polish-grid/) **nie zawierają geo** w samym MATPOWER. Współrzędne stacji 400/220 kV znajdują się w pliku PowerWorld `.EPC` z paczki TAMU. Konwertujemy je do GeoJSON sidecara:
+Pliki `.m` od [TAMU Polish Grid](https://electricgrids.engr.tamu.edu/electric-grid-test-cases/polish-grid/) **nie zawierają geo** w samym MATPOWER. Współrzędne stacji 400/220 kV znajdują się w pliku PowerWorld `.EPC` z paczki TAMU. Konwertujemy je do pliku pomocniczego GeoJSON:
 
 ```bash
 uv run python -m kse_grid.convert_tamu_geo "/path/case.EPC" --out data/case.geojson
@@ -194,9 +203,9 @@ uv run python -m kse_grid.convert_kse_kmz \
   --out data/case.geojson
 ```
 
-Wynikowy sidecar zawiera w `properties.source` znacznik `"kmz"` (dokładne coords z KMZ) lub `"epc"` (fallback z TAMU EPC). Dopasowanie korzysta z normalizacji nazw (usunięcie diakrytyków, kodów PowerWorld i fuzzy match `difflib`). Stroj `--cutoff` (domyślnie 0.86) reguluje agresywność dopasowania.
+Wynikowy plik pomocniczy zawiera w `properties.source` znacznik `"kmz"` (dokładne coords z KMZ) lub `"epc"` (fallback z TAMU EPC). Dopasowanie korzysta z normalizacji nazw (usunięcie diakrytyków, kodów PowerWorld i fuzzy match `difflib`). Stroj `--cutoff` (domyślnie 0.86) reguluje agresywność dopasowania.
 
-Sidecar musi mieć ten sam stem co `.m` (np. `case2746wop_TAMU_Updated.m` ↔ `case2746wop_TAMU_Updated.geojson`). Po konwersji:
+Plik pomocniczy musi mieć tę samą nazwę co `.m` (np. `case2746wop_TAMU_Updated.m` ↔ `case2746wop_TAMU_Updated.geojson`). Po konwersji:
 
 ```bash
 uv run python main.py data/case2746wop_TAMU_Updated.m
@@ -204,17 +213,13 @@ uv run python main.py data/case2746wop_TAMU_Updated.m
 
 #### Atlas KSE 2019 jako warstwa referencyjna
 
-#### Atlas KSE 2019 jako osobny widok
-
-Niezależnie od tego, czy case ma geometrię, w sidebarze dostępny jest tryb **Atlas KSE** — pokazuje on stacje i linie z atlasu KSE 2019 (OpenInfraMap / OSM) na mapie Polski, bez modelu pandapower. Linie i stacje są pokolorowane wg roli: przesył NN (PSE) – czerwony, dystrybucja 110 kV (OSD) – niebieski, linie blokowe / JW – szary kreskowany. To widok referencyjny pozwalający wzrokowo zweryfikować, czy dataset TAMU pokrywa się z rzeczywistą topologią KSE.
-
-Pliki `kse_grid/web/kse_atlas_points.geojson` i `kse_grid/web/kse_atlas_lines.geojson` są wbudowane w aplikację. Można je odświeżyć z `KSE_2019.kmz`:
+Pliki `kse_grid/web/kse_atlas_points.geojson` i `kse_grid/web/kse_atlas_lines.geojson` są wbudowane w aplikację i zasilają tryb **Atlas KSE** w sidebarze. Można je odświeżyć z `KSE_2019.kmz`:
 
 ```bash
 uv run python -m kse_grid.convert_kse_atlas docs/03-materialy-zrodlowe/kse-atlas/KSE_2019.kmz
 ```
 
-### Obsługiwane sidecary GeoJSON
+### Obsługiwane pliki pomocnicze GeoJSON
 
 - `data/<stem>.geojson`
 - `data/<stem>.json`

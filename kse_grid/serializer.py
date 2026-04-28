@@ -14,9 +14,9 @@ from pandapower.topology import create_nxgraph
 
 _VOLTAGE_OK_MIN = 0.95
 _VOLTAGE_OK_MAX = 1.05
-_OVERLOAD_PCT = 100.0
-_LOAD_WARN_PCT = 80.0
-_LOAD_BAD_PCT = 100.0
+_OVERLOAD_PCT = 150.0
+_LOAD_WARN_PCT = 100.0
+_LOAD_BAD_PCT = 150.0
 _CORE_VOLTAGE_KV = 220.0
 
 

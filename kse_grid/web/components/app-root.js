@@ -14,6 +14,8 @@ export const App = {
         const selectedTypes = ref(['line', 'trafo', 'bus']);
         const viewMode = ref('graph');
         const atlasCategories = ref(['osp', 'osd', 'jw']);
+        const minLineLoading = ref(0);
+        const minBusPower = ref(0);
         const graphPanelRef = ref(null);
 
         const storedTheme = (typeof localStorage !== 'undefined' && localStorage.getItem(THEME_STORAGE_KEY)) || 'dark';
@@ -56,6 +58,8 @@ export const App = {
             selectedTypes,
             viewMode,
             atlasCategories,
+            minLineLoading,
+            minBusPower,
             graphPanelRef,
             theme,
             toggleTheme,
@@ -104,6 +108,8 @@ export const App = {
                 v-model:selected-types="selectedTypes"
                 v-model:view-mode="viewMode"
                 v-model:atlas-categories="atlasCategories"
+                v-model:min-line-loading="minLineLoading"
+                v-model:min-bus-power="minBusPower"
                 @reset-view="onResetView"
                 @select-bus="onSelectBus" />
             <GraphPanel
@@ -113,6 +119,8 @@ export const App = {
                 :atlas-categories="atlasCategories"
                 :selected-voltages="selectedVoltages"
                 :selected-types="selectedTypes"
+                :min-line-loading="minLineLoading"
+                :min-bus-power="minBusPower"
                 :theme="theme" />
         </div>
     </div>

@@ -24,8 +24,10 @@ export const Sidebar = {
         viewMode: String,
         geoAvailable: Boolean,
         atlasCategories: Array,
+        minLineLoading: { type: Number, default: 0 },
+        minBusPower: { type: Number, default: 0 },
     },
-    emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'update:atlasCategories', 'reset-view', 'select-bus'],
+    emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'update:atlasCategories', 'update:minLineLoading', 'update:minBusPower', 'reset-view', 'select-bus'],
     setup (props, { emit }) {
         const search = ref('');
         const showSuggestions = ref(false);
@@ -174,6 +176,24 @@ export const Sidebar = {
             focusBus(bin.firstBusId);
         }
 
+        const maxBusPower = computed(() => {
+            let max = 0;
+            for (const bus of props.buses) {
+                const p = Math.max(Math.abs(bus.loadMw ?? 0), Math.abs(bus.genMw ?? 0));
+                if (p > max) max = p;
+            }
+            return Math.ceil(max);
+        });
+
+        function setMinLineLoading (value) {
+            const num = Math.max(0, Number(value) || 0);
+            emit('update:minLineLoading', num);
+        }
+        function setMinBusPower (value) {
+            const num = Math.max(0, Number(value) || 0);
+            emit('update:minBusPower', num);
+        }
+
         return {
             search, showSuggestions, suggestions,
             isCore, isAll, isMediumVoltage,
@@ -185,6 +205,7 @@ export const Sidebar = {
             minBusSub, maxBusSub, maxElementSub,
             canFocusBus, focusBus, histogramBarStyle, focusHistogramBin,
             formatMw,
+            maxBusPower, setMinLineLoading, setMinBusPower,
         };
     },
     template: `
@@ -261,15 +282,15 @@ export const Sidebar = {
                         <span class="diag-sub">{{ maxElementSub }}</span>
                     </span>
                     <span class="diag-values">
-                        <span class="diag-value tabular" :class="loadingDiag.maxPct >= 100 ? 'bad' : (loadingDiag.maxPct >= 80 ? 'warn' : 'good')">{{ loadingDiag.maxPct != null ? loadingDiag.maxPct.toFixed(1) + ' %' : '—' }}</span>
+                        <span class="diag-value tabular" :class="loadingDiag.maxPct >= 150 ? 'bad' : (loadingDiag.maxPct >= 100 ? 'warn' : 'good')">{{ loadingDiag.maxPct != null ? loadingDiag.maxPct.toFixed(1) + ' %' : '—' }}</span>
                     </span>
                 </div>
                 <div class="diag-row">
-                    <span class="diag-label">Przeciążone ≥ 100%</span>
+                    <span class="diag-label">Przeciążone ≥ 150%</span>
                     <span class="diag-value tabular" :class="{ bad: (loadingDiag.overloadedCount ?? 0) > 0 }">{{ loadingDiag.overloadedCount ?? 0 }}</span>
                 </div>
                 <div class="diag-row">
-                    <span class="diag-label">Ciężko obciążone 80–100%</span>
+                    <span class="diag-label">Ciężko obciążone 100–150%</span>
                     <span class="diag-value tabular">{{ loadingDiag.heavyCount ?? 0 }}</span>
                 </div>
                 <div class="diag-row">
@@ -387,6 +408,57 @@ export const Sidebar = {
         </section>
 
         <section class="section-card">
+            <h3 class="section-title">Filtry mocy / obciążenia</h3>
+            <div class="filter-row">
+                <label class="filter-label" for="flt-line-loading">
+                    Min. obciążenie linii / trafo
+                    <span class="diag-value tabular">{{ minLineLoading.toFixed(0) }}%</span>
+                </label>
+                <div class="filter-controls">
+                    <input
+                        id="flt-line-loading"
+                        type="range"
+                        min="0" max="200" step="1"
+                        :value="minLineLoading"
+                        @input="setMinLineLoading($event.target.value)" />
+                    <input
+                        type="number"
+                        min="0" max="200" step="1"
+                        class="filter-num"
+                        :value="minLineLoading"
+                        @input="setMinLineLoading($event.target.value)" />
+                </div>
+                <p class="helper" v-if="!hasResults">Brak wyników rozpływu — filtr ukryje wszystko przy wartości &gt; 0.</p>
+            </div>
+            <div class="filter-row">
+                <label class="filter-label" for="flt-bus-power">
+                    Min. moc na szynie (max{P obc., P gen.})
+                    <span class="diag-value tabular">{{ formatMw(minBusPower) }}</span>
+                </label>
+                <div class="filter-controls">
+                    <input
+                        id="flt-bus-power"
+                        type="range"
+                        min="0" :max="maxBusPower" step="1"
+                        :value="minBusPower"
+                        @input="setMinBusPower($event.target.value)" />
+                    <input
+                        type="number"
+                        min="0" :max="maxBusPower" step="1"
+                        class="filter-num"
+                        :value="minBusPower"
+                        @input="setMinBusPower($event.target.value)" />
+                </div>
+                <p class="helper">Maks. w sieci: {{ formatMw(maxBusPower) }}. Linie z ukrytymi szynami też znikają.</p>
+            </div>
+            <div class="btn-search-row">
+                <button class="btn btn-block" type="button" @click="setMinLineLoading(0); setMinBusPower(0);">
+                    Wyczyść filtry
+                </button>
+            </div>
+        </section>
+
+        <section class="section-card">
             <h3 class="section-title">Poziomy napięć</h3>
             <div class="chip-row">
                 <button class="chip" :class="{ active: isCore }" @click="applyPreset('core')">Rdzeń 400/220</button>
@@ -467,7 +539,7 @@ export const Sidebar = {
             <h3 class="section-title">Obciążenie linii</h3>
             <div class="legend-bar"></div>
             <div class="legend-scale">
-                <span>0%</span><span>40%</span><span>80%</span><span>100%+</span>
+                <span>0%</span><span>60%</span><span>100%</span><span>150%+</span>
             </div>
         </section>
 

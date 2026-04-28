@@ -57,6 +57,8 @@ export const GraphPanel = {
         viewMode: String,
         atlasCategories: Array,
         theme: { type: String, default: 'dark' },
+        minLineLoading: { type: Number, default: 0 },
+        minBusPower: { type: Number, default: 0 },
     },
     setup (props) {
         const graphEl = ref(null);
@@ -76,11 +78,36 @@ export const GraphPanel = {
             const voltageSet = new Set(props.selectedVoltages);
             const typeSet = new Set(props.selectedTypes);
             const total = { bus: props.network.buses.length, line: props.network.lines.length };
+            const minLoad = Math.max(0, Number(props.minLineLoading) || 0);
+            const minPow = Math.max(0, Number(props.minBusPower) || 0);
+            const passesBusPower = bus => minPow <= 0
+                || Math.max(Math.abs(bus.loadMw ?? 0), Math.abs(bus.genMw ?? 0)) >= minPow;
+            const visibleBusIds = new Set(props.network.buses.filter(passesBusPower).map(bus => bus.id));
+            const branchOk = el => visibleBusIds.has(el.fromBus ?? el.hvBus) && visibleBusIds.has(el.toBus ?? el.lvBus);
+            let connected = null;
+            if (minLoad > 0) {
+                connected = new Set();
+                for (const ln of props.network.lines) {
+                    if ((ln.loading ?? 0) >= minLoad && branchOk(ln)) {
+                        connected.add(ln.fromBus); connected.add(ln.toBus);
+                    }
+                }
+                for (const tr of props.network.trafos) {
+                    if ((tr.loading ?? 0) >= minLoad && branchOk(tr)) {
+                        connected.add(tr.hvBus); connected.add(tr.lvBus);
+                    }
+                }
+            }
             const buses = typeSet.has('bus')
-                ? props.network.buses.filter(bus => voltageSet.has(bus.vn_kv) && ((props.viewMode !== 'geo' && props.viewMode !== 'atlas') || (bus.lat != null && bus.lon != null))).length
+                ? props.network.buses.filter(bus => voltageSet.has(bus.vn_kv)
+                    && visibleBusIds.has(bus.id)
+                    && (connected === null || connected.has(bus.id))
+                    && ((props.viewMode !== 'geo' && props.viewMode !== 'atlas') || (bus.lat != null && bus.lon != null))).length
                 : 0;
             const lines = typeSet.has('line')
-                ? props.network.lines.filter(line => voltageSet.has(line.voltage)).length
+                ? props.network.lines.filter(line => voltageSet.has(line.voltage)
+                    && (line.loading ?? 0) >= minLoad
+                    && visibleBusIds.has(line.fromBus) && visibleBusIds.has(line.toBus)).length
                 : 0;
             return { buses, lines, totalBuses: total.bus, totalLines: total.line };
         });
@@ -231,7 +258,10 @@ export const GraphPanel = {
 
             const built = props.viewMode === 'atlas'
                 ? buildAtlasTraces()
-                : buildTraces(props.network, props.viewMode);
+                : buildTraces(props.network, props.viewMode, {
+                    minLineLoading: props.minLineLoading,
+                    minBusPower: props.minBusPower,
+                });
             const traces = built.traces;
             const meta = built.meta;
             const shapes = built.shapes || [];
@@ -402,6 +432,10 @@ export const GraphPanel = {
         });
 
         watch(() => props.theme, async () => {
+            await buildPlot();
+        });
+
+        watch(() => [props.minLineLoading, props.minBusPower], async () => {
             await buildPlot();
         });
 
