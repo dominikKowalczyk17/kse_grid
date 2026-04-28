@@ -220,7 +220,7 @@ export function buildTraces(network, viewMode = 'graph', filters = {}) {
     let trafoRadius = 0.04;
     if (viewMode !== 'geo' && graphBounds?.x) {
         const dx = graphBounds.x[1] - graphBounds.x[0];
-        trafoRadius = Math.max(dx * 0.00008, 0.00002);
+        trafoRadius = Math.max(dx * 0.00020, 0.00100);
     }
 
     // ----- linie
