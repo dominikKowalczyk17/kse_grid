@@ -8,8 +8,7 @@
 
 ## Co to jest
 
-
-To jest funkcja pomocnicza lub główna o nazwie `_refresh_composite_names`. Po nazwie widać, że odpowiada za fragment logiki związany z: **refresh composite names**.
+`_refresh_composite_names(net)` odświeża nazwy linii i traf po zmianie nazw busów.
 
 ## Nagłówek funkcji
 
@@ -32,6 +31,13 @@ Kod podpowiada, że funkcja zwraca: `None`.
 
 ## Co robi krok po kroku
 
+To ważne, bo wcześniej linia mogła mieć nazwę:
 
-1. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-2. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
+   - Line 5: Bus 12 -> Bus 48
+
+a po dopasowaniu stacji powinna mieć:
+
+   - Line 5: Kielce 220 kV -> Radom 220 kV
+
+Ale funkcja zmienia tylko nazwy domyślne/generowane automatycznie.
+Jeśli nazwa była własna i sensowna, zostawia ją.

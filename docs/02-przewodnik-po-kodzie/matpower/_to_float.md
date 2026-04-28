@@ -8,8 +8,7 @@
 
 ## Co to jest
 
-
-To jest funkcja pomocnicza lub główna o nazwie `_to_float`. Po nazwie widać, że odpowiada za fragment logiki związany z: **to float**.
+`_to_float(value)` zamienia wartość na float.
 
 ## Nagłówek funkcji
 
@@ -30,10 +29,15 @@ def _to_float(value: object) -> float:
 
 Kod podpowiada, że funkcja zwraca: `float`.
 
-## Co robi krok po kroku
+## Obsługuje:
 
+   - liczby rzeczywiste
+   - bool
+   - string typu "220.0"
 
-1. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-4. Wykonuje kolejny krok logiki funkcji.
+  Jak nie pasuje, rzuca TypeError.
+
+Po co: bezpieczne czytanie:
+- współrzędnych lon/lat
+- napięć vn_kv
+- innych pól liczbowych

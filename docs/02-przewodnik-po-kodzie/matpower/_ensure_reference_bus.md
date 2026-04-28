@@ -9,7 +9,7 @@
 ## Co to jest
 
 
-To jest funkcja pomocnicza lub główna o nazwie `_ensure_reference_bus`. Po nazwie widać, że odpowiada za fragment logiki związany z: **ensure reference bus**.
+`ensure_reference_bus(net)` - pilnuje, żeby sieć miała punkt odniesienia/slack, bo bez tego load flow może się nie policzyć.
 
 ## Nagłówek funkcji
 
@@ -25,16 +25,16 @@ def _ensure_reference_bus(net: pp.pandapowerNet) -> None:
 |---|---|---|
 | `net` | `pp.pandapowerNet` | `brak` |
 
-## Co zwraca
+## Logika:
 
+1. sprawdza, czy już istnieje aktywny ext_grid
+2. albo aktywny generator z slack=True
+3. jeśli tak, nic nie robi
 
-Kod podpowiada, że funkcja zwraca: `None`.
+Jeśli nie ma reference bus:
 
-## Co robi krok po kroku
-
-
-1. Przygotowuje zmienne pomocnicze: `active_ext_grid`.
-2. Przygotowuje zmienne pomocnicze: `active_slack_gen`.
-3. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-4. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-5. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
+1. bierze pierwszy ext_grid, którego bus jest aktywny, i ustawia mu in_service=True
+2. jeśli nie ma sensownego ext_grid, bierze pierwszy aktywny generator:
+   - ustawia in_service=True
+   - ustawia slack=True
+   - jeśli jest kolumna slack_weight i jest pusta, daje 1.0

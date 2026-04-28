@@ -33,13 +33,9 @@ Kod podpowiada, że funkcja zwraca: `brak`.
 ## Co robi krok po kroku
 
 
-1. Tworzy lub uzupełnia zmienne `bus_names` na podstawie wyniku funkcji `net.bus["name"].fillna("").astype(str).str.strip`.
-2. Tworzy lub uzupełnia zmienne `empty_bus_names` na podstawie wyniku funkcji `bus_names.eq`.
-3. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-4. Tworzy lub uzupełnia zmienne `line_names` na podstawie wyniku funkcji `net.line["name"].fillna("").astype(str).str.strip`.
-5. Tworzy lub uzupełnia zmienne `empty_line_names` na podstawie wyniku funkcji `line_names.eq`.
-6. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-7. Tworzy lub uzupełnia zmienne `trafo_names` na podstawie wyniku funkcji `net.trafo["name"].fillna("").astype(str).str.strip`.
-8. Tworzy lub uzupełnia zmienne `empty_trafo_names` na podstawie wyniku funkcji `trafo_names.eq`.
-9. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-10. Wywołuje funkcję `_ensure_reference_bus`.
+1. jeśli szyna nie ma nazwy, wpisuje Bus N
+2. jeśli linia nie ma nazwy, wpisuje Line N: busA -> busB
+3. jeśli trafo nie ma nazwy, wpisuje Trafo N: hvBus -> lvBus
+4. na końcu woła _ensure_reference_bus(net)
+
+Po co: żeby UI, tooltipy, listy i diagnostyka nie miały pustych nazw.

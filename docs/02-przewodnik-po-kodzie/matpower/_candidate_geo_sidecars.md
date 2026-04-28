@@ -7,10 +7,17 @@
 
 
 ## Co to jest
+`_candidate_geo_sidecars(case_path)` generuje listę nazw plików, których loader szuka obok case'a.
 
+  Dla case2746wop.m sprawdzi kolejno np.:
 
-To jest funkcja pomocnicza lub główna o nazwie `_candidate_geo_sidecars`. Po nazwie widać, że odpowiada za fragment logiki związany z: **candidate geo sidecars**.
+   1. case2746wop.geojson
+   2. case2746wop.json
+   3. case2746wop.wgs84.geojson
+   4. case2746wop_wgs84.geojson
+   5. case2746wop_geo.geojson
 
+  Po co: różne konwertery i datasety dają różne nazwy plików, więc loader obsługuje kilka wariantów.
 ## Nagłówek funkcji
 
 

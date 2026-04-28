@@ -78,6 +78,27 @@ net.line.loc[0, "name"]
 
 To drugie pokazuje ważny szczegół: po zmianie nazwy szyny potrafią zmienić się też nazwy elementów złożonych.
 
+## Krok po kroku:
+
+   1. czyta plik JSON
+   2. sprawdza, czy to FeatureCollection
+   3. buduje 3 słowniki do dopasowania:
+      - po indeksie busa 0-based
+      - po indeksie 1-based
+      - po nazwie busa
+   4. iteruje po features
+   5. bierze tylko obiekty typu Point
+   6. bierze współrzędne lon, lat
+   7. woła _match_geo_feature_to_bus(...), żeby znaleźć bus
+   8. jeśli znalazł:
+      - wpisuje net.bus["geo"] jako GeoJSON Point
+      - opcjonalnie podmienia nazwę szyny na nazwę stacji z GeoJSON
+   9. jeśli zmienił jakieś nazwy szyn, woła _refresh_composite_names(net)
+
+  Jeśli nie dopasuje ani jednego punktu, rzuca błąd.
+
+  Czyli: „wczytaj punkty, znajdź odpowiadające busy, wpisz im współrzędne i lepsze nazwy”.
+
 ## Jak dokładnie łączy GeoJSON z case'em
 
 1. Wczytuje `FeatureCollection` z pliku.

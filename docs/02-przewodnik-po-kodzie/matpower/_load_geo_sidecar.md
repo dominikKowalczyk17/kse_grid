@@ -7,9 +7,17 @@
 
 
 ## Co to jest
+`_load_geo_sidecar(net, case_path)` ładuje geometrię szyn z pliku obok case'a.
 
+  Logika:
 
-To jest funkcja pomocnicza lub główna o nazwie `_load_geo_sidecar`. Po nazwie widać, że odpowiada za fragment logiki związany z: **load geo sidecar**.
+   1. bierze listę możliwych sidecarów z _candidate_geo_sidecars(...)
+   2. sprawdza po kolei, czy plik istnieje
+   3. pierwszy znaleziony przekazuje do _apply_geojson_sidecar(...)
+   4. zapamiętuje źródło w net._geo_source
+   5. kończy po pierwszym trafionym pliku
+
+  Czyli: „znajdź GeoJSON obok .m i dolep współrzędne do busów”.
 
 ## Nagłówek funkcji
 
@@ -25,13 +33,3 @@ def _load_geo_sidecar(net: pp.pandapowerNet, case_path: Path) -> None:
 |---|---|---|
 | `net` | `pp.pandapowerNet` | `brak` |
 | `case_path` | `Path` | `brak` |
-
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `None`.
-
-## Co robi krok po kroku
-
-
-1. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.

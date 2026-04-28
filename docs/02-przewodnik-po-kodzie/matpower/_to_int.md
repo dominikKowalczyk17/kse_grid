@@ -8,8 +8,7 @@
 
 ## Co to jest
 
-
-To jest funkcja pomocnicza lub główna o nazwie `_to_int`. Po nazwie widać, że odpowiada za fragment logiki związany z: **to int**.
+`_to_int(value)` zamienia wartość na int, ale tylko jeśli wygląda jak liczba całkowita.
 
 ## Nagłówek funkcji
 
@@ -30,9 +29,12 @@ def _to_int(value: object) -> int:
 
 Kod podpowiada, że funkcja zwraca: `int`.
 
-## Co robi krok po kroku
+## Obsługuje:
 
+   - int
+   - inne typy całkowite
+   - string typu "12"
 
-1. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Wykonuje kolejny krok logiki funkcji.
+  Jak nie pasuje, rzuca TypeError.
+
+  Po co: bezpieczne wyciąganie indeksów busów/linii/traf z tabel pandapower.

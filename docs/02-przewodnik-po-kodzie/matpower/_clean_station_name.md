@@ -8,8 +8,7 @@
 
 ## Co to jest
 
-
-To jest funkcja pomocnicza lub główna o nazwie `_clean_station_name`. Po nazwie widać, że odpowiada za fragment logiki związany z: **clean station name**.
+`_clean_station_name(raw)` czyści nazwę stacji z GeoJSON.
 
 ## Nagłówek funkcji
 
@@ -30,12 +29,13 @@ def _clean_station_name(raw: object) -> str:
 
 Kod podpowiada, że funkcja zwraca: `str`.
 
-## Co robi krok po kroku
+## Robi:
 
+ 1. jeśli to nie string -> zwraca pusty string
+ 2. usuwa prefiks liczbowy z początku, np. 123 Stacja
+ 3. ucina „śmieci” od &... do końca
+ 4. przepuszcza przez _to_ascii(...)
+ 5. zwija wielokrotne spacje
+ 6. trimuje
 
-1. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-2. Tworzy lub uzupełnia zmienne `text` na podstawie wyniku funkcji `_STATION_PREFIX_RE.sub`.
-3. Tworzy lub uzupełnia zmienne `text` na podstawie wyniku funkcji `_STATION_NOISE_RE.sub`.
-4. Tworzy lub uzupełnia zmienne `text` na podstawie wyniku funkcji `_to_ascii`.
-5. Tworzy lub uzupełnia zmienne `text` na podstawie wyniku funkcji `re.sub(r"\s+", " ", text).strip`.
-6. Na końcu zwraca wynik: `text`.
+ Czyli z surowego station robi krótką, czystą nazwę stacji.
