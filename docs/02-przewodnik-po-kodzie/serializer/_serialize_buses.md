@@ -1,18 +1,13 @@
 # `_serialize_buses`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 195-249
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_serialize_buses`. Po nazwie widać, że odpowiada za fragment logiki związany z: **serialize buses**.
+Zamienia tabelę `net.bus` oraz powiązane wyniki na listę prostych słowników JSON opisujących szyny.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _serialize_buses(
@@ -23,26 +18,25 @@ def _serialize_buses(
 ) -> list[dict[str, Any]]:
 ```
 
-## Argumenty
+## Co trafia do pojedynczego busa
 
+Każdy element listy zawiera m.in.:
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `net` | `pp.pandapowerNet` | `brak` |
-| `positions` | `dict[int, tuple[float, float]]` | `brak` |
-| `geo_positions` | `dict[int, tuple[float, float]]` | `brak` |
-| `has_results` | `bool` | `brak` |
+- `id`,
+- `name`,
+- `type` (`Slack` / `PV` / `PQ`),
+- `vn_kv`,
+- `x`, `y`,
+- `loadMw`, `loadMvar`, `genMw`,
+- opcjonalnie `lon`, `lat`,
+- opcjonalnie `vmPu`, `vaDeg`, `genMvar`.
 
-## Co zwraca
+## Jak działa
 
-
-Kod podpowiada, że funkcja zwraca: `list[dict[str, Any]]`.
-
-## Co robi krok po kroku
-
-
-1. Przygotowuje zmienne pomocnicze: `slack_buses`.
-2. Przygotowuje zmienne pomocnicze: `gen_buses`.
-3. Przygotowuje zmienną pomocniczą `out`.
-4. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-5. Na końcu zwraca wynik: `out`.
+1. buduje zbiory busów slack i generatorowych,
+2. iteruje po wszystkich szynach,
+3. przypisuje pozycję grafową,
+4. sumuje obciążenia i generację przypięte do danej szyny,
+5. ustala typ busa,
+6. jeśli istnieje geometria, dopina `lon/lat`,
+7. jeśli istnieją wyniki load flow, dopina napięcie, kąt i moc bierną generatorów.

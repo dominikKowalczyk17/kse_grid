@@ -1,79 +1,43 @@
 # `PowerFlowRunner.run`
 
-
 **Plik źródłowy:** `kse_grid\runner.py`  
-**Rodzaj:** metoda klasy `PowerFlowRunner`  
-**Linie w kodzie:** 18-38
+**Rodzaj:** metoda klasy `PowerFlowRunner`
 
+## Co robi
 
-## Co to jest
-
-
-To jest metoda klasy `PowerFlowRunner`. Po nazwie widać, że odpowiada za fragment logiki związany z: **run**.
+Uruchamia load flow przez `pandapower.runpp`. Włącza obliczanie kątów napięć, używa `flat start` i zwraca tylko prostą odpowiedź logiczną: czy solver się zbiega.
 
 ## Nagłówek metody
 
-
 ```python
-    def run(self,
-            algorithm: str = "nr",
-            max_iteration: int = 100,
-            tolerance_mva: float = 1.0) -> bool:
+def run(
+    self,
+    algorithm: str = "nr",
+    max_iteration: int = 100,
+    tolerance_mva: float = 1.0,
+) -> bool:
 ```
 
 ## Argumenty
 
-
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `algorithm` | `str` | `"nr"` |
-| `max_iteration` | `int` | `100` |
-| `tolerance_mva` | `float` | `1.0` |
+| Argument | Znaczenie |
+|---|---|
+| `algorithm` | algorytm solvera, np. `nr` albo `iwamoto_nr` |
+| `max_iteration` | limit iteracji |
+| `tolerance_mva` | tolerancja zbieżności |
 
 ## Co zwraca
 
+- `True` - jeśli `runpp(...)` zakończy się sukcesem,
+- `False` - jeśli `pandapower` rzuci `LoadflowNotConverged`.
 
-Kod podpowiada, że metoda zwraca: `bool`.
+## Co dzieje się w środku
 
-## Co wchodzi
+1. wywołuje `_RUNPP(...)`, domyślnie alias do `pp.runpp`,
+2. przekazuje `calculate_voltage_angles=True`,
+3. przekazuje `init="flat"`,
+4. jeśli solver się nie zbiega, łapie wyjątek i drukuje komunikat zamiast wywalać cały program.
 
-Metoda dostaje:
+## Efekt uboczny
 
-- `self.net` - gotowy model `pandapowerNet`,
-- nazwę algorytmu,
-- limit iteracji,
-- tolerancję mocy.
-
-Typowe wywołanie w tym projekcie:
-
-```python
-runner.run(algorithm="iwamoto_nr", max_iteration=100, tolerance_mva=1.5)
-```
-
-## Co wychodzi
-
-Z punktu widzenia Pythona wynik to tylko `True` albo `False`, ale ważniejsze są skutki w `self.net`:
-
-- gdy wynik to `True`, pandapower zapisuje wyniki do `res_bus`, `res_line`, `res_trafo`,
-- gdy wynik to `False`, metoda łapie `LoadflowNotConverged`, drukuje komunikat i nie przerywa programu wyjątkiem.
-
-Przykład:
-
-```python
-ok = runner.run(algorithm="iwamoto_nr", max_iteration=100, tolerance_mva=1.5)
-ok
-# True
-
-runner.net.res_bus.loc[0, ["vm_pu", "va_degree"]].to_dict()
-# {'vm_pu': 1.0535466794624884, 'va_degree': -2.543403484847102}
-```
-
-## Co robi krok po kroku
-
-
-1. Próbuje wykonać operacje i reaguje na możliwe błędy.
-
-## Oryginalny opis zapisany w kodzie
-
-Uruchamia load flow z inicjalizacją AC (flat start: U=1 p.u., kąt=0°).
-Zwraca True jeśli zbieżny, False jeśli nie.
+Po udanym wywołaniu `pandapower` wypełnia `net.res_*`, np. `net.res_bus`, `net.res_line`, `net.res_trafo`.

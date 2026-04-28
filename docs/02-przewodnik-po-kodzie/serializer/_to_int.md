@@ -1,38 +1,24 @@
 # `_to_int`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 54-59
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_to_int`. Po nazwie widać, że odpowiada za fragment logiki związany z: **to int**.
+Bezpiecznie zamienia wartość na `int`, ale tylko jeśli wygląda jak liczba całkowita albo string z liczbą całkowitą.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _to_int(value: object) -> int:
 ```
 
-## Argumenty
+## Kiedy jest używana
 
+Przede wszystkim przy pracy z indeksami busów, linii i transformatorów, które w `pandapower` mogą mieć typy numpy/pandas, a frontend i kod pomocniczy oczekują zwykłego `int`.
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `value` | `object` | `brak` |
+## Zachowanie
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `int`.
-
-## Co robi krok po kroku
-
-
-1. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Wykonuje kolejny krok logiki funkcji.
+- dla `Integral` zwraca `int(value)`,
+- dla stringa typu `"12"` też zwraca `12`,
+- dla innych typów rzuca `TypeError`.

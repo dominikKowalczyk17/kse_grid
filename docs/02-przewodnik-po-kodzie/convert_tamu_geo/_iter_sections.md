@@ -1,39 +1,32 @@
 # `_iter_sections`
 
-
 **Plik źródłowy:** `kse_grid\convert_tamu_geo.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 25-47
+**Rodzaj:** funkcja
 
+## Co robi
 
-## Co to jest
+Rozbija tekst pliku `.EPC` na logiczne sekcje typu `substation data [...]`, `bus data [...]` itd. Zwraca iterator par:
 
+```python
+(section_name, rows)
+```
 
-To jest funkcja pomocnicza lub główna o nazwie `_iter_sections`. Po nazwie widać, że odpowiada za fragment logiki związany z: **iter sections**.
+gdzie `rows` to surowe wiersze należące do danej sekcji.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _iter_sections(text: str) -> Iterator[tuple[str, list[str]]]:
 ```
 
-## Argumenty
+## Co dzieje się w środku
 
+1. czyta plik linia po linii,
+2. rozpoznaje początek sekcji przez `SECTION_RE`,
+3. gdy widzi nową sekcję, emituje poprzednią,
+4. linie `end` oraz `injgroup data  [  0]` traktuje jako zamknięcie sekcji,
+5. zbiera tylko niepuste wiersze należące do aktualnego bloku.
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `text` | `str` | `brak` |
+## Po co istnieje
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `Iterator[tuple[str, list[str]]]`.
-
-## Co robi krok po kroku
-
-
-1. Przygotowuje zmienną pomocniczą `current`.
-2. Przygotowuje zmienną pomocniczą `rows`.
-3. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-4. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
+Plik EPC nie jest JSON-em ani CSV. To tekstowy format blokowy, więc najpierw trzeba go pociąć na sekcje, a dopiero potem można osobno parsować bus'y i stacje.

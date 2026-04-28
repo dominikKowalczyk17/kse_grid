@@ -1,38 +1,25 @@
 # `_safe_float`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 298-312
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_safe_float`. Po nazwie widać, że odpowiada za fragment logiki związany z: **safe float**.
+Próbuje zamienić wartość na `float`, ale zamiast rzucać wyjątek przy problemie zwraca `None`.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _safe_float(value: Any) -> float | None:
 ```
 
-## Argumenty
+## Zachowanie
 
+- obsługuje `bool`, liczby rzeczywiste i stringi z liczbą,
+- odrzuca wartości nienumeryczne,
+- odrzuca też `NaN` i `inf`,
+- przy błędzie zwraca `None`.
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `value` | `Any` | `brak` |
+## Kiedy jest używana
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `float | None`.
-
-## Co robi krok po kroku
-
-
-1. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Na końcu zwraca wynik: `f`.
+Tam, gdzie brak liczby nie musi zatrzymywać programu, np. przy czytaniu geometrii, napięć albo obciążeń z częściowo niekompletnych danych.

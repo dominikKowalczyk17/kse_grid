@@ -1,36 +1,36 @@
 # `KSEGrid.__init__`
 
-
 **Plik źródłowy:** `kse_grid\grid.py`  
-**Rodzaj:** metoda klasy `KSEGrid`  
-**Linie w kodzie:** 25-28
+**Rodzaj:** metoda klasy `KSEGrid`
 
+## Co robi
 
-## Co to jest
+Inicjalizuje pusty obiekt-fasadę. Na tym etapie sieć nie jest jeszcze załadowana i nie ma wyników obliczeń.
 
+Ustawia trzy pola stanu:
 
-To jest metoda klasy `KSEGrid`. Po nazwie widać, że odpowiada za fragment logiki związany z: **init**.
+- `self.net = None` - jeszcze brak `pandapowerNet`,
+- `self._runner = None` - jeszcze brak helpera od load flow,
+- `self._converged = False` - brak potwierdzonej zbieżności obliczeń.
 
 ## Nagłówek metody
 
-
 ```python
-    def __init__(self):
+def __init__(self):
 ```
 
 ## Argumenty
 
-
-Ta funkcja nie przyjmuje własnych argumentów roboczych.
+Metoda nie przyjmuje własnych argumentów roboczych poza `self`.
 
 ## Co zwraca
 
+Nic jawnie nie zwraca. Jej rolą jest przygotowanie początkowego stanu obiektu.
 
-Kod podpowiada, że metoda zwraca: `brak`.
+## Po co istnieje
 
-## Co robi krok po kroku
+Dzięki temu kolejne kroki pipeline'u mają jasny stan:
 
-
-1. Przygotowuje zmienną pomocniczą `self.net`.
-2. Przygotowuje zmienną pomocniczą `self._runner`.
-3. Przygotowuje zmienną pomocniczą `self._converged`.
+1. po `__init__` obiekt jest pusty,
+2. po `from_matpower_case(...)` pojawia się `self.net`,
+3. po `run_powerflow(...)` pojawiają się wyniki i `self._runner`.

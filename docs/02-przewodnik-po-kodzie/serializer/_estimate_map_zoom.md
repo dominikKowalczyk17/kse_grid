@@ -1,50 +1,27 @@
 # `_estimate_map_zoom`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 166-188
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_estimate_map_zoom`. Po nazwie widać, że odpowiada za fragment logiki związany z: **estimate map zoom**.
+Dobiera przybliżony zoom mapy na podstawie rozmiaru obszaru zajmowanego przez sieć.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _estimate_map_zoom(west: float, east: float, south: float, north: float) -> float:
 ```
 
-## Argumenty
+## Jak działa
 
+1. liczy rozpiętość obszaru jako większą z:
+   - `east - west`,
+   - `north - south`,
+2. porównuje ten span z kilkoma progami,
+3. dla małych obszarów daje duży zoom,
+4. dla dużych obszarów daje mniejszy zoom.
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `west` | `float` | `brak` |
-| `east` | `float` | `brak` |
-| `south` | `float` | `brak` |
-| `north` | `float` | `brak` |
+## Charakter funkcji
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `float`.
-
-## Co robi krok po kroku
-
-
-1. Tworzy lub uzupełnia zmienne `span` na podstawie wyniku funkcji `max`.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-4. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-5. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-6. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-7. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-8. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-9. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-10. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-11. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-12. Na końcu zwraca wynik: `3.0`.
+To nie jest dokładna geodezyjna formuła Mapboxa. To świadomie prosty heurystyczny mapper: wystarcza, żeby startowy widok był sensowny dla polskiej sieci, bez nadmiernej komplikacji.

@@ -1,73 +1,40 @@
 # `KSEGrid.report`
 
-
 **Plik źródłowy:** `kse_grid\grid.py`  
-**Rodzaj:** metoda klasy `KSEGrid`  
-**Linie w kodzie:** 53-68
+**Rodzaj:** metoda klasy `KSEGrid`
 
+## Co robi
 
-## Co to jest
-
-
-To jest metoda klasy `KSEGrid`. Po nazwie widać, że odpowiada za fragment logiki związany z: **report**.
+Drukuje skrócony raport tekstowy po load flow. Jeśli obliczenia się nie zbiegły, nie próbuje nic analizować - wypisuje tylko komunikat i zwraca obiekt bez zmian.
 
 ## Nagłówek metody
 
-
 ```python
-    def report(self) -> "KSEGrid":
+def report(self) -> "KSEGrid":
 ```
-
-## Argumenty
-
-
-Ta funkcja nie przyjmuje własnych argumentów roboczych.
 
 ## Co zwraca
 
-
-Kod podpowiada, że metoda zwraca: `"KSEGrid"`.
-
-## Co wchodzi
-
-`report()` działa sensownie tylko wtedy, gdy wcześniej load flow się zbiegnie:
+Zwraca `self`, więc można pisać:
 
 ```python
-grid = KSEGrid.from_matpower_case("data/case3120sp.m").run_powerflow()
-grid.report()
+KSEGrid.from_matpower_case("case.m").run_powerflow().report().serve()
 ```
 
-Jeśli `self._converged` jest `False`, metoda nie rzuca błędu - tylko wypisuje:
+## Co dzieje się w środku
 
-```text
-Brak wyników – load flow nie zbiegł.
-```
+1. jeśli `self._converged` jest `False`, wypisuje informację o braku wyników,
+2. jeśli nie ma `self._runner`, rzuca błąd,
+3. wywołuje `self._runner.summary()`,
+4. pobiera tabelę naruszeń napięciowych przez `self._runner.voltage_violations()`,
+5. jeśli naruszenia istnieją, pokazuje ich liczbę i podgląd pierwszych wierszy.
 
-## Co wychodzi
+## Co raport zawiera
 
-Ta metoda nie zwraca nowych danych. Jej prawdziwym wyjściem jest **tekst w terminalu**:
+Raport tekstowy pokazuje między innymi:
 
-1. woła `self._runner.summary()`,
-2. liczy `violations = self._runner.voltage_violations()`,
-3. jeśli są naruszenia napięcia, drukuje preview tabeli.
-
-Dla `case3120sp.m` po zbieżnym load flow liczba naruszeń to:
-
-```python
-len(grid._runner.voltage_violations())
-# 1610
-```
-
-## Co robi krok po kroku
-
-
-1. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Wywołuje funkcję `self._runner.summary`.
-4. Tworzy lub uzupełnia zmienne `violations` na podstawie wyniku funkcji `self._runner.voltage_violations`.
-5. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-6. Na końcu zwraca wynik: `self`.
-
-## Oryginalny opis zapisany w kodzie
-
-Drukuje wyniki load flow. Brak efektu, jeśli nie zbiegł.
+- bilans mocy,
+- największe odchylenia napięć,
+- top obciążonych linii,
+- transformatory o największym obciążeniu,
+- listę busów poza pasmem ±5% Un.

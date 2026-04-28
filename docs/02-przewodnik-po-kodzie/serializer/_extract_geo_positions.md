@@ -1,40 +1,27 @@
 # `_extract_geo_positions`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 117-150
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
+Wyciąga współrzędne geograficzne busów z dwóch możliwych miejsc:
 
+1. `net.bus_geodata`,
+2. kolumny `net.bus["geo"]` z GeoJSON Point.
 
-To jest funkcja pomocnicza lub główna o nazwie `_extract_geo_positions`. Po nazwie widać, że odpowiada za fragment logiki związany z: **extract geo positions**.
+Wynikiem jest jednolita mapa `{bus_id: (lon, lat)}`.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _extract_geo_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, float]]:
 ```
 
-## Argumenty
+## Co dzieje się w środku
 
-
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `net` | `pp.pandapowerNet` | `brak` |
-
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `dict[int, tuple[float, float]]`.
-
-## Co robi krok po kroku
-
-
-1. Przygotowuje zmienną pomocniczą `positions`.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-4. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-5. Na końcu zwraca wynik: `positions`.
+1. jeśli istnieje `net.bus_geodata`, czyta z niego `x`, `y`,
+2. jeśli w `net.bus` istnieje kolumna `geo`, próbuje sparsować ją jako GeoJSON,
+3. bierze tylko obiekty typu `Point`,
+4. pomija wpisy uszkodzone, puste albo nienumeryczne,
+5. zwraca słownik z geometrią tylko dla busów, które udało się poprawnie odczytać.

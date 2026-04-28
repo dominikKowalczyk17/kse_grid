@@ -1,39 +1,25 @@
 # `_count_overloads`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 357-363
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_count_overloads`. Po nazwie widać, że odpowiada za fragment logiki związany z: **count overloads**.
+Liczy łączną liczbę przeciążonych gałęzi: linii i transformatorów.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _count_overloads(net: pp.pandapowerNet) -> int:
 ```
 
-## Argumenty
+## Jak działa
 
+1. zaczyna od `0`,
+2. jeśli są wyniki dla linii, dodaje liczbę przypadków z `loading_percent > _OVERLOAD_PCT`,
+3. jeśli są wyniki dla traf, robi to samo dla `net.res_trafo`,
+4. zwraca sumę.
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `net` | `pp.pandapowerNet` | `brak` |
+## Ważne
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `int`.
-
-## Co robi krok po kroku
-
-
-1. Przygotowuje zmienne pomocnicze: `total`.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-4. Na końcu zwraca wynik: `total`.
+W tym module `_OVERLOAD_PCT` jest ustawione na `150.0`, więc przeciążenie oznacza przekroczenie 150% obciążenia znamionowego.

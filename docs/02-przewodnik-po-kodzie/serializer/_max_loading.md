@@ -1,39 +1,25 @@
 # `_max_loading`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 337-347
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_max_loading`. Po nazwie widać, że odpowiada za fragment logiki związany z: **max loading**.
+Znajduje największe obciążenie procentowe w całej sieci, biorąc pod uwagę zarówno linie, jak i transformatory.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _max_loading(net: pp.pandapowerNet) -> float:
 ```
 
-## Argumenty
+## Jak działa
 
+1. zbiera maksimum z `net.res_line["loading_percent"]`, jeśli istnieje,
+2. zbiera maksimum z `net.res_trafo["loading_percent"]`, jeśli istnieje,
+3. zwraca większą z tych wartości,
+4. jeśli brak danych, zwraca `0.0`.
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `net` | `pp.pandapowerNet` | `brak` |
+## Po co istnieje
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `float`.
-
-## Co robi krok po kroku
-
-
-1. Przygotowuje zmienną pomocniczą `candidates`.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-4. Na końcu zwraca wynik: `max(candidates, default=0.0)`.
+To pojedyncza liczba do szybkiego pokazania w UI: "jak bardzo obciążony jest najbardziej krytyczny element sieci".

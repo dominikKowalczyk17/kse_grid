@@ -1,54 +1,29 @@
 # `main`
 
-
 **Plik źródłowy:** `kse_grid\convert_kse_kmz.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 119-188
+**Rodzaj:** funkcja CLI
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `main`. Po nazwie widać, że odpowiada za fragment logiki związany z: **main**.
+To punkt wejścia dla skryptu uruchamianego z linii poleceń. Parsuje argumenty `--epc`, `--kmz`, `--out`, buduje katalog z KMZ, czyta EPC i zapisuje GeoJSON sidecar z możliwie najlepszymi współrzędnymi busów.
 
 ## Nagłówek funkcji
-
 
 ```python
 def main() -> None:
 ```
 
-## Argumenty
+## Co dzieje się w środku
 
+1. tworzy parser argumentów CLI,
+2. wczytuje katalog stacji z KMZ przez `parse_kmz(...)`,
+3. parsuje sekcje `substation` i `bus` z EPC,
+4. dla każdego busa szuka najlepszego dopasowania nazwy stacji w KMZ,
+5. jeśli znajdzie trafienie, bierze współrzędne z KMZ,
+6. jeśli nie, ale zna stację z EPC, bierze współrzędne z EPC,
+7. zapisuje wynik jako `FeatureCollection`,
+8. wypisuje statystyki: ile busów dostało geometrię z KMZ, ile tylko z EPC, ile pozostało bez geometrii.
 
-Ta funkcja nie przyjmuje własnych argumentów roboczych.
+## Efekt
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `None`.
-
-## Co robi krok po kroku
-
-
-1. Tworzy lub uzupełnia zmienne `parser` na podstawie wyniku funkcji `argparse.ArgumentParser`.
-2. Wywołuje funkcję `parser.add_argument`.
-3. Wywołuje funkcję `parser.add_argument`.
-4. Wywołuje funkcję `parser.add_argument`.
-5. Wywołuje funkcję `parser.add_argument`.
-6. Tworzy lub uzupełnia zmienne `args` na podstawie wyniku funkcji `parser.parse_args`.
-7. Tworzy lub uzupełnia zmienne `catalogue` na podstawie wyniku funkcji `parse_kmz`.
-8. Wywołuje funkcję `print`.
-9. Tworzy lub uzupełnia zmienne `text` na podstawie wyniku funkcji `args.epc.read_text`.
-10. Przygotowuje zmienną pomocniczą `subs`.
-11. Przygotowuje zmienną pomocniczą `buses`.
-12. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-13. Wywołuje funkcję `print`.
-14. Przygotowuje zmienne pomocnicze: `features`.
-15. Przygotowuje zmienne pomocnicze: `matched_kmz`.
-16. Przygotowuje zmienne pomocnicze: `matched_epc_only`.
-17. Przygotowuje zmienne pomocnicze: `unmatched`.
-18. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-19. Przygotowuje zmienne pomocnicze: `fc`.
-20. Wywołuje funkcję `args.out.write_text`.
-21. Wywołuje funkcję `print`.
+Powstaje GeoJSON sidecar lepszy jakościowo niż czysty eksport z EPC, bo tam gdzie się da korzysta z atlasu KSE.

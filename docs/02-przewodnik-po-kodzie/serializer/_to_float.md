@@ -1,38 +1,24 @@
 # `_to_float`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 62-66
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_to_float`. Po nazwie widać, że odpowiada za fragment logiki związany z: **to float**.
+Zamienia wartość na `float`, ale w odróżnieniu od `_safe_float(...)` nie pozwala na ciche niepowodzenie. Jeśli konwersja się nie uda, rzuca `TypeError`.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _to_float(value: object) -> float:
 ```
 
-## Argumenty
+## Jak działa
 
+1. woła `_safe_float(value)`,
+2. jeśli wynik jest `None`, zgłasza błąd,
+3. w przeciwnym razie zwraca liczbę zmiennoprzecinkową.
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `value` | `object` | `brak` |
+## Kiedy jest używana
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `float`.
-
-## Co robi krok po kroku
-
-
-1. Tworzy lub uzupełnia zmienne `result` na podstawie wyniku funkcji `_safe_float`.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Na końcu zwraca wynik: `result`.
+Tam, gdzie dana liczba jest wymagana i jej brak oznacza błąd danych, np. przy `vn_kv`, `length_km` albo `sn_mva`.

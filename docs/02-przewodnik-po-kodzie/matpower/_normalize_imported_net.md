@@ -1,41 +1,25 @@
 # `_normalize_imported_net`
 
-
 **Plik źródłowy:** `kse_grid\matpower.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 53-75
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_normalize_imported_net`. Po nazwie widać, że odpowiada za fragment logiki związany z: **normalize imported net**.
+Porządkuje świeżo zaimportowaną sieć. Uzupełnia brakujące nazwy busów, linii i transformatorów, a na końcu pilnuje, żeby istniał aktywny bus odniesienia.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _normalize_imported_net(net: pp.pandapowerNet):
 ```
 
-## Argumenty
+## Co dzieje się w środku
 
+1. dla pustych nazw busów wpisuje `Bus N`,
+2. dla pustych nazw linii wpisuje `Line N: from -> to`,
+3. dla pustych nazw transformatorów wpisuje `Trafo N: hv -> lv`,
+4. wywołuje `_ensure_reference_bus(net)`.
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `net` | `pp.pandapowerNet` | `brak` |
+## Po co istnieje
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `brak`.
-
-## Co robi krok po kroku
-
-
-1. jeśli szyna nie ma nazwy, wpisuje Bus N
-2. jeśli linia nie ma nazwy, wpisuje Line N: busA -> busB
-3. jeśli trafo nie ma nazwy, wpisuje Trafo N: hvBus -> lvBus
-4. na końcu woła _ensure_reference_bus(net)
-
-Po co: żeby UI, tooltipy, listy i diagnostyka nie miały pustych nazw.
+Po imporcie z MATPOWER część nazw bywa pusta albo nieczytelna. Bez tej normalizacji tooltipy, raporty i listy w UI miałyby dużo gorszą jakość.

@@ -1,36 +1,24 @@
 # `PowerFlowRunner.__init__`
 
-
 **Plik źródłowy:** `kse_grid\runner.py`  
-**Rodzaj:** metoda klasy `PowerFlowRunner`  
-**Linie w kodzie:** 14-15
+**Rodzaj:** metoda klasy `PowerFlowRunner`
 
+## Co robi
 
-## Co to jest
-
-
-To jest metoda klasy `PowerFlowRunner`. Po nazwie widać, że odpowiada za fragment logiki związany z: **init**.
+Inicjalizator jest bardzo prosty: zapisuje przekazaną sieć do `self.net`. Nie uruchamia żadnych obliczeń i nie tworzy dodatkowych struktur.
 
 ## Nagłówek metody
 
-
 ```python
-    def __init__(self, net: pp.pandapowerNet):
+def __init__(self, net: pp.pandapowerNet):
 ```
 
 ## Argumenty
 
-
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `net` | `pp.pandapowerNet` | `brak` |
+| Argument | Znaczenie |
+|---|---|
+| `net` | gotowy model `pandapowerNet`, na którym mają być wykonywane obliczenia |
 
 ## Co zwraca
 
-
-Kod podpowiada, że metoda zwraca: `brak`.
-
-## Co robi krok po kroku
-
-
-1. Przygotowuje zmienne pomocnicze: `self.net`.
+Nic jawnie nie zwraca. Przygotowuje obiekt runnera do dalszych wywołań `run()`, `summary()` i `voltage_violations()`.

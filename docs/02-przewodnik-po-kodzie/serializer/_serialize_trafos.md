@@ -1,39 +1,30 @@
 # `_serialize_trafos`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 276-295
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_serialize_trafos`. Po nazwie widać, że odpowiada za fragment logiki związany z: **serialize trafos**.
+Serializuje transformatory do prostych słowników JSON używanych przez frontend.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _serialize_trafos(net: pp.pandapowerNet, has_results: bool) -> list[dict[str, Any]]:
 ```
 
-## Argumenty
+## Co trafia do pojedynczego transformatora
 
+- `id`,
+- `name`,
+- `hvBus`, `lvBus`,
+- `vnHvKv`, `vnLvKv`,
+- `snMva`,
+- opcjonalnie `loading`, `pHvMw`.
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `net` | `pp.pandapowerNet` | `brak` |
-| `has_results` | `bool` | `brak` |
+## Jak działa
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `list[dict[str, Any]]`.
-
-## Co robi krok po kroku
-
-
-1. Przygotowuje zmienną pomocniczą `out`.
-2. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-3. Na końcu zwraca wynik: `out`.
+1. iteruje po `net.trafo`,
+2. przepisuje dane znamionowe i połączenia HV/LV,
+3. jeśli są wyniki load flow, dopina obciążenie i moc po stronie HV,
+4. jeśli wyników nie ma, wpisuje `loading = 0.0`.

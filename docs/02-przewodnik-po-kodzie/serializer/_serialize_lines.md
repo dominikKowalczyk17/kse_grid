@@ -1,39 +1,35 @@
 # `_serialize_lines`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 252-273
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_serialize_lines`. Po nazwie widać, że odpowiada za fragment logiki związany z: **serialize lines**.
+Serializuje linie do listy słowników JSON z informacją topologiczną, napięciową i - jeśli są geodane - także z długością oszacowaną po współrzędnych.
 
 ## Nagłówek funkcji
 
-
 ```python
-def _serialize_lines(net: pp.pandapowerNet, has_results: bool) -> list[dict[str, Any]]:
+def _serialize_lines(
+    net: pp.pandapowerNet,
+    has_results: bool,
+    geo_positions: dict[int, tuple[float, float]],
+) -> list[dict[str, Any]]:
 ```
 
-## Argumenty
+## Najważniejsza cecha
 
+Funkcja rozróżnia dwa typy długości:
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `net` | `pp.pandapowerNet` | `brak` |
-| `has_results` | `bool` | `brak` |
+- `modelLengthKm` - długość z modelu MATPOWER/pandapower,
+- `geoLengthKm` - długość policzona po `lon/lat` metodą haversine.
 
-## Co zwraca
+Pole `lengthKm` dostaje preferencyjnie wartość geograficzną, a `lengthSource` mówi, skąd ona pochodzi.
 
+## Co trafia do pojedynczej linii
 
-Kod podpowiada, że funkcja zwraca: `list[dict[str, Any]]`.
-
-## Co robi krok po kroku
-
-
-1. Przygotowuje zmienną pomocniczą `out`.
-2. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-3. Na końcu zwraca wynik: `out`.
+- `id`, `name`,
+- `fromBus`, `toBus`,
+- `voltage`,
+- `lengthKm`, `modelLengthKm`, `geoLengthKm`, `lengthSource`,
+- opcjonalnie `loading`, `pFromMw`.

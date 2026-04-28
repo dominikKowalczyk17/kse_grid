@@ -1,42 +1,29 @@
 # `_compute_bounds`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 107-114
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_compute_bounds`. Po nazwie widać, że odpowiada za fragment logiki związany z: **compute bounds**.
+Wyznacza prostokąt obejmujący cały layout grafowy. Frontend używa tego do ustawienia zakresu osi i sensownego marginesu wokół sieci.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _compute_bounds(positions: dict[int, tuple[float, float]]) -> dict[str, list[float]]:
 ```
 
-## Argumenty
-
-
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `positions` | `dict[int, tuple[float, float]]` | `brak` |
-
 ## Co zwraca
 
+Słownik:
 
-Kod podpowiada, że funkcja zwraca: `dict[str, list[float]]`.
+```python
+{"x": [xmin, xmax], "y": [ymin, ymax]}
+```
 
-## Co robi krok po kroku
+## Jak działa
 
-
-1. Przygotowuje zmienne pomocnicze: `xs`.
-2. Przygotowuje zmienne pomocnicze: `ys`.
-3. Przygotowuje zmienne pomocnicze: `x_min, x_max`.
-4. Przygotowuje zmienne pomocnicze: `y_min, y_max`.
-5. Tworzy lub uzupełnia zmienne `pad_x` na podstawie wyniku funkcji `max`.
-6. Tworzy lub uzupełnia zmienne `pad_y` na podstawie wyniku funkcji `max`.
-7. Na końcu zwraca wynik: `{"x": [x_min - pad_x, x_max + pad_x], "y": [y_min - pad_y, y_max + pad_y]}`.
+1. zbiera wszystkie współrzędne `x` i `y`,
+2. liczy minima i maksima,
+3. dodaje padding równy `8%` rozpiętości, ale nie mniejszy niż `0.2`,
+4. zwraca wynik dla obu osi.

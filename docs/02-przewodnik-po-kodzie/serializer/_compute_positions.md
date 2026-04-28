@@ -1,47 +1,29 @@
 # `_compute_positions`
 
-
 **Plik źródłowy:** `kse_grid\serializer.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 73-104
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_compute_positions`. Po nazwie widać, że odpowiada za fragment logiki związany z: **compute positions**.
+Liczy pozycje wszystkich busów w abstrakcyjnym układzie grafowym. Nie używa geometrii WGS84 - buduje layout logiczny na podstawie topologii sieci.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _compute_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, float]]:
 ```
 
-## Argumenty
+## Najważniejsza idea
 
+Funkcja korzysta z `networkx.spring_layout`, ale nadaje połączeniom transformatorowym dużo większą wagę niż liniom. Dzięki temu szyny połączone trafem układają się blisko siebie, co lepiej oddaje stację z wieloma poziomami napięć.
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `net` | `pp.pandapowerNet` | `brak` |
+## Co dzieje się w środku
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `dict[int, tuple[float, float]]`.
-
-## Co robi krok po kroku
-
-
-1. Tworzy lub uzupełnia zmienne `graph` na podstawie wyniku funkcji `create_nxgraph`.
-2. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-3. Tworzy lub uzupełnia zmienne `components` na podstawie wyniku funkcji `list`.
-4. Przygotowuje zmienną pomocniczą `positions`.
-5. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-6. Na końcu zwraca wynik: `positions`.
-
-## Oryginalny opis zapisany w kodzie
-
-Liczy pozycje szyn algorytmem spring layout (Fruchterman-Reingold) na grafie
-topologii sieci. Geodane (`net.bus.geo`) są celowo ignorowane — siatka jest
-renderowana jako abstrakcyjny graf, nie jako mapa.
+1. tworzy graf topologii przez `create_nxgraph(...)`,
+2. dodaje osierocone węzły, jeśli trzeba,
+3. ustawia wagę linii na `1.0`,
+4. ustawia wagę krawędzi trafo/trafo3w na `50.0`,
+5. dzieli graf na spójne składowe,
+6. dla każdej składowej liczy osobny `spring_layout`,
+7. rozsuwa składowe offsetem, żeby się nie nakładały,
+8. zwraca mapę `{bus_id: (x, y)}`.

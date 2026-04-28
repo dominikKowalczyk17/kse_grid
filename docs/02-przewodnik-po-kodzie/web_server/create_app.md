@@ -1,18 +1,13 @@
 # `create_app`
 
-
 **Plik źródłowy:** `kse_grid\web_server.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 21-35
+**Rodzaj:** funkcja
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `create_app`. Po nazwie widać, że odpowiada za fragment logiki związany z: **create app**.
+Buduje gotową aplikację `FastAPI` dla jednej, konkretnej sieci. Najpierw serializuje `pandapowerNet` do payloadu JSON, potem wystawia dwa główne endpointy i montuje frontend statyczny.
 
 ## Nagłówek funkcji
-
 
 ```python
 def create_app(net: pp.pandapowerNet) -> FastAPI:
@@ -20,56 +15,28 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
 
 ## Argumenty
 
-
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `net` | `pp.pandapowerNet` | `brak` |
+| Argument | Znaczenie |
+|---|---|
+| `net` | sieć `pandapower`, która ma być pokazana w dashboardzie |
 
 ## Co zwraca
 
+Obiekt `FastAPI` gotowy do uruchomienia przez Uvicorn.
 
-Kod podpowiada, że funkcja zwraca: `FastAPI`.
+## Jakie route'y tworzy
 
-## Co wchodzi
+| Route | Rola |
+|---|---|
+| `GET /api/network` | zwraca gotowy payload JSON dla frontendu |
+| `GET /` | zwraca `index.html` |
+| mount `StaticFiles` pod `/` | serwuje JS, CSS, ikony i pliki pomocnicze z `kse_grid/web` |
 
-Funkcja dostaje jedno wejście: `pandapowerNet`. Nie oczekuje surowego JSON-a, bo sama robi:
+## Ważna cecha
+
+Payload jest liczony raz przy tworzeniu aplikacji:
 
 ```python
 payload = serialize_network(net)
 ```
 
-To ważne: `create_app(...)` jest bardziej adapterem niż logiką biznesową.
-
-## Co wychodzi
-
-Wyjściem jest obiekt `FastAPI` z już zamkniętym nad payloadem closurem.
-
-W praktyce powstają dwa ważne endpointy:
-
-```python
-app = create_app(net)
-
-[(route.path, sorted(route.methods)) for route in app.routes if route.path in ["/", "/api/network"]]
-# [('/api/network', ['GET']), ('/', ['GET'])]
-```
-
-Tytuł aplikacji też bierze się z serializowanego payloadu:
-
-```python
-app.title
-# 'case3120sp – KSE Grid'
-```
-
-## Co robi krok po kroku
-
-
-1. Tworzy lub uzupełnia zmienne `payload` na podstawie wyniku funkcji `serialize_network`.
-2. Tworzy lub uzupełnia zmienne `app` na podstawie wyniku funkcji `FastAPI`.
-3. Wykonuje kolejny krok logiki funkcji.
-4. Wykonuje kolejny krok logiki funkcji.
-5. Wywołuje funkcję `app.mount`.
-6. Na końcu zwraca wynik: `app`.
-
-## Oryginalny opis zapisany w kodzie
-
-Tworzy aplikację FastAPI dla danej sieci.
+Czyli frontend dostaje statyczny zrzut aktualnego stanu sieci, a nie oblicza nic sam po stronie klienta.

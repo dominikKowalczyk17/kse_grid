@@ -1,41 +1,34 @@
 # `PowerFlowRunner.voltage_violations`
 
-
 **Plik źródłowy:** `kse_grid\runner.py`  
-**Rodzaj:** metoda klasy `PowerFlowRunner`  
-**Linie w kodzie:** 111-116
+**Rodzaj:** metoda klasy `PowerFlowRunner`
 
+## Co robi
 
-## Co to jest
-
-
-To jest metoda klasy `PowerFlowRunner`. Po nazwie widać, że odpowiada za fragment logiki związany z: **voltage violations**.
+Zwraca tabelę z szynami, których napięcie wyszło poza przedział `0.95-1.05 p.u.`. To jest surowy, programistyczny odpowiednik ostrzeżeń napięciowych pokazywanych potem w `KSEGrid.report()`.
 
 ## Nagłówek metody
 
-
 ```python
-    def voltage_violations(self) -> pd.DataFrame:
+def voltage_violations(self) -> pd.DataFrame:
 ```
-
-## Argumenty
-
-
-Ta funkcja nie przyjmuje własnych argumentów roboczych.
 
 ## Co zwraca
 
+`pandas.DataFrame` z kolumnami:
 
-Kod podpowiada, że metoda zwraca: `pd.DataFrame`.
+- `vm_pu`,
+- `name`,
+- `vn_kv`.
 
-## Co robi krok po kroku
+Wiersze zawiera tylko dla busów spełniających:
 
+```python
+(vm_pu < 0.95) | (vm_pu > 1.05)
+```
 
-1. Tworzy lub uzupełnia zmienne `res` na podstawie wyniku funkcji `self.net.res_bus[["vm_pu"]].copy`.
-2. Przygotowuje zmienne pomocnicze: `res["name"]`.
-3. Przygotowuje zmienne pomocnicze: `res["vn_kv"]`.
-4. Na końcu zwraca wynik: `res[(res.vm_pu < 0.95) | (res.vm_pu > 1.05)]`.
+## Co dzieje się w środku
 
-## Oryginalny opis zapisany w kodzie
-
-Zwraca DataFrame z szynami poza pasmem ±5% Un.
+1. kopiuje `net.res_bus[["vm_pu"]]`,
+2. dopina nazwę i poziom napięcia z `net.bus`,
+3. filtruje tylko przypadki poza dopuszczalnym pasmem.

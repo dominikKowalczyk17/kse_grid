@@ -1,18 +1,13 @@
 # `serve`
 
-
 **Plik źródłowy:** `kse_grid\web_server.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 38-48
+**Rodzaj:** funkcja
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `serve`. Po nazwie widać, że odpowiada za fragment logiki związany z: **serve**.
+Uruchamia serwer HTTP z dashboardem. To wygodny wrapper, który bierze `pandapowerNet`, buduje aplikację `FastAPI`, opcjonalnie otwiera przeglądarkę i startuje `uvicorn`.
 
 ## Nagłówek funkcji
-
 
 ```python
 def serve(
@@ -25,60 +20,19 @@ def serve(
 
 ## Argumenty
 
+| Argument | Znaczenie |
+|---|---|
+| `net` | sieć do pokazania |
+| `host` | adres bind serwera |
+| `port` | port serwera |
+| `auto_open` | czy po starcie wywołać `webbrowser.open(...)` |
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `net` | `pp.pandapowerNet` | `brak` |
-| `host` | `str` | `"127.0.0.1"` |
-| `port` | `int` | `8050` |
-| `auto_open` | `bool` | `True` |
+## Co dzieje się w środku
 
-## Co zwraca
-
-
-Kod podpowiada, że funkcja zwraca: `None`.
-
-## Co wchodzi
-
-Minimalne wywołanie:
-
-```python
-serve(net)
-```
-
-Pełniejsze:
-
-```python
-serve(net, host="127.0.0.1", port=8050, auto_open=True)
-```
-
-## Co wychodzi
-
-Formalnie nic nie zwraca, ale uruchamia trzy rzeczy:
-
-1. buduje `app = create_app(net)`,
-2. opcjonalnie otwiera przeglądarkę,
+1. tworzy aplikację przez `create_app(net)`,
+2. jeśli `auto_open=True`, uruchamia `Timer`, który po chwili otwiera URL w przeglądarce,
 3. startuje `uvicorn.run(...)`.
 
-Czyli praktycznym wyjściem jest działający adres:
+## Po co `Timer`
 
-```text
-http://127.0.0.1:8050/
-```
-
-oraz JSON dostępny pod:
-
-```text
-http://127.0.0.1:8050/api/network
-```
-
-## Co robi krok po kroku
-
-
-1. Tworzy lub uzupełnia zmienne `app` na podstawie wyniku funkcji `create_app`.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Wywołuje funkcję `uvicorn.run`.
-
-## Oryginalny opis zapisany w kodzie
-
-Uruchamia serwer i opcjonalnie otwiera przeglądarkę.
+Przeglądarka jest otwierana z krótkim opóźnieniem, żeby serwer zdążył wystartować zanim system spróbuje wejść na adres.

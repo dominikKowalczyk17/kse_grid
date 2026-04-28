@@ -1,45 +1,38 @@
 # `best_match`
 
-
 **Plik źródłowy:** `kse_grid\convert_kse_kmz.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 92-116
+**Rodzaj:** funkcja
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `best_match`. Po nazwie widać, że odpowiada za fragment logiki związany z: **best match**.
+Szuka najlepszego dopasowania nazwy stacji w katalogu z KMZ. Najpierw próbuje idealnego trafienia, potem `difflib`, a na końcu prosty fallback oparty o wspólne tokeny.
 
 ## Nagłówek funkcji
 
-
 ```python
-def best_match(query: str, catalogue: dict[str, tuple[float, float, str]], cutoff: float = 0.86):
+def best_match(
+    query: str,
+    catalogue: dict[str, tuple[float, float, str]],
+    cutoff: float = 0.86,
+):
 ```
 
-## Argumenty
+## Kolejność dopasowania
 
-
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `query` | `str` | `brak` |
-| `catalogue` | `dict[str, tuple[float, float, str]]` | `brak` |
-| `cutoff` | `float` | `0.86` |
+1. **exact match** - jeśli `query` jest dokładnym kluczem w katalogu,
+2. **fuzzy match** - `difflib.get_close_matches(...)`,
+3. **token overlap fallback** - porównanie nakładania się zbiorów tokenów.
 
 ## Co zwraca
 
+Jeśli znajdzie dopasowanie, zwraca trójkę w stylu:
 
-Kod podpowiada, że funkcja zwraca: `brak`.
+```python
+((lon, lat, raw_name), matched_key, score)
+```
 
-## Co robi krok po kroku
+Jeśli nie znajdzie nic sensownego, zwraca `None`.
 
+## Po co fallback tokenowy
 
-1. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-2. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-3. Tworzy lub uzupełnia zmienne `keys` na podstawie wyniku funkcji `list`.
-4. Tworzy lub uzupełnia zmienne `matches` na podstawie wyniku funkcji `difflib.get_close_matches`.
-5. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-6. Tworzy lub uzupełnia zmienne `q_tokens` na podstawie wyniku funkcji `set`.
-7. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-8. Na końcu zwraca wynik: `None`.
+Przy krótkich nazwach `difflib` bywa zbyt restrykcyjny. Token overlap pozwala jeszcze wyłapać przypadki, gdzie część słów się zgadza, ale zapis jest inny niż w atlasie.

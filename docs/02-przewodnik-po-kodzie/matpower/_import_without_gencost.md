@@ -1,41 +1,34 @@
 # `_import_without_gencost`
 
-
 **Plik źródłowy:** `kse_grid\matpower.py`  
-**Rodzaj:** funkcja  
-**Linie w kodzie:** 33-50
+**Rodzaj:** funkcja pomocnicza
 
+## Co robi
 
-## Co to jest
-
-
-To jest funkcja pomocnicza lub główna o nazwie `_import_without_gencost`. Po nazwie widać, że odpowiada za fragment logiki związany z: **import without gencost**.
+Importuje case MATPOWER po usunięciu całego bloku `mpc.gencost`. To awaryjna ścieżka używana tylko wtedy, gdy standardowy importer `pandapower` wywala się na danych kosztowych generatorów.
 
 ## Nagłówek funkcji
-
 
 ```python
 def _import_without_gencost(case_path: Path, f_hz: int) -> pp.pandapowerNet:
 ```
 
-## Argumenty
+## Co dzieje się w środku
 
+1. czyta cały plik `.m` jako tekst,
+2. regexem wycina blok:
 
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `case_path` | `Path` | `brak` |
-| `f_hz` | `int` | `brak` |
+```matlab
+mpc.gencost = [
+...
+];
+```
 
-## Co zwraca
+3. jeśli nic nie wyciął, rzuca błąd,
+4. zapisuje tymczasową wersję pliku bez `gencost`,
+5. importuje ją przez `from_mpc(...)`,
+6. na końcu usuwa plik tymczasowy.
 
+## Ważne
 
-Kod podpowiada, że funkcja zwraca: `pp.pandapowerNet`.
-
-## Co robi krok po kroku
-
-
-1. Tworzy lub uzupełnia zmienne `text` na podstawie wyniku funkcji `case_path.read_text`.
-2. Tworzy lub uzupełnia zmienne `stripped, replacements` na podstawie wyniku funkcji `re.subn`.
-3. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-4. Otwiera zasób pomocniczy i wykonuje na nim operacje tylko w tym bloku.
-5. Próbuje wykonać operacje i reaguje na możliwe błędy.
+Usunięcie `gencost` jest bezpieczne dla zwykłego power flow, bo koszty generatorów są potrzebne do OPF, a nie do samego rozpływu mocy.

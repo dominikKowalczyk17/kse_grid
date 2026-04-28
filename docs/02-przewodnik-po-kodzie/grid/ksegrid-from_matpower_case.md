@@ -1,74 +1,42 @@
 # `KSEGrid.from_matpower_case`
 
-
 **Plik źródłowy:** `kse_grid\grid.py`  
-**Rodzaj:** metoda klasy `KSEGrid`  
-**Linie w kodzie:** 32-38
+**Rodzaj:** metoda klasowa klasy `KSEGrid`
 
+## Co robi
 
-## Co to jest
-
-
-To jest metoda klasy `KSEGrid`. Po nazwie widać, że odpowiada za fragment logiki związany z: **from matpower case**.
+To jest główna brama wejściowa do projektu. Tworzy nowy obiekt `KSEGrid`, ładuje plik MATPOWER `.m` przez `load_matpower_case(...)`, zapisuje wynik do `grid.net` i wypisuje krótki komunikat z liczbą szyn, linii i transformatorów.
 
 ## Nagłówek metody
 
-
 ```python
-    def from_matpower_case(cls, case_file: str | Path, f_hz: int = 50) -> "KSEGrid":
+@classmethod
+def from_matpower_case(cls, case_file: str | Path, f_hz: int = 50) -> "KSEGrid":
 ```
 
 ## Argumenty
 
-
-| Argument | Typ w kodzie | Wartość domyślna |
-|---|---|---|
-| `case_file` | `str | Path` | `brak` |
-| `f_hz` | `int` | `50` |
+| Argument | Znaczenie |
+|---|---|
+| `case_file` | ścieżka do pliku MATPOWER `.m` |
+| `f_hz` | częstotliwość sieci przekazywana do importera `pandapower` |
 
 ## Co zwraca
 
+Nowy obiekt `KSEGrid` z uzupełnionym polem `net`.
 
-Kod podpowiada, że metoda zwraca: `"KSEGrid"`.
+## Co dzieje się w środku
 
-## Co faktycznie dostaje na wejściu
+1. tworzy pusty obiekt `grid = cls()`,
+2. ładuje przypadek przez `load_matpower_case(...)`,
+3. zapisuje wynik do `grid.net`,
+4. wypisuje nazwę modelu i liczność elementów,
+5. zwraca gotowy obiekt.
 
-Najczęściej zwykłą ścieżkę do pliku `.m`:
+## Typowe użycie
 
 ```python
 grid = KSEGrid.from_matpower_case("data/case3120sp.m")
 ```
 
-Metoda nie oczekuje jeszcze gotowego `pandapowerNet`. Sama woła `load_matpower_case(...)` i dopiero wynik wkłada do `grid.net`.
-
-## Co faktycznie oddaje na wyjściu
-
-Zwraca nowy obiekt `KSEGrid`, w którym:
-
-- `grid.net` już istnieje,
-- `grid.net.name` jest ustawione na stem pliku,
-- `grid._runner` jest jeszcze `None`,
-- `grid._converged` jest jeszcze `False`.
-
-Przykład po wywołaniu:
-
-```python
-grid.net.name
-# 'case3120sp'
-
-len(grid.net.bus), len(grid.net.line), len(grid.net.trafo)
-# (3120, 3487, 206)
-```
-
-## Co robi krok po kroku
-
-
-1. Tworzy lub uzupełnia zmienne `grid` na podstawie wyniku funkcji `cls`.
-2. Tworzy lub uzupełnia zmienne `grid.net` na podstawie wyniku funkcji `load_matpower_case`.
-3. Wywołuje funkcję `print`.
-4. Wywołuje funkcję `print`.
-5. Na końcu zwraca wynik: `grid`.
-
-## Oryginalny opis zapisany w kodzie
-
-Tworzy KSEGrid z pliku MATPOWER (.m).
+Po tym kroku można już wywołać `run_powerflow()`, `report()` albo `serve()`.
