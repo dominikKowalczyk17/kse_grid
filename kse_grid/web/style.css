@@ -38,6 +38,9 @@
     --grid-110: oklch(0.70 0.16 240);
     --grid-mv: oklch(0.70 0.18 300);
 
+    --bg-glow-1: oklch(0.25 0.05 220 / 0.35);
+    --bg-glow-2: oklch(0.22 0.05 280 / 0.25);
+
     --radius: 0.5rem;
     --radius-sm: 0.25rem;
 
@@ -45,6 +48,43 @@
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
     color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+    --background: oklch(0.985 0.003 240);
+    --foreground: oklch(0.20 0.02 260);
+
+    --card: oklch(1 0 0);
+    --card-50: oklch(1 0 0 / 0.75);
+    --popover: oklch(1 0 0);
+
+    --muted: oklch(0.95 0.005 240);
+    --muted-40: oklch(0.93 0.008 240 / 0.6);
+    --muted-foreground: oklch(0.45 0.015 260);
+
+    --border: oklch(0.88 0.008 250);
+    --input: oklch(0.97 0.005 240);
+
+    --primary: oklch(0.55 0.16 220);
+    --primary-15: oklch(0.55 0.16 220 / 0.14);
+    --primary-30: oklch(0.55 0.16 220 / 0.30);
+    --primary-foreground: oklch(0.99 0 0);
+
+    --accent-bg: oklch(0.85 0.04 220);
+    --accent-soft: oklch(0.85 0.04 220 / 0.45);
+
+    --sidebar: oklch(0.97 0.005 240);
+    --sidebar-60: oklch(0.97 0.005 240 / 0.85);
+
+    --good: oklch(0.55 0.18 145);
+    --warn: oklch(0.65 0.16 85);
+    --bad: oklch(0.55 0.22 25);
+    --slack: oklch(0.65 0.16 90);
+
+    --bg-glow-1: oklch(0.85 0.05 220 / 0.30);
+    --bg-glow-2: oklch(0.88 0.04 280 / 0.20);
+
+    color-scheme: light;
 }
 
 * {
@@ -64,8 +104,8 @@ body {
     color: var(--foreground);
     -webkit-font-smoothing: antialiased;
     background-image:
-        radial-gradient(circle at 20% 0%, oklch(0.25 0.05 220 / 0.35), transparent 50%),
-        radial-gradient(circle at 100% 100%, oklch(0.22 0.05 280 / 0.25), transparent 50%);
+        radial-gradient(circle at 20% 0%, var(--bg-glow-1), transparent 50%),
+        radial-gradient(circle at 100% 100%, var(--bg-glow-2), transparent 50%);
     background-attachment: fixed;
     overflow: hidden;
 }
@@ -610,6 +650,20 @@ body {
 
 .btn-block {
     width: 100%;
+}
+
+.btn-icon {
+    width: 32px;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.theme-toggle {
+    color: var(--muted-foreground);
+}
+
+.theme-toggle:hover {
+    color: var(--foreground);
 }
 
 .btn-search-row {

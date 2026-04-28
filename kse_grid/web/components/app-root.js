@@ -1,9 +1,12 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watchEffect } from 'vue';
 import { Sidebar } from '/components/sidebar.js';
 import { GraphPanel } from '/components/graph-panel.js';
+import { IconSun, IconMoon } from '/icons.js';
+
+const THEME_STORAGE_KEY = 'kse_grid:theme';
 
 export const App = {
-    components: { Sidebar, GraphPanel },
+    components: { Sidebar, GraphPanel, IconSun, IconMoon },
     setup () {
         const network = ref(null);
         const error = ref(null);
@@ -12,6 +15,18 @@ export const App = {
         const viewMode = ref('graph');
         const atlasCategories = ref(['osp', 'osd', 'jw']);
         const graphPanelRef = ref(null);
+
+        const storedTheme = (typeof localStorage !== 'undefined' && localStorage.getItem(THEME_STORAGE_KEY)) || 'dark';
+        const theme = ref(storedTheme === 'light' ? 'light' : 'dark');
+
+        watchEffect(() => {
+            document.documentElement.dataset.theme = theme.value;
+            try { localStorage.setItem(THEME_STORAGE_KEY, theme.value); } catch (_) {}
+        });
+
+        function toggleTheme () {
+            theme.value = theme.value === 'dark' ? 'light' : 'dark';
+        }
 
         fetch('/api/network')
             .then(response => response.ok ? response.json() : Promise.reject(`HTTP ${response.status}`))
@@ -42,6 +57,8 @@ export const App = {
             viewMode,
             atlasCategories,
             graphPanelRef,
+            theme,
+            toggleTheme,
             onSelectBus,
             onResetView,
         };
@@ -60,6 +77,17 @@ export const App = {
                 <span class="header-stat"><span class="v tabular">{{ stats.nLine }}</span> linii</span>
                 <span class="header-stat"><span class="v tabular">{{ stats.nTrafo }}</span> trafo</span>
             </div>
+
+            <div class="header-spacer"></div>
+
+            <button class="btn btn-icon theme-toggle"
+                    type="button"
+                    :aria-label="theme === 'dark' ? 'Włącz jasny motyw' : 'Włącz ciemny motyw'"
+                    :title="theme === 'dark' ? 'Jasny motyw' : 'Ciemny motyw'"
+                    @click="toggleTheme">
+                <IconSun v-if="theme === 'dark'" />
+                <IconMoon v-else />
+            </button>
         </header>
         <div class="app-body">
             <Sidebar
@@ -84,7 +112,8 @@ export const App = {
                 :view-mode="viewMode"
                 :atlas-categories="atlasCategories"
                 :selected-voltages="selectedVoltages"
-                :selected-types="selectedTypes" />
+                :selected-types="selectedTypes"
+                :theme="theme" />
         </div>
     </div>
     <div v-else-if="error" class="overlay">

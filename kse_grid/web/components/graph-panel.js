@@ -13,10 +13,9 @@ import { coordKeys } from '/lib/view-mode.js';
 const FOCUS_ZOOM_RATIO = 0.12;
 
 const PLOT_LAYOUT_BASE = {
-    template: 'plotly_dark',
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
-    font: { family: 'Inter, system-ui, sans-serif', color: '#e6edf3', size: 12 },
+    font: { family: 'Inter, system-ui, sans-serif', size: 12 },
     hovermode: 'closest',
     dragmode: 'pan',
     clickmode: 'event',
@@ -25,14 +24,27 @@ const PLOT_LAYOUT_BASE = {
     showlegend: false,
     uirevision: 'kse-grid',
     margin: { l: 0, r: 0, t: 0, b: 0 },
-    hoverlabel: {
-        bgcolor: '#1a1f2c',
-        bordercolor: '#3a4357',
-        font: { family: 'Inter, system-ui, sans-serif', color: '#e6edf3', size: 12 },
-    },
     xaxis: { visible: false },
     yaxis: { visible: false, scaleanchor: 'x', scaleratio: 1 },
 };
+
+function themedLayout (theme) {
+    const isLight = theme === 'light';
+    return {
+        ...PLOT_LAYOUT_BASE,
+        template: isLight ? 'plotly_white' : 'plotly_dark',
+        font: { ...PLOT_LAYOUT_BASE.font, color: isLight ? '#1f2937' : '#e6edf3' },
+        hoverlabel: {
+            bgcolor: isLight ? '#ffffff' : '#1a1f2c',
+            bordercolor: isLight ? '#d1d5db' : '#3a4357',
+            font: {
+                family: 'Inter, system-ui, sans-serif',
+                color: isLight ? '#1f2937' : '#e6edf3',
+                size: 12,
+            },
+        },
+    };
+}
 
 const PLOT_CONFIG = { displayModeBar: false, scrollZoom: true, responsive: true };
 
@@ -44,6 +56,7 @@ export const GraphPanel = {
         selectedTypes: Array,
         viewMode: String,
         atlasCategories: Array,
+        theme: { type: String, default: 'dark' },
     },
     setup (props) {
         const graphEl = ref(null);
@@ -138,12 +151,17 @@ export const GraphPanel = {
         }
 
         function initialLayout () {
+            const base = themedLayout(props.theme);
             if (props.viewMode === 'geo' || props.viewMode === 'atlas') {
                 const view = mapboxView();
+                const isLight = props.theme === 'light';
+                const mapStyle = props.viewMode === 'atlas'
+                    ? 'open-street-map'
+                    : (isLight ? 'carto-positron' : 'carto-darkmatter');
                 return {
-                    ...PLOT_LAYOUT_BASE,
+                    ...base,
                     mapbox: {
-                        style: props.viewMode === 'atlas' ? 'open-street-map' : 'carto-positron',
+                        style: mapStyle,
                         center: { ...view.center },
                         zoom: view.zoom,
                         layers: buildMapboxLayers(),
@@ -151,9 +169,9 @@ export const GraphPanel = {
                 };
             }
             return {
-                ...PLOT_LAYOUT_BASE,
-                xaxis: { ...PLOT_LAYOUT_BASE.xaxis, range: props.network.graphBounds.x },
-                yaxis: { ...PLOT_LAYOUT_BASE.yaxis, range: props.network.graphBounds.y },
+                ...base,
+                xaxis: { ...base.xaxis, range: props.network.graphBounds.x },
+                yaxis: { ...base.yaxis, range: props.network.graphBounds.y },
             };
         }
 
@@ -211,13 +229,19 @@ export const GraphPanel = {
                 }
             }
 
-            const { traces, meta } = props.viewMode === 'atlas'
+            const built = props.viewMode === 'atlas'
                 ? buildAtlasTraces()
                 : buildTraces(props.network, props.viewMode);
+            const traces = built.traces;
+            const meta = built.meta;
+            const shapes = built.shapes || [];
             allTraces.value = traces;
             traceMeta.value = meta;
 
             const layout = initialLayout();
+            if (shapes.length && !(props.viewMode === 'geo' || props.viewMode === 'atlas')) {
+                layout.shapes = shapes;
+            }
             if ((props.viewMode === 'geo' || props.viewMode === 'atlas') && layout.mapbox) {
                 defaultMapView.value = {
                     center: { ...layout.mapbox.center },
@@ -374,6 +398,10 @@ export const GraphPanel = {
         }, { deep: true });
 
         watch(() => props.viewMode, async () => {
+            await buildPlot();
+        });
+
+        watch(() => props.theme, async () => {
             await buildPlot();
         });
 

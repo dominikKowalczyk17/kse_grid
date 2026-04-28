@@ -39,7 +39,7 @@ def serialize_network(net: pp.pandapowerNet) -> dict[str, Any]:
         "voltageLevels": voltage_levels,
         "defaultVoltageFilter": default_voltage_filter,
         "layoutModes": ["graph", "geo"] if geo_view else ["graph"],
-        "defaultViewMode": "geo" if geo_view else "graph",
+        "defaultViewMode": "graph",
         "geoAvailable": geo_view is not None,
         "stats": _compute_stats(net),
         "totals": _compute_totals(net),

@@ -105,13 +105,87 @@ function busCoords(bus, viewMode) {
     return x == null || y == null ? null : { x, y };
 }
 
+function trafoSymbolCoords(from, to, viewMode) {
+    const midX = (from.x + to.x) / 2;
+    const midY = (from.y + to.y) / 2;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy);
+
+    // Offset jest dobrany tak, żeby przy domyślnym zoomie dwa kółka
+    // mocno się zachodziły, tworząc jeden zwarty symbol IEC 60417-5156.
+    // Wartość = ~30% promienia markera w danych (size=18 → r≈9px, separacja środków ≈ 6px).
+    const baseOffset = viewMode === 'geo' ? 0.0014 : 0.0045;
+
+    let tx, ty;
+    if (length < 1e-9) {
+        tx = 0;
+        ty = 1;
+    } else {
+        tx = dx / length;
+        ty = dy / length;
+    }
+    const offset = length < 1e-9 ? baseOffset : Math.min(baseOffset, length * 0.45);
+    return {
+        coilA: { x: midX - tx * offset, y: midY - ty * offset },
+        coilB: { x: midX + tx * offset, y: midY + ty * offset },
+    };
+}
+
+function trafoShapeCircles(from, to, color, radius) {
+    const mx = (from.x + to.x) / 2;
+    const my = (from.y + to.y) / 2;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy);
+    let tx, ty;
+    if (len < 1e-9) {
+        tx = 0;
+        ty = 1;
+    } else {
+        tx = dx / len;
+        ty = dy / len;
+    }
+    const sep = radius * 0.6;
+    const cAx = mx - tx * sep;
+    const cAy = my - ty * sep;
+    const cBx = mx + tx * sep;
+    const cBy = my + ty * sep;
+    const lineSpec = { color, width: 1.6 };
+    return [
+        {
+            type: 'circle', xref: 'x', yref: 'y',
+            x0: cAx - radius, x1: cAx + radius,
+            y0: cAy - radius, y1: cAy + radius,
+            line: lineSpec,
+            fillcolor: 'rgba(0,0,0,0)',
+            layer: 'above',
+        },
+        {
+            type: 'circle', xref: 'x', yref: 'y',
+            x0: cBx - radius, x1: cBx + radius,
+            y0: cBy - radius, y1: cBy + radius,
+            line: lineSpec,
+            fillcolor: 'rgba(0,0,0,0)',
+            layer: 'above',
+        },
+    ];
+}
+
 export function buildTraces(network, viewMode = 'graph') {
-    const { buses, lines, trafos, voltageLevels, hasResults } = network;
+    const { buses, lines, trafos, voltageLevels, hasResults, graphBounds } = network;
     const busById = Object.fromEntries(buses.map(b => [b.id, b]));
     const keys = pointKeys(viewMode);
 
     const traces = [];
     const meta = [];
+    const shapes = [];
+
+    let trafoRadius = 0.04;
+    if (viewMode !== 'geo' && graphBounds?.x) {
+        const dx = graphBounds.x[1] - graphBounds.x[0];
+        trafoRadius = Math.max(dx * 0.00008, 0.00002);
+    }
 
     // ----- linie
     for (const level of voltageLevels) {
@@ -155,6 +229,7 @@ export function buildTraces(network, viewMode = 'graph') {
     }
 
     // ----- transformatory (grupa po napięciu LV)
+    const useShapes = viewMode !== 'geo';
     const lvLevels = [...new Set(trafos.map(t => t.vnLvKv))].sort((a, b) => b - a);
     for (const lv of lvLevels) {
         const atLv = trafos.filter(t => t.vnLvKv === lv);
@@ -170,13 +245,19 @@ export function buildTraces(network, viewMode = 'graph') {
                 if (!from || !to) continue;
                 xs.push(from.x, to.x, null);
                 ys.push(from.y, to.y, null);
-                midX.push((from.x + to.x) / 2);
-                midY.push((from.y + to.y) / 2);
+                const mx = (from.x + to.x) / 2;
+                const my = (from.y + to.y) / 2;
+                midX.push(mx);
+                midY.push(my);
                 hovers.push(trafoHover(tr, hasResults));
                 ids.push(tr.id);
+                if (useShapes) {
+                    shapes.push(...trafoShapeCircles(from, to, bin.color, trafoRadius));
+                }
             }
             if (!ids.length) continue;
 
+            // linia kropkowana między szynami
             traces.push({
                 type: keys.traceType, [keys.x]: xs, [keys.y]: ys, mode: 'lines',
                 line: { color: bin.color, width: 2.2, dash: 'dot' },
@@ -185,9 +266,15 @@ export function buildTraces(network, viewMode = 'graph') {
             });
             meta.push({ kind: 'trafo', voltage: lv, ids: [] });
 
+            // pojedynczy punkt hovera/klikania nad symbolem IEC (jeden tooltip per trafo)
+            // - w trybie graph: niewidoczny (symbol rysowany przez layout.shapes)
+            // - w trybie geo: widoczny marker (mapbox nie wspiera shapes)
+            const hoverMarker = useShapes
+                ? { size: 24, color: 'rgba(0,0,0,0)', line: { width: 0 } }
+                : { size: 12, color: bin.color, opacity: 0.9, symbol: 'circle' };
             traces.push({
                 type: keys.traceType, [keys.x]: midX, [keys.y]: midY, mode: 'markers',
-                marker: { size: 9, color: bin.color, opacity: 0.35, symbol: 'diamond' },
+                marker: hoverMarker,
                 text: hovers,
                 hovertemplate: '%{text}<extra></extra>',
                 showlegend: false,
@@ -253,7 +340,7 @@ export function buildTraces(network, viewMode = 'graph') {
     });
     meta.push({ kind: 'selection', voltage: 0, ids: [] });
 
-    return { traces, meta };
+    return { traces, meta, shapes };
 }
 
 export const SELECTION_TRACE_KIND = 'selection';

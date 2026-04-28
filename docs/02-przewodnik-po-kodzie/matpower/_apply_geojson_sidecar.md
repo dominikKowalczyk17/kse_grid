@@ -9,7 +9,8 @@
 ## Co to jest
 
 
-To jest funkcja pomocnicza lub główna o nazwie `_apply_geojson_sidecar`. Po nazwie widać, że odpowiada za fragment logiki związany z: **apply geojson sidecar**.
+To funkcja, która bierze gotowy plik `GeoJSON` i przypina jego punkty do busów
+aktualnie załadowanego case'a `MATPOWER`.
 
 ## Nagłówek funkcji
 
@@ -77,17 +78,63 @@ net.line.loc[0, "name"]
 
 To drugie pokazuje ważny szczegół: po zmianie nazwy szyny potrafią zmienić się też nazwy elementów złożonych.
 
-## Co robi krok po kroku
+## Jak dokładnie łączy GeoJSON z case'em
 
+1. Wczytuje `FeatureCollection` z pliku.
+2. Buduje słowniki lookupów dla busów:
+   - indeksy `pandapower`,
+   - numerację `1-based`,
+   - nazwy busów.
+3. Dla każdego `Feature`:
+   - sprawdza, czy geometria to `Point`,
+   - pobiera `coordinates = [lon, lat]`,
+   - wywołuje `_match_geo_feature_to_bus(...)`.
+4. Jeśli bus został znaleziony:
+   - zapisuje punkt do `net.bus.at[bus_idx, "geo"]`,
+   - opcjonalnie podmienia nazwę busa na nazwę stacji.
+5. Jeśli po całej pętli nie dopasowano żadnego punktu, rzuca błąd.
 
-1. Tworzy lub uzupełnia zmienne `payload` na podstawie wyniku funkcji `json.loads`.
-2. Tworzy lub uzupełnia zmienne `features` na podstawie wyniku funkcji `payload.get`.
-3. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-4. Przygotowuje zmienne pomocnicze: `id_lookup`.
-5. Przygotowuje zmienne pomocnicze: `one_based_lookup`.
-6. Przygotowuje zmienne pomocnicze: `name_lookup`.
-7. Przygotowuje zmienne pomocnicze: `matched`.
-8. Przygotowuje zmienne pomocnicze: `renamed`.
-9. Przechodzi po kolejnych elementach i dla każdego wykonuje te same operacje.
-10. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
-11. Sprawdza warunek i wybiera odpowiednią ścieżkę działania.
+## Kluczowy przykład
+
+Jeśli `Feature` ma:
+
+```json
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [21.0, 51.625]
+  },
+  "properties": {
+    "bus": 123,
+    "station": "Kozienice"
+  }
+}
+```
+
+i `_match_geo_feature_to_bus(...)` zwróci bus o indeksie `122`, to efekt jest
+logicznie taki:
+
+```python
+net.bus.at[122, "geo"] = '{"type":"Point","coordinates":[21.0,51.625]}'
+```
+
+Jeśli obecna nazwa busa była pusta albo tymczasowa, funkcja może też ustawić:
+
+```python
+net.bus.at[122, "name"] = "Kozienice 220 kV"
+```
+
+## Co to znaczy w praktyce
+
+Ta funkcja jest miejscem, gdzie kończy się etap:
+
+```text
+EPC -> GeoJSON
+```
+
+i zaczyna etap:
+
+```text
+GeoJSON -> net.bus["geo"] -> widok na mapie
+```
