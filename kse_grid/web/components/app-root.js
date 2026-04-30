@@ -2,6 +2,7 @@ import { computed, ref, watchEffect } from 'vue';
 import { Sidebar } from '/components/sidebar.js';
 import { GraphPanel } from '/components/graph-panel.js';
 import { IconSun, IconMoon } from '/icons.js';
+import { fetchNetwork, resetTopology, setSwitchState } from '/lib/api.js';
 
 const THEME_STORAGE_KEY = 'kse_grid:theme';
 
@@ -16,6 +17,9 @@ export const App = {
         const atlasCategories = ref(['osp', 'osd', 'jw']);
         const minLineLoading = ref(0);
         const minBusPower = ref(0);
+        const showSwitches = ref(true);
+        const topologyBusy = ref(false);
+        const topologyError = ref('');
         const graphPanelRef = ref(null);
 
         const storedTheme = (typeof localStorage !== 'undefined' && localStorage.getItem(THEME_STORAGE_KEY)) || 'dark';
@@ -30,20 +34,81 @@ export const App = {
             theme.value = theme.value === 'dark' ? 'light' : 'dark';
         }
 
-        fetch('/api/network')
-            .then(response => response.ok ? response.json() : Promise.reject(`HTTP ${response.status}`))
-            .then(data => {
-                network.value = data;
+        function applyNetwork (data) {
+            const isFirstLoad = !network.value;
+            network.value = data;
+            document.title = `${data.name} – kse_grid`;
+
+            if (isFirstLoad) {
                 selectedVoltages.value = [...data.defaultVoltageFilter];
                 viewMode.value = data.defaultViewMode || 'graph';
-                document.title = `${data.name} – kse_grid`;
-            })
-            .catch(fetchError => { error.value = String(fetchError); });
+                return;
+            }
+
+            const nextVoltages = selectedVoltages.value.filter(level => data.voltageLevels.includes(level));
+            selectedVoltages.value = nextVoltages.length ? nextVoltages : [...data.defaultVoltageFilter];
+            if (viewMode.value === 'geo' && !data.geoAvailable) viewMode.value = data.defaultViewMode || 'graph';
+        }
+
+        async function loadNetwork () {
+            try {
+                applyNetwork(await fetchNetwork());
+                error.value = null;
+            } catch (fetchError) {
+                error.value = String(fetchError);
+            }
+        }
+
+        async function onSetSwitchState ({ switchId, closed }) {
+            topologyBusy.value = true;
+            topologyError.value = '';
+            try {
+                applyNetwork(await setSwitchState(switchId, closed));
+            } catch (requestError) {
+                topologyError.value = String(requestError);
+            } finally {
+                topologyBusy.value = false;
+            }
+        }
+
+        async function onSetSwitchesState ({ switchIds, closed }) {
+            topologyBusy.value = true;
+            topologyError.value = '';
+            try {
+                let payload = network.value;
+                for (const switchId of switchIds) {
+                    payload = await setSwitchState(switchId, closed);
+                }
+                applyNetwork(payload);
+            } catch (requestError) {
+                topologyError.value = String(requestError);
+            } finally {
+                topologyBusy.value = false;
+            }
+        }
+
+        async function onResetTopology () {
+            topologyBusy.value = true;
+            topologyError.value = '';
+            try {
+                applyNetwork(await resetTopology());
+            } catch (requestError) {
+                topologyError.value = String(requestError);
+            } finally {
+                topologyBusy.value = false;
+            }
+        }
+
+        loadNetwork();
 
         const stats = computed(() => network.value?.stats || {});
 
         function onSelectBus (busId) {
             graphPanelRef.value?.selectBus(busId, true);
+        }
+
+        function onSelectElement (selection) {
+            graphPanelRef.value?.selectElement(selection);
         }
 
         function onResetView () {
@@ -60,10 +125,17 @@ export const App = {
             atlasCategories,
             minLineLoading,
             minBusPower,
+            showSwitches,
+            topologyBusy,
+            topologyError,
             graphPanelRef,
             theme,
             toggleTheme,
+            onSetSwitchState,
+            onSetSwitchesState,
+            onResetTopology,
             onSelectBus,
+            onSelectElement,
             onResetView,
         };
     },
@@ -84,6 +156,13 @@ export const App = {
 
             <div class="header-spacer"></div>
 
+            <button class="btn"
+                    type="button"
+                    :disabled="topologyBusy"
+                    @click="onResetTopology">
+                {{ topologyBusy ? 'Przeliczam…' : 'Reset stanu sieci' }}
+            </button>
+
             <button class="btn btn-icon theme-toggle"
                     type="button"
                     :aria-label="theme === 'dark' ? 'Włącz jasny motyw' : 'Włącz ciemny motyw'"
@@ -98,9 +177,12 @@ export const App = {
                 :stats="stats"
                 :totals="network.totals"
                 :diagnostics="network.diagnostics"
+                :topology="network.topology"
                 :voltage-levels="network.voltageLevels"
                 :default-voltage-filter="network.defaultVoltageFilter"
                 :buses="network.buses"
+                :lines="network.lines"
+                :trafos="network.trafos"
                 :has-results="network.hasResults"
                 :view-mode="viewMode"
                 :geo-available="network.geoAvailable"
@@ -110,8 +192,13 @@ export const App = {
                 v-model:atlas-categories="atlasCategories"
                 v-model:min-line-loading="minLineLoading"
                 v-model:min-bus-power="minBusPower"
+                v-model:show-switches="showSwitches"
+                :topology-busy="topologyBusy"
+                :topology-error="topologyError"
                 @reset-view="onResetView"
-                @select-bus="onSelectBus" />
+                @reset-topology="onResetTopology"
+                @select-bus="onSelectBus"
+                @select-element="onSelectElement" />
             <GraphPanel
                 ref="graphPanelRef"
                 :network="network"
@@ -121,7 +208,11 @@ export const App = {
                 :selected-types="selectedTypes"
                 :min-line-loading="minLineLoading"
                 :min-bus-power="minBusPower"
-                :theme="theme" />
+                :show-switches="showSwitches"
+                :topology-busy="topologyBusy"
+                :theme="theme"
+                @set-switch-state="onSetSwitchState"
+                @set-switches-state="onSetSwitchesState" />
         </div>
     </div>
     <div v-else-if="error" class="overlay">

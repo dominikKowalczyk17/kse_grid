@@ -48,6 +48,24 @@ function themedLayout (theme) {
 
 const PLOT_CONFIG = { displayModeBar: false, scrollZoom: true, responsive: true };
 
+function loadingValue(value) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : 0;
+}
+
+function lineVisible(line, voltageSet, minLoad, branchOk) {
+    return voltageSet.has(line.voltage)
+        && loadingValue(line.loading) >= minLoad
+        && branchOk(line);
+}
+
+function trafoVisible(trafo, voltageSet, minLoad, branchOk) {
+    return voltageSet.has(trafo.vnHvKv)
+        && voltageSet.has(trafo.vnLvKv)
+        && loadingValue(trafo.loading) >= minLoad
+        && branchOk(trafo);
+}
+
 export const GraphPanel = {
     components: { SelectionCard },
     props: {
@@ -59,7 +77,10 @@ export const GraphPanel = {
         theme: { type: String, default: 'dark' },
         minLineLoading: { type: Number, default: 0 },
         minBusPower: { type: Number, default: 0 },
+        showSwitches: { type: Boolean, default: false },
+        topologyBusy: { type: Boolean, default: false },
     },
+    emits: ['set-switch-state', 'set-switches-state'],
     setup (props) {
         const graphEl = ref(null);
         const traceMeta = ref([]);
@@ -68,6 +89,7 @@ export const GraphPanel = {
         const defaultRange = ref(null);
         const defaultMapView = ref(null);
         const focusHalf = ref({ x: 1, y: 1 });
+        const preservedViewport = ref(null);
         const ready = ref(false);
         const atlasData = ref(null);
 
@@ -77,23 +99,29 @@ export const GraphPanel = {
         const visibleCounts = computed(() => {
             const voltageSet = new Set(props.selectedVoltages);
             const typeSet = new Set(props.selectedTypes);
-            const total = { bus: props.network.buses.length, line: props.network.lines.length };
+            const total = {
+                bus: props.network.buses.length,
+                line: props.network.lines.length,
+                switch: props.network.switches?.length || 0,
+            };
             const minLoad = Math.max(0, Number(props.minLineLoading) || 0);
             const minPow = Math.max(0, Number(props.minBusPower) || 0);
             const passesBusPower = bus => minPow <= 0
                 || Math.max(Math.abs(bus.loadMw ?? 0), Math.abs(bus.genMw ?? 0)) >= minPow;
             const visibleBusIds = new Set(props.network.buses.filter(passesBusPower).map(bus => bus.id));
             const branchOk = el => visibleBusIds.has(el.fromBus ?? el.hvBus) && visibleBusIds.has(el.toBus ?? el.lvBus);
+            const lineById = Object.fromEntries(props.network.lines.map(line => [line.id, line]));
+            const trafoById = Object.fromEntries(props.network.trafos.map(trafo => [trafo.id, trafo]));
             let connected = null;
             if (minLoad > 0) {
                 connected = new Set();
                 for (const ln of props.network.lines) {
-                    if ((ln.loading ?? 0) >= minLoad && branchOk(ln)) {
+                    if (lineVisible(ln, voltageSet, minLoad, branchOk)) {
                         connected.add(ln.fromBus); connected.add(ln.toBus);
                     }
                 }
                 for (const tr of props.network.trafos) {
-                    if ((tr.loading ?? 0) >= minLoad && branchOk(tr)) {
+                    if (trafoVisible(tr, voltageSet, minLoad, branchOk)) {
                         connected.add(tr.hvBus); connected.add(tr.lvBus);
                     }
                 }
@@ -105,11 +133,30 @@ export const GraphPanel = {
                     && ((props.viewMode !== 'geo' && props.viewMode !== 'atlas') || (bus.lat != null && bus.lon != null))).length
                 : 0;
             const lines = typeSet.has('line')
-                ? props.network.lines.filter(line => voltageSet.has(line.voltage)
-                    && (line.loading ?? 0) >= minLoad
-                    && visibleBusIds.has(line.fromBus) && visibleBusIds.has(line.toBus)).length
+                ? props.network.lines.filter(line => lineVisible(line, voltageSet, minLoad, branchOk)).length
                 : 0;
-            return { buses, lines, totalBuses: total.bus, totalLines: total.line };
+            const switches = props.showSwitches
+                ? (props.network.switches || []).filter(sw => {
+                    if (!voltageSet.has(sw.voltage)) return false;
+                    if (sw.parentKind === 'line') {
+                        const parent = lineById[sw.elementId];
+                        return typeSet.has('line') && parent ? lineVisible(parent, voltageSet, minLoad, branchOk) : false;
+                    }
+                    if (sw.parentKind === 'trafo') {
+                        const parent = trafoById[sw.elementId];
+                        return typeSet.has('trafo') && parent ? trafoVisible(parent, voltageSet, minLoad, branchOk) : false;
+                    }
+                    return false;
+                }).length
+                : 0;
+            return {
+                buses,
+                lines,
+                switches,
+                totalBuses: total.bus,
+                totalLines: total.line,
+                totalSwitches: total.switch,
+            };
         });
 
         function buildMapboxLayers () {
@@ -202,6 +249,45 @@ export const GraphPanel = {
             };
         }
 
+        function captureViewport () {
+            if (!graphEl.value?.layout) return null;
+            if (props.viewMode === 'geo' || props.viewMode === 'atlas') {
+                const mapbox = graphEl.value.layout.mapbox;
+                if (!mapbox?.center) return null;
+                return {
+                    kind: 'map',
+                    center: { lon: mapbox.center.lon, lat: mapbox.center.lat },
+                    zoom: mapbox.zoom,
+                };
+            }
+            const xRange = graphEl.value.layout.xaxis?.range;
+            const yRange = graphEl.value.layout.yaxis?.range;
+            if (!xRange || !yRange) return null;
+            return {
+                kind: 'graph',
+                x: [...xRange],
+                y: [...yRange],
+            };
+        }
+
+        function applyPreservedViewport () {
+            const viewport = preservedViewport.value;
+            if (!viewport) return;
+            if (viewport.kind === 'map' && (props.viewMode === 'geo' || props.viewMode === 'atlas')) {
+                Plotly.relayout(graphEl.value, {
+                    'mapbox.center': viewport.center,
+                    'mapbox.zoom': viewport.zoom,
+                });
+                return;
+            }
+            if (viewport.kind === 'graph' && props.viewMode !== 'geo' && props.viewMode !== 'atlas') {
+                Plotly.relayout(graphEl.value, {
+                    'xaxis.range': viewport.x,
+                    'yaxis.range': viewport.y,
+                });
+            }
+        }
+
         function buildAtlasTraces () {
             if (!atlasData.value) return { traces: [], meta: [] };
             const enabled = new Set(props.atlasCategories || ATLAS_CATEGORIES);
@@ -241,6 +327,13 @@ export const GraphPanel = {
         }
 
         async function buildPlot () {
+            // Każdy redraw — po filtrach, zmianie payloadu, motywie czy przełącznikach —
+            // powinien zachować aktualny viewport, jeśli użytkownik sam nie poprosił
+            // o reset. Dlatego snapshot kamery/range robimy centralnie tutaj.
+            if (ready.value) {
+                preservedViewport.value = captureViewport();
+            }
+
             ready.value = false;
             selection.value = null;
             traceMeta.value = [];
@@ -261,7 +354,8 @@ export const GraphPanel = {
                 : buildTraces(props.network, props.viewMode, {
                     minLineLoading: props.minLineLoading,
                     minBusPower: props.minBusPower,
-                });
+                    selectedVoltages: props.selectedVoltages,
+                }, props.theme);
             const traces = built.traces;
             const meta = built.meta;
             const shapes = built.shapes || [];
@@ -291,6 +385,7 @@ export const GraphPanel = {
             graphEl.value.on('plotly_hover', () => graphEl.value.classList.add('is-hovering-target'));
             graphEl.value.on('plotly_unhover', () => graphEl.value.classList.remove('is-hovering-target'));
             applyVisibility();
+            applyPreservedViewport();
             ready.value = true;
         }
 
@@ -300,6 +395,7 @@ export const GraphPanel = {
             const typeSet = new Set(props.selectedTypes);
             const update = traceMeta.value.map(meta => {
                 if (meta.kind === 'selection' || meta.kind === 'atlas-station') return undefined;
+                if (meta.kind === 'switch') return props.showSwitches && typeSet.has(meta.parentKind) && voltageSet.has(meta.voltage);
                 return typeSet.has(meta.kind) && voltageSet.has(meta.voltage);
             });
             const indices = update.map((_, index) => index).filter(index => update[index] !== undefined);
@@ -363,11 +459,36 @@ export const GraphPanel = {
                     selection.value = { kind: 'trafo', payload: trafo };
                     highlightAt(point[keys.x], point[keys.y], 14);
                 }
+            } else if (meta.kind === 'switch') {
+                const id = meta.ids[point.pointIndex];
+                const sw = props.network.switches.find(item => item.id === id);
+                const keys = coordKeys(props.viewMode);
+                if (sw) {
+                    selection.value = { kind: 'switch', payload: sw };
+                    highlightAt(point[keys.x], point[keys.y], 11);
+                }
             }
         }
 
         function findBusTraceIndex (voltage) {
             return traceMeta.value.findIndex(meta => meta.kind === 'bus' && meta.voltage === voltage);
+        }
+
+        function focusPoint (targetX, targetY, focus) {
+            if (!focus) return;
+            if (props.viewMode === 'geo' || props.viewMode === 'atlas') {
+                Plotly.relayout(graphEl.value, {
+                    'mapbox.center': { lon: targetX, lat: targetY },
+                    'mapbox.zoom': props.viewMode === 'geo' && props.network.geoView
+                        ? props.network.geoView.focusZoom
+                        : ATLAS_DEFAULT_VIEW.focusZoom,
+                });
+                return;
+            }
+            Plotly.relayout(graphEl.value, {
+                'xaxis.range': [targetX - focusHalf.value.x, targetX + focusHalf.value.x],
+                'yaxis.range': [targetY - focusHalf.value.y, targetY + focusHalf.value.y],
+            });
         }
 
         function selectBus (busId, focus) {
@@ -382,26 +503,51 @@ export const GraphPanel = {
             const targetY = bus[keys.y];
             if (targetX == null || targetY == null) return;
             highlightAt(targetX, targetY, baseSize);
+            focusPoint(targetX, targetY, focus);
+        }
 
-            if (focus) {
-                if ((props.viewMode === 'geo' || props.viewMode === 'atlas') && bus.lon != null && bus.lat != null) {
-                    const zoom = props.viewMode === 'geo' && props.network.geoView
-                        ? props.network.geoView.focusZoom
-                        : ATLAS_DEFAULT_VIEW.focusZoom;
-                    Plotly.relayout(graphEl.value, {
-                        'mapbox.center': { lon: bus.lon, lat: bus.lat },
-                        'mapbox.zoom': zoom,
-                    });
-                } else {
-                    Plotly.relayout(graphEl.value, {
-                        'xaxis.range': [bus.x - focusHalf.value.x, bus.x + focusHalf.value.x],
-                        'yaxis.range': [bus.y - focusHalf.value.y, bus.y + focusHalf.value.y],
-                    });
-                }
+        function selectLine (lineId, focus) {
+            const line = props.network.lines.find(item => item.id === lineId);
+            if (!line) return;
+            const from = props.network.buses.find(item => item.id === line.fromBus);
+            const to = props.network.buses.find(item => item.id === line.toBus);
+            if (!from || !to) return;
+            const keys = coordKeys(props.viewMode);
+            const targetX = ((from[keys.x] ?? 0) + (to[keys.x] ?? 0)) / 2;
+            const targetY = ((from[keys.y] ?? 0) + (to[keys.y] ?? 0)) / 2;
+            selection.value = { kind: 'line', payload: line };
+            highlightAt(targetX, targetY, 14);
+            if (from[keys.x] == null || from[keys.y] == null || to[keys.x] == null || to[keys.y] == null) return;
+            focusPoint(targetX, targetY, focus);
+        }
+
+        function selectTrafo (trafoId, focus) {
+            const trafo = props.network.trafos.find(item => item.id === trafoId);
+            if (!trafo) return;
+            const hv = props.network.buses.find(item => item.id === trafo.hvBus);
+            const lv = props.network.buses.find(item => item.id === trafo.lvBus);
+            if (!hv || !lv) return;
+            const keys = coordKeys(props.viewMode);
+            const targetX = ((hv[keys.x] ?? 0) + (lv[keys.x] ?? 0)) / 2;
+            const targetY = ((hv[keys.y] ?? 0) + (lv[keys.y] ?? 0)) / 2;
+            selection.value = { kind: 'trafo', payload: trafo };
+            highlightAt(targetX, targetY, 14);
+            if (hv[keys.x] == null || hv[keys.y] == null || lv[keys.x] == null || lv[keys.y] == null) return;
+            focusPoint(targetX, targetY, focus);
+        }
+
+        function selectElement ({ kind, id, focus = true }) {
+            if (kind === 'bus') {
+                selectBus(id, focus);
+            } else if (kind === 'line') {
+                selectLine(id, focus);
+            } else if (kind === 'trafo') {
+                selectTrafo(id, focus);
             }
         }
 
         function resetView () {
+            preservedViewport.value = null;
             if (props.viewMode === 'geo' || props.viewMode === 'atlas') {
                 if (!defaultMapView.value) return;
                 Plotly.relayout(graphEl.value, {
@@ -423,8 +569,8 @@ export const GraphPanel = {
             clearHighlight();
         }
 
-        watch(() => [props.selectedVoltages, props.selectedTypes], () => {
-            if (ready.value) applyVisibility();
+        watch(() => [props.selectedVoltages, props.selectedTypes, props.showSwitches], () => {
+            if (ready.value) buildPlot();
         }, { deep: true });
 
         watch(() => props.viewMode, async () => {
@@ -451,6 +597,10 @@ export const GraphPanel = {
             }
         }, { deep: true });
 
+        watch(() => props.network, async () => {
+            await buildPlot();
+        });
+
         function onKey (event) {
             if (event.target && ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return;
             if (event.key === 'Escape') clearSelection();
@@ -468,15 +618,23 @@ export const GraphPanel = {
             });
         });
 
-        return { graphEl, selection, clearSelection, selectBus, resetView, visibleCounts };
+        return { graphEl, selection, clearSelection, selectBus, selectLine, selectTrafo, selectElement, resetView, visibleCounts };
     },
     template: `
     <div class="graph-panel">
         <div ref="graphEl" class="graph-canvas"></div>
-        <SelectionCard :selection="selection" :has-results="network.hasResults" @close="clearSelection" />
+        <SelectionCard
+            :selection="selection"
+            :switches="network.switches || []"
+            :has-results="network.hasResults"
+            :topology-busy="topologyBusy"
+            @close="clearSelection"
+            @set-switch-state="$emit('set-switch-state', $event)"
+            @set-switches-state="$emit('set-switches-state', $event)" />
         <div class="graph-hud">
             pokazano {{ visibleCounts.buses }}/{{ visibleCounts.totalBuses }} szyn ·
             {{ visibleCounts.lines }}/{{ visibleCounts.totalLines }} gałęzi
+            <template v-if="showSwitches"> · {{ visibleCounts.switches }}/{{ visibleCounts.totalSwitches }} switchy</template>
         </div>
         <div class="kbd-hint">
             <span class="kbd">R</span> reset

@@ -4,8 +4,13 @@ import { voltageStatus } from '/lib/formatters.js';
 
 export const SelectionCard = {
     components: { IconClose },
-    props: { selection: Object, hasResults: Boolean },
-    emits: ['close'],
+    props: {
+        selection: Object,
+        switches: { type: Array, default: () => [] },
+        hasResults: Boolean,
+        topologyBusy: { type: Boolean, default: false },
+    },
+    emits: ['close', 'set-switch-state', 'set-switches-state'],
     setup (props) {
         const rows = computed(() => {
             if (!props.selection) return [];
@@ -50,7 +55,26 @@ export const SelectionCard = {
                     items.push({ label: 'Obciążenie', value: `${(trafo.loading ?? 0).toFixed(1)}%` });
                     if (trafo.pHvMw != null) items.push({ label: 'P po stronie HV', value: `${trafo.pHvMw.toFixed(1)} MW` });
                 }
+                const trafoSwitches = props.switches.filter(sw => sw.parentKind === 'trafo' && sw.elementId === trafo.id);
+                for (const sw of trafoSwitches) {
+                    items.push({
+                        label: `Switch ${sw.sideLabel || sw.name}`,
+                        value: sw.closed ? 'Zamknięty' : 'Otwarty',
+                        status: sw.closed ? 'good' : 'bad',
+                    });
+                }
                 return items;
+            }
+            if (selection.kind === 'switch') {
+                const sw = selection.payload;
+                return [
+                    { label: 'Stan', value: sw.closed ? 'Zamknięty' : 'Otwarty', status: sw.closed ? 'good' : 'bad' },
+                    { label: 'Powiązanie', value: sw.parentKind === 'trafo' ? 'Transformator' : sw.parentKind === 'line' ? 'Linia' : 'Łącznik szyn' },
+                    { label: 'Element', value: `${sw.elementName} (#${sw.elementId})` },
+                    { label: 'Bus', value: `${sw.busName} (#${sw.busId})` },
+                    { label: 'Drugi koniec', value: sw.remoteBusName ? `${sw.remoteBusName} (#${sw.remoteBusId})` : '—' },
+                    { label: 'Strona', value: sw.sideLabel || '—' },
+                ];
             }
             return [];
         });
@@ -63,16 +87,45 @@ export const SelectionCard = {
             if (id == null) return '';
             return selection.kind === 'bus' ? `Szyna #${id}`
                 : selection.kind === 'line' ? `Linia #${id}`
-                    : selection.kind === 'trafo' ? `Trafo #${id}` : '';
+                    : selection.kind === 'trafo' ? `Trafo #${id}`
+                        : selection.kind === 'switch' ? `Łącznik #${id}` : '';
         });
         const kindLabel = computed(() => {
             const kind = props.selection?.kind;
             return kind === 'bus' ? 'Szyna'
                 : kind === 'line' ? 'Linia'
-                    : kind === 'trafo' ? 'Transformator' : '';
+                    : kind === 'trafo' ? 'Transformator'
+                        : kind === 'switch' ? 'Łącznik' : '';
         });
 
-        return { rows, title, subtitle, kindLabel };
+        const switchActionLabel = computed(() => {
+            const sw = props.selection?.kind === 'switch' ? props.selection.payload : null;
+            if (!sw) return '';
+            return sw.closed ? 'Otwórz switch' : 'Zamknij switch';
+        });
+
+        const relatedTrafoSwitches = computed(() => {
+            const trafo = props.selection?.kind === 'trafo' ? props.selection.payload : null;
+            if (!trafo) return [];
+            return props.switches.filter(sw => sw.parentKind === 'trafo' && sw.elementId === trafo.id);
+        });
+
+        const trafoConnected = computed(() => relatedTrafoSwitches.value.some(sw => sw.closed));
+        const trafoActionLabel = computed(() => {
+            if (props.selection?.kind !== 'trafo' || !relatedTrafoSwitches.value.length) return '';
+            return trafoConnected.value ? 'Odłącz trafo' : 'Załącz trafo';
+        });
+
+        return {
+            rows,
+            title,
+            subtitle,
+            kindLabel,
+            switchActionLabel,
+            relatedTrafoSwitches,
+            trafoConnected,
+            trafoActionLabel,
+        };
     },
     template: `
     <div v-if="selection" class="selection-card">
@@ -89,6 +142,33 @@ export const SelectionCard = {
         <div v-for="(row, i) in rows" :key="i" class="selection-row">
             <span class="lbl">{{ row.label }}</span>
             <span class="val" :class="row.status">{{ row.value }}</span>
+        </div>
+        <div v-if="selection.kind === 'switch'" class="selection-actions">
+            <button
+                class="btn btn-block"
+                type="button"
+                :disabled="topologyBusy"
+                @click="$emit('set-switch-state', { switchId: selection.payload.id, closed: !selection.payload.closed })">
+                {{ topologyBusy ? 'Przeliczam…' : switchActionLabel }}
+            </button>
+        </div>
+        <div v-else-if="selection.kind === 'trafo' && relatedTrafoSwitches.length" class="selection-actions">
+            <button
+                class="btn btn-block"
+                type="button"
+                :disabled="topologyBusy"
+                @click="$emit('set-switches-state', { switchIds: relatedTrafoSwitches.map(sw => sw.id), closed: !trafoConnected })">
+                {{ topologyBusy ? 'Przeliczam…' : trafoActionLabel }}
+            </button>
+            <button
+                v-for="sw in relatedTrafoSwitches"
+                :key="sw.id"
+                class="btn btn-block"
+                type="button"
+                :disabled="topologyBusy"
+                @click="$emit('set-switch-state', { switchId: sw.id, closed: !sw.closed })">
+                {{ topologyBusy ? 'Przeliczam…' : (sw.closed ? 'Otwórz ' : 'Zamknij ') + (sw.sideLabel || sw.name) }}
+            </button>
         </div>
     </div>
     `,

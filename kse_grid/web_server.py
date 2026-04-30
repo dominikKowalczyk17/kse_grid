@@ -8,24 +8,44 @@ from threading import Timer
 
 import pandapower as pp
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from kse_grid.serializer import serialize_network
+from kse_grid.switching import SwitchingSession
 
 
 _WEB_DIR = Path(__file__).parent / "web"
 
 
+class SwitchStateUpdate(BaseModel):
+    """Payload PATCH dla pojedynczego switcha."""
+
+    closed: bool
+
+
 def create_app(net: pp.pandapowerNet) -> FastAPI:
     """Tworzy aplikację FastAPI dla danej sieci."""
-    payload = serialize_network(net)
+    session = SwitchingSession(net)
+    payload = session.build_payload()
     app = FastAPI(title=f"{payload['name']} – KSE Grid", docs_url=None, redoc_url=None)
 
     @app.get("/api/network")
     def get_network() -> JSONResponse:
+        return JSONResponse(session.build_payload())
+
+    @app.patch("/api/switches/{switch_id}")
+    def patch_switch(switch_id: int, update: SwitchStateUpdate) -> JSONResponse:
+        try:
+            payload = session.set_switch_state(switch_id, update.closed)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
         return JSONResponse(payload)
+
+    @app.post("/api/topology/reset")
+    def reset_topology() -> JSONResponse:
+        return JSONResponse(session.reset())
 
     @app.get("/")
     def index() -> FileResponse:

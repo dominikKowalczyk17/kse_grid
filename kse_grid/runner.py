@@ -23,6 +23,14 @@ class PowerFlowRunner:
         Uruchamia load flow z inicjalizacją AC (flat start: U=1 p.u., kąt=0°).
         Zwraca True jeśli zbieżny, False jeśli nie.
         """
+        # Parametry zapisujemy na sieci, żeby inne warstwy backendu — np. sesja
+        # przełączeniowa od switchy — mogły później uruchamiać `runpp()` z tymi
+        # samymi ustawieniami, bez zgadywania jak liczony był stan bazowy.
+        setattr(self.net, "_powerflow_options", {
+            "algorithm": algorithm,
+            "max_iteration": max_iteration,
+            "tolerance_mva": tolerance_mva,
+        })
         try:
             _RUNPP(
                 self.net,

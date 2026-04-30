@@ -30,6 +30,28 @@ const TRAFO_BINS = [
     { label: '>150%',     lower: 150, upper: Infinity, color: '#C62828' },
 ];
 
+function tracePalette(theme = 'dark') {
+    const isLight = theme === 'light';
+    return {
+        trafoBins: isLight
+            ? [
+                { label: '0-60%', lower: 0, upper: 60, color: '#1565C0' },
+                { label: '60-100%', lower: 60, upper: 100, color: '#00695C' },
+                { label: '100-150%', lower: 100, upper: 150, color: '#B26A00' },
+                { label: '>150%', lower: 150, upper: Infinity, color: '#B71C1C' },
+            ]
+            : TRAFO_BINS,
+        switchClosedFill: isLight ? '#16A34A' : '#4ADE80',
+        switchClosedStroke: isLight ? '#14532D' : '#14532D',
+        switchOpenFill: isLight ? '#DC2626' : '#F87171',
+        switchOpenStroke: isLight ? '#7F1D1D' : '#7F1D1D',
+        busNoResults: isLight ? '#64748B' : '#5b6472',
+        busStroke: isLight ? '#F8FAFC' : '#0e1116',
+        selectionOuter: isLight ? '#2563EB' : '#8fc7ea',
+        selectionInner: isLight ? '#1D4ED8' : '#4ea1ff',
+    };
+}
+
 function lineWidth(voltage) {
     if (voltage >= 400) return 3.6;
     if (voltage >= 220) return 2.6;
@@ -46,7 +68,26 @@ function busSize(voltage) {
 
 function fmt(value, digits = 1) {
     if (value === null || value === undefined) return '—';
-    return Number(value).toFixed(digits);
+    const num = Number(value);
+    return Number.isFinite(num) ? num.toFixed(digits) : '—';
+}
+
+function loadingValue(value) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : 0;
+}
+
+function lineVisible(line, voltageSet, minLineLoading, branchPasses) {
+    return voltageSet.has(line.voltage)
+        && loadingValue(line.loading) >= minLineLoading
+        && branchPasses(line);
+}
+
+function trafoVisible(trafo, voltageSet, minLineLoading, branchPasses) {
+    return voltageSet.has(trafo.vnHvKv)
+        && voltageSet.has(trafo.vnLvKv)
+        && loadingValue(trafo.loading) >= minLineLoading
+        && branchPasses(trafo);
 }
 
 function lineHover(line, hasResults) {
@@ -86,6 +127,18 @@ function busHover(bus, hasResults) {
     }
     if (bus.genMw > 0) lines.push(`Generacja: ${fmt(bus.genMw)} MW`);
     if (bus.loadMw > 0) lines.push(`Obciążenie: ${fmt(bus.loadMw)} MW`);
+    return lines.join('<br>');
+}
+
+function switchHover(sw) {
+    const lines = [
+        `<b>${sw.name}</b>`,
+        `Stan: ${sw.closed ? 'zamknięty' : 'otwarty'}`,
+        `Element: ${sw.elementName}`,
+        `Bus: ${sw.busName}`,
+    ];
+    if (sw.remoteBusName) lines.push(`Drugi koniec: ${sw.remoteBusName}`);
+    if (sw.sideLabel) lines.push(`Strona: ${sw.sideLabel}`);
     return lines.join('<br>');
 }
 
@@ -172,19 +225,50 @@ function trafoShapeCircles(from, to, color, radius) {
     ];
 }
 
+function switchMarkerCoords(sw, busById, viewMode) {
+    const bus = busById[sw.busId];
+    if (!bus) return null;
+
+    const from = busCoords(bus, viewMode);
+    if (!from) return null;
+
+    const remoteBus = sw.remoteBusId == null ? null : busById[sw.remoteBusId];
+    const to = remoteBus ? busCoords(remoteBus, viewMode) : null;
+    if (!to) return from;
+
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy);
+    if (length < 1e-9) return from;
+
+    const ux = dx / length;
+    const uy = dy / length;
+    // Switch ma być czytelnie "przy busie", a nie w połowie gałęzi.
+    // Trzymamy więc mały offset zależny od długości odcinka, ale z ciasnymi
+    // ograniczeniami min/max, żeby marker nadal był łatwy do kliknięcia.
+    const minOffset = viewMode === 'geo' ? 0.004 : 0.018;
+    const maxOffset = viewMode === 'geo' ? 0.028 : 0.080;
+    const offset = Math.min(Math.max(length * 0.08, minOffset), maxOffset);
+    return { x: from.x + ux * offset, y: from.y + uy * offset };
+}
+
 function busPower(bus) {
     const load = Math.abs(bus.loadMw ?? 0);
     const gen = Math.abs(bus.genMw ?? 0);
     return Math.max(load, gen);
 }
 
-export function buildTraces(network, viewMode = 'graph', filters = {}) {
-    const { buses, lines, trafos, voltageLevels, hasResults, graphBounds } = network;
+export function buildTraces(network, viewMode = 'graph', filters = {}, theme = 'dark') {
+    const { buses, lines, trafos, switches = [], voltageLevels, hasResults, graphBounds } = network;
     const busById = Object.fromEntries(buses.map(b => [b.id, b]));
+    const lineById = Object.fromEntries(lines.map(line => [line.id, line]));
+    const trafoById = Object.fromEntries(trafos.map(trafo => [trafo.id, trafo]));
     const keys = pointKeys(viewMode);
+    const palette = tracePalette(theme);
 
     const minLineLoading = Math.max(0, Number(filters.minLineLoading) || 0);
     const minBusPower = Math.max(0, Number(filters.minBusPower) || 0);
+    const voltageSet = new Set(filters.selectedVoltages || voltageLevels);
 
     const visibleBusIds = new Set(
         buses
@@ -198,13 +282,13 @@ export function buildTraces(network, viewMode = 'graph', filters = {}) {
     if (minLineLoading > 0) {
         busHasVisibleBranch = new Set();
         for (const ln of lines) {
-            if ((ln.loading ?? 0) >= minLineLoading && branchPasses(ln)) {
+            if (lineVisible(ln, voltageSet, minLineLoading, branchPasses)) {
                 busHasVisibleBranch.add(ln.fromBus);
                 busHasVisibleBranch.add(ln.toBus);
             }
         }
         for (const tr of trafos) {
-            if ((tr.loading ?? 0) >= minLineLoading && branchPasses(tr)) {
+            if (trafoVisible(tr, voltageSet, minLineLoading, branchPasses)) {
                 busHasVisibleBranch.add(tr.hvBus);
                 busHasVisibleBranch.add(tr.lvBus);
             }
@@ -226,12 +310,10 @@ export function buildTraces(network, viewMode = 'graph', filters = {}) {
     // ----- linie
     for (const level of voltageLevels) {
         const linesAtLevel = lines.filter(l =>
-            l.voltage === level
-            && (l.loading ?? 0) >= minLineLoading
-            && branchPasses(l)
+            l.voltage === level && lineVisible(l, voltageSet, minLineLoading, branchPasses)
         );
         for (const bin of LINE_BINS) {
-            const inBin = linesAtLevel.filter(l => l.loading >= bin.lower && l.loading < bin.upper);
+            const inBin = linesAtLevel.filter(l => loadingValue(l.loading) >= bin.lower && loadingValue(l.loading) < bin.upper);
             if (!inBin.length) continue;
 
             const xs = [], ys = [], midX = [], midY = [], hovers = [], ids = [];
@@ -273,12 +355,10 @@ export function buildTraces(network, viewMode = 'graph', filters = {}) {
     const lvLevels = [...new Set(trafos.map(t => t.vnLvKv))].sort((a, b) => b - a);
     for (const lv of lvLevels) {
         const atLv = trafos.filter(t =>
-            t.vnLvKv === lv
-            && (t.loading ?? 0) >= minLineLoading
-            && branchPasses(t)
+            t.vnLvKv === lv && trafoVisible(t, voltageSet, minLineLoading, branchPasses)
         );
-        for (const bin of TRAFO_BINS) {
-            const inBin = atLv.filter(t => t.loading >= bin.lower && t.loading < bin.upper);
+        for (const bin of palette.trafoBins) {
+            const inBin = atLv.filter(t => loadingValue(t.loading) >= bin.lower && loadingValue(t.loading) < bin.upper);
             if (!inBin.length) continue;
 
             const xs = [], ys = [], midX = [], midY = [], hovers = [], ids = [];
@@ -327,6 +407,61 @@ export function buildTraces(network, viewMode = 'graph', filters = {}) {
         }
     }
 
+    // ----- switche
+    for (const level of voltageLevels) {
+        const atLevel = switches.filter(sw => {
+            if (sw.voltage !== level) return false;
+            if (sw.parentKind === 'line') {
+                const parent = lineById[sw.elementId];
+                return parent ? lineVisible(parent, voltageSet, minLineLoading, branchPasses) : false;
+            }
+            if (sw.parentKind === 'trafo') {
+                const parent = trafoById[sw.elementId];
+                return parent ? trafoVisible(parent, voltageSet, minLineLoading, branchPasses) : false;
+            }
+            return false;
+        });
+
+        for (const parentKind of ['line', 'trafo']) {
+            const inParent = atLevel.filter(sw => sw.parentKind === parentKind);
+            for (const closed of [true, false]) {
+                const inState = inParent.filter(sw => sw.closed === closed);
+                if (!inState.length) continue;
+
+                const xs = [];
+                const ys = [];
+                const hovers = [];
+                const ids = [];
+                for (const sw of inState) {
+                    const coords = switchMarkerCoords(sw, busById, viewMode);
+                    if (!coords) continue;
+                    xs.push(coords.x);
+                    ys.push(coords.y);
+                    hovers.push(switchHover(sw));
+                    ids.push(sw.id);
+                }
+                if (!ids.length) continue;
+
+                traces.push({
+                    type: keys.traceType,
+                    [keys.x]: xs,
+                    [keys.y]: ys,
+                    mode: 'markers',
+                    marker: {
+                        size: closed ? 8 : 10,
+                        color: closed ? palette.switchClosedFill : palette.switchOpenFill,
+                        opacity: 0.95,
+                        line: { width: 1.5, color: closed ? palette.switchClosedStroke : palette.switchOpenStroke },
+                    },
+                    text: hovers,
+                    hovertemplate: '%{text}<extra></extra>',
+                    showlegend: false,
+                });
+                meta.push({ kind: 'switch', parentKind, voltage: level, ids });
+            }
+        }
+    }
+
     // ----- szyny
     let firstBusTrace = true;
     for (const level of voltageLevels) {
@@ -339,14 +474,14 @@ export function buildTraces(network, viewMode = 'graph', filters = {}) {
 
         const xs = busesAtLevel.map(b => b[keys.x]);
         const ys = busesAtLevel.map(b => b[keys.y]);
-        const colors = busesAtLevel.map(b => hasResults ? busColor(b.vmPu ?? 1.0) : '#5b6472');
+        const colors = busesAtLevel.map(b => hasResults ? busColor(b.vmPu ?? 1.0) : palette.busNoResults);
         const hovers = busesAtLevel.map(b => busHover(b, hasResults));
         const ids = busesAtLevel.map(b => b.id);
 
         const marker = {
             size: busSize(level),
             color: colors,
-            line: { color: '#0e1116', width: 1.2 },
+            line: { color: palette.busStroke, width: 1.2 },
         };
 
         firstBusTrace = false;
@@ -367,7 +502,7 @@ export function buildTraces(network, viewMode = 'graph', filters = {}) {
         type: keys.traceType, [keys.x]: [], [keys.y]: [], mode: 'markers',
         marker: {
             size: 18,
-            color: '#8fc7ea',
+            color: palette.selectionOuter,
             symbol: 'cross',
         },
         hoverinfo: 'skip',
@@ -380,7 +515,7 @@ export function buildTraces(network, viewMode = 'graph', filters = {}) {
         type: keys.traceType, [keys.x]: [], [keys.y]: [], mode: 'markers',
         marker: {
             size: 12,
-            color: '#4ea1ff',
+            color: palette.selectionInner,
             symbol: 'x',
         },
         hoverinfo: 'skip',

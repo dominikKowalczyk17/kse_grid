@@ -1,5 +1,6 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot } from '/icons.js';
+import { SwitchingPanel } from '/components/switching-panel.js';
 import {
     formatMw,
     HISTOGRAM_BIN_WIDTH,
@@ -10,28 +11,37 @@ import {
 } from '/lib/formatters.js';
 
 export const Sidebar = {
-    components: { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot },
+    components: { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot, SwitchingPanel },
     props: {
         stats: Object,
         totals: Object,
         diagnostics: Object,
+        topology: Object,
         voltageLevels: Array,
         defaultVoltageFilter: Array,
         selectedVoltages: Array,
         selectedTypes: Array,
         buses: Array,
+        lines: Array,
+        trafos: Array,
         hasResults: Boolean,
         viewMode: String,
         geoAvailable: Boolean,
         atlasCategories: Array,
         minLineLoading: { type: Number, default: 0 },
         minBusPower: { type: Number, default: 0 },
+        showSwitches: { type: Boolean, default: false },
+        topologyBusy: { type: Boolean, default: false },
+        topologyError: { type: String, default: '' },
     },
-    emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'update:atlasCategories', 'update:minLineLoading', 'update:minBusPower', 'reset-view', 'select-bus'],
+    emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'update:atlasCategories', 'update:minLineLoading', 'update:minBusPower', 'update:showSwitches', 'reset-view', 'reset-topology', 'select-bus', 'select-element'],
     setup (props, { emit }) {
         const search = ref('');
         const showSuggestions = ref(false);
         const hoveredBinIndex = ref(null);
+        const activeHistogramBinIndex = ref(null);
+        const activeHistogramBusCursor = ref(0);
+        const activeBranchCursor = ref(0);
 
         const suggestions = computed(() => {
             const query = search.value.trim().toLowerCase();
@@ -73,7 +83,7 @@ export const Sidebar = {
                     hi,
                     count: 0,
                     status: voltageStatus(mid) || 'good',
-                    firstBusId: null,
+                    busIds: [],
                 };
             });
 
@@ -83,7 +93,7 @@ export const Sidebar = {
                     const vmPu = Math.max(HISTOGRAM_MIN, Math.min(HISTOGRAM_MAX - 1e-9, bus.vmPu));
                     const index = Math.min(binCount - 1, Math.floor((vmPu - HISTOGRAM_MIN) / HISTOGRAM_BIN_WIDTH));
                     bins[index].count += 1;
-                    if (bins[index].firstBusId == null) bins[index].firstBusId = bus.id;
+                    bins[index].busIds.push(bus.id);
                 }
             }
 
@@ -99,6 +109,15 @@ export const Sidebar = {
         const hoveredBin = computed(() => hoveredBinIndex.value == null
             ? null
             : histogram.value.bins[hoveredBinIndex.value] ?? null);
+        const activeHistogramBin = computed(() => activeHistogramBinIndex.value == null
+            ? null
+            : histogram.value.bins[activeHistogramBinIndex.value] ?? null);
+        const activeHistogramBusIds = computed(() => activeHistogramBin.value?.busIds || []);
+        const activeHistogramBusId = computed(() => {
+            if (!activeHistogramBusIds.value.length) return null;
+            const index = Math.min(activeHistogramBusCursor.value, activeHistogramBusIds.value.length - 1);
+            return activeHistogramBusIds.value[index] ?? null;
+        });
         const lossPctLabel = computed(() => totals.value.lossPct == null ? '—' : `${totals.value.lossPct.toFixed(2)} %`);
         const slackLabel = computed(() => totals.value.slackBusId == null ? '—' : `#${totals.value.slackBusId}`);
         const minBusSub = computed(() => voltageDiag.value.minBusId == null
@@ -110,6 +129,48 @@ export const Sidebar = {
         const maxElementSub = computed(() => {
             if (loadingDiag.value.maxId == null) return 'Brak danych';
             return `${loadingDiag.value.maxKind === 'trafo' ? 'Trafo' : 'Linia'} #${loadingDiag.value.maxId}`;
+        });
+        const busById = computed(() => Object.fromEntries((props.buses || []).map(bus => [bus.id, bus])));
+        const sortedBranches = computed(() => {
+            if (!props.hasResults) return [];
+            const selectedVoltages = new Set(props.selectedVoltages);
+            const items = [];
+            if (props.selectedTypes.includes('line')) {
+                for (const line of props.lines || []) {
+                    if (!selectedVoltages.has(line.voltage)) continue;
+                    items.push({
+                        kind: 'line',
+                        id: line.id,
+                        name: line.name,
+                        label: `Linia #${line.id}`,
+                        loading: Number(line.loading) || 0,
+                        voltageLabel: `${line.voltage.toFixed(0)} kV`,
+                        fromBus: line.fromBus,
+                        toBus: line.toBus,
+                    });
+                }
+            }
+            if (props.selectedTypes.includes('trafo')) {
+                for (const trafo of props.trafos || []) {
+                    if (!selectedVoltages.has(trafo.vnHvKv) || !selectedVoltages.has(trafo.vnLvKv)) continue;
+                    items.push({
+                        kind: 'trafo',
+                        id: trafo.id,
+                        name: trafo.name,
+                        label: `Trafo #${trafo.id}`,
+                        loading: Number(trafo.loading) || 0,
+                        voltageLabel: `${trafo.vnHvKv.toFixed(0)}/${trafo.vnLvKv.toFixed(0)} kV`,
+                        fromBus: trafo.hvBus,
+                        toBus: trafo.lvBus,
+                    });
+                }
+            }
+            return items.sort((left, right) => right.loading - left.loading || left.kind.localeCompare(right.kind) || left.id - right.id);
+        });
+        const activeBranch = computed(() => {
+            if (!sortedBranches.value.length) return null;
+            const index = Math.min(activeBranchCursor.value, sortedBranches.value.length - 1);
+            return sortedBranches.value[index] ?? null;
         });
 
         function applyPreset (name) {
@@ -152,6 +213,19 @@ export const Sidebar = {
             emit('select-bus', busId);
         }
 
+        function canFocusElement (element) {
+            if (!element) return false;
+            if (props.viewMode !== 'geo' && props.viewMode !== 'atlas') return true;
+            const fromBus = busById.value[element.fromBus];
+            const toBus = busById.value[element.toBus];
+            return Boolean(fromBus && toBus && fromBus.lat != null && fromBus.lon != null && toBus.lat != null && toBus.lon != null);
+        }
+
+        function focusElement (element) {
+            if (!canFocusElement(element)) return;
+            emit('select-element', { kind: element.kind, id: element.id, focus: true });
+        }
+
         function blurLater () {
             setTimeout(() => { showSuggestions.value = false; }, 200);
         }
@@ -171,9 +245,33 @@ export const Sidebar = {
             return { height: `${(bin.count / histogram.value.max) * 100}%` };
         }
 
-        function focusHistogramBin (bin) {
-            if (!bin?.firstBusId) return;
-            focusBus(bin.firstBusId);
+        function focusHistogramBin (index) {
+            const bin = histogram.value.bins[index];
+            if (!bin?.busIds?.length) return;
+            activeHistogramBinIndex.value = index;
+            activeHistogramBusCursor.value = 0;
+            focusBus(bin.busIds[0]);
+        }
+
+        function navigateHistogramBin (step) {
+            if (!activeHistogramBusIds.value.length) return;
+            const next = Math.min(
+                activeHistogramBusIds.value.length - 1,
+                Math.max(0, activeHistogramBusCursor.value + step),
+            );
+            activeHistogramBusCursor.value = next;
+            focusBus(activeHistogramBusIds.value[next]);
+        }
+
+        function focusBranchAt (index) {
+            if (!sortedBranches.value.length) return;
+            const next = Math.min(sortedBranches.value.length - 1, Math.max(0, index));
+            activeBranchCursor.value = next;
+            focusElement(sortedBranches.value[next]);
+        }
+
+        function navigateBranches (step) {
+            focusBranchAt(activeBranchCursor.value + step);
         }
 
         const maxBusPower = computed(() => {
@@ -194,6 +292,23 @@ export const Sidebar = {
             emit('update:minBusPower', num);
         }
 
+        watch(activeHistogramBusIds, ids => {
+            if (!ids.length) {
+                activeHistogramBinIndex.value = null;
+                activeHistogramBusCursor.value = 0;
+                return;
+            }
+            activeHistogramBusCursor.value = Math.min(activeHistogramBusCursor.value, ids.length - 1);
+        });
+
+        watch(sortedBranches, items => {
+            if (!items.length) {
+                activeBranchCursor.value = 0;
+                return;
+            }
+            activeBranchCursor.value = Math.min(activeBranchCursor.value, items.length - 1);
+        });
+
         return {
             search, showSuggestions, suggestions,
             isCore, isAll, isMediumVoltage,
@@ -201,15 +316,22 @@ export const Sidebar = {
             toggleAtlasCategory,
             HISTOGRAM_BIN_WIDTH,
             voltageColorVar, totals, voltageDiag, loadingDiag,
-            histogram, hoveredBin, hoveredBinIndex, lossPctLabel, slackLabel,
+            histogram, hoveredBin, hoveredBinIndex, activeHistogramBinIndex, activeHistogramBin, activeHistogramBusIds, activeHistogramBusId, activeHistogramBusCursor, lossPctLabel, slackLabel,
             minBusSub, maxBusSub, maxElementSub,
-            canFocusBus, focusBus, histogramBarStyle, focusHistogramBin,
+            canFocusBus, focusBus, histogramBarStyle, focusHistogramBin, navigateHistogramBin,
             formatMw,
             maxBusPower, setMinLineLoading, setMinBusPower,
+            sortedBranches, activeBranch, activeBranchCursor, canFocusElement, focusBranchAt, navigateBranches,
         };
     },
     template: `
     <aside class="sidebar">
+
+        <SwitchingPanel
+            :topology="topology"
+            :busy="topologyBusy"
+            :request-error="topologyError"
+            @reset-topology="$emit('reset-topology')" />
 
         <section class="section-card">
             <h3 class="section-title">Bilans mocy</h3>
@@ -276,15 +398,18 @@ export const Sidebar = {
         <section class="section-card">
             <h3 class="section-title">Obciążenie gałęzi</h3>
             <div class="diag-stack">
-                <div class="diag-row">
+                <button class="diag-row diag-row-button"
+                        type="button"
+                        :disabled="!activeBranch || !canFocusElement(activeBranch)"
+                        @click="focusBranchAt(activeBranchCursor)">
                     <span class="diag-main">
                         <span class="diag-label">Maks. obciążenie</span>
-                        <span class="diag-sub">{{ maxElementSub }}</span>
+                        <span class="diag-sub">{{ activeBranch ? activeBranch.label + ' · ' + activeBranch.voltageLabel : maxElementSub }}</span>
                     </span>
                     <span class="diag-values">
-                        <span class="diag-value tabular" :class="loadingDiag.maxPct >= 150 ? 'bad' : (loadingDiag.maxPct >= 100 ? 'warn' : 'good')">{{ loadingDiag.maxPct != null ? loadingDiag.maxPct.toFixed(1) + ' %' : '—' }}</span>
+                        <span class="diag-value tabular" :class="(activeBranch?.loading ?? loadingDiag.maxPct) >= 150 ? 'bad' : ((activeBranch?.loading ?? loadingDiag.maxPct) >= 100 ? 'warn' : 'good')">{{ activeBranch ? activeBranch.loading.toFixed(1) + ' %' : (loadingDiag.maxPct != null ? loadingDiag.maxPct.toFixed(1) + ' %' : '—') }}</span>
                     </span>
-                </div>
+                </button>
                 <div class="diag-row">
                     <span class="diag-label">Przeciążone ≥ 150%</span>
                     <span class="diag-value tabular" :class="{ bad: (loadingDiag.overloadedCount ?? 0) > 0 }">{{ loadingDiag.overloadedCount ?? 0 }}</span>
@@ -296,6 +421,22 @@ export const Sidebar = {
                 <div class="diag-row">
                     <span class="diag-label">Szyny z obciążeniem</span>
                     <span class="diag-value tabular">{{ loadingDiag.loadBusCount ?? 0 }}</span>
+                </div>
+                <div v-if="activeBranch" class="group-nav">
+                    <button class="chip"
+                            type="button"
+                            :disabled="activeBranchCursor <= 0"
+                            @click="navigateBranches(-1)">Poprzednia</button>
+                    <button class="chip"
+                            type="button"
+                            :disabled="!canFocusElement(activeBranch)"
+                            @click="focusBranchAt(activeBranchCursor)">
+                        {{ activeBranchCursor + 1 }}/{{ sortedBranches.length }}
+                    </button>
+                    <button class="chip"
+                            type="button"
+                            :disabled="activeBranchCursor >= sortedBranches.length - 1"
+                            @click="navigateBranches(1)">Następna</button>
                 </div>
             </div>
         </section>
@@ -489,6 +630,10 @@ export const Sidebar = {
                     <input type="checkbox" :checked="selectedTypes.includes('bus')" @change="toggleType('bus')" />
                     <span class="label">Szyny</span>
                 </label>
+                <label class="check-row">
+                    <input type="checkbox" :checked="showSwitches" @change="$emit('update:showSwitches', $event.target.checked)" />
+                    <span class="label">Switche</span>
+                </label>
             </div>
         </section>
 
@@ -503,11 +648,11 @@ export const Sidebar = {
                             v-for="(bin, index) in histogram.bins"
                             :key="index"
                             class="histogram-bar-button"
-                            :class="{ active: hoveredBinIndex === index, clickable: bin.firstBusId != null }"
+                            :class="{ active: hoveredBinIndex === index || activeHistogramBinIndex === index, clickable: bin.busIds.length > 0 }"
                             type="button"
                             @mouseenter="hoveredBinIndex = index"
                             @mouseleave="hoveredBinIndex = null"
-                            @click="focusHistogramBin(bin)">
+                            @click="focusHistogramBin(index)">
                             <span class="histogram-bar" :class="bin.status" :style="histogramBarStyle(bin)"></span>
                         </button>
                     </div>
@@ -523,14 +668,35 @@ export const Sidebar = {
                     <span v-if="hoveredBin">
                         <span class="diag-value tabular">{{ hoveredBin.lo.toFixed(2) }}–{{ hoveredBin.hi.toFixed(2) }} p.u.</span>
                         · {{ hoveredBin.count }} szyn
-                        <span v-if="hoveredBin.firstBusId != null"> · kliknij, aby przejść do #{{ hoveredBin.firstBusId }}</span>
+                        <span v-if="hoveredBin.busIds.length"> · kliknij, aby wejść w grupę</span>
+                    </span>
+                    <span v-else-if="activeHistogramBin">
+                        <span class="diag-value tabular">{{ activeHistogramBin.lo.toFixed(2) }}–{{ activeHistogramBin.hi.toFixed(2) }} p.u.</span>
+                        · {{ activeHistogramBusCursor + 1 }}/{{ activeHistogramBusIds.length }}
+                        <span v-if="activeHistogramBusId != null"> · szyna #{{ activeHistogramBusId }}</span>
                     </span>
                     <span v-else-if="hasResults">
                         n = <span class="diag-value tabular">{{ histogram.total }}</span>
                         · koszyk {{ HISTOGRAM_BIN_WIDTH.toFixed(2) }} p.u.
-                        · kliknij słupek, aby przejść do pierwszej szyny
+                        · kliknij słupek, aby przechodzić po całej grupie
                     </span>
                     <span v-else>Brak wyników rozpływu mocy — rozkład U jest niedostępny.</span>
+                </div>
+                <div v-if="activeHistogramBin" class="group-nav">
+                    <button class="chip"
+                            type="button"
+                            :disabled="activeHistogramBusCursor <= 0"
+                            @click="navigateHistogramBin(-1)">Poprzednia</button>
+                    <button class="chip"
+                            type="button"
+                            :disabled="activeHistogramBusId == null"
+                            @click="focusBus(activeHistogramBusId)">
+                        {{ activeHistogramBusCursor + 1 }}/{{ activeHistogramBusIds.length }}
+                    </button>
+                    <button class="chip"
+                            type="button"
+                            :disabled="activeHistogramBusCursor >= activeHistogramBusIds.length - 1"
+                            @click="navigateHistogramBin(1)">Następna</button>
                 </div>
             </div>
         </section>

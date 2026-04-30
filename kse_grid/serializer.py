@@ -9,7 +9,7 @@ from typing import Any
 
 import networkx as nx
 import pandapower as pp
-from pandapower.topology import create_nxgraph
+from pandapower.topology import create_nxgraph, unsupplied_buses
 
 
 _VOLTAGE_OK_MIN = 0.95
@@ -20,9 +20,18 @@ _LOAD_BAD_PCT = 150.0
 _CORE_VOLTAGE_KV = 220.0
 
 
-def serialize_network(net: pp.pandapowerNet) -> dict[str, Any]:
+def compute_graph_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, float]]:
+    """Publiczny helper do jednorazowego przygotowania stabilnego layoutu grafu."""
+    return _compute_positions(net)
+
+
+def serialize_network(
+    net: pp.pandapowerNet,
+    *,
+    graph_positions: dict[int, tuple[float, float]] | None = None,
+) -> dict[str, Any]:
     """Zwraca słownik z całą siecią + wynikami load flow gotowy do JSON-a."""
-    positions = _compute_positions(net)
+    positions = graph_positions or _compute_positions(net)
     geo_positions = _extract_geo_positions(net)
     has_bus_results = not net.res_bus.empty
     has_line_results = not net.res_line.empty
@@ -47,6 +56,8 @@ def serialize_network(net: pp.pandapowerNet) -> dict[str, Any]:
         "buses": _serialize_buses(net, positions, geo_positions, has_bus_results),
         "lines": _serialize_lines(net, has_line_results, geo_positions),
         "trafos": _serialize_trafos(net, has_trafo_results),
+        "switches": _serialize_switches(net),
+        "topology": _compute_topology(net),
         "bounds": graph_bounds,
         "graphBounds": graph_bounds,
         "geoView": geo_view,
@@ -345,6 +356,70 @@ def _serialize_trafos(net: pp.pandapowerNet, has_results: bool) -> list[dict[str
     return out
 
 
+def _serialize_switches(net: pp.pandapowerNet) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for switch_idx, row in net.switch.iterrows():
+        switch_id = _to_int(switch_idx)
+        bus_id = _to_int(row.bus)
+        element_id = _to_int(row.element)
+        switch_type = str(row.et)
+        bus_name = str(net.bus.at[bus_id, "name"])
+        voltage = _to_float(net.bus.at[bus_id, "vn_kv"])
+
+        remote_bus_id: int | None = None
+        remote_bus_name: str | None = None
+        element_name = str(row.get("name") or f"Switch {switch_id}")
+        parent_kind = "switch"
+        side = ""
+        side_label = ""
+
+        if switch_type == "l" and element_id in net.line.index:
+            line = net.line.loc[element_id]
+            from_bus = _to_int(line.from_bus)
+            to_bus = _to_int(line.to_bus)
+            remote_bus_id = to_bus if bus_id == from_bus else from_bus
+            remote_bus_name = str(net.bus.at[remote_bus_id, "name"])
+            element_name = str(line["name"])
+            parent_kind = "line"
+            side = "from" if bus_id == from_bus else "to"
+            side_label = "strona początkowa" if side == "from" else "strona końcowa"
+        elif switch_type == "t" and element_id in net.trafo.index:
+            trafo = net.trafo.loc[element_id]
+            hv_bus = _to_int(trafo.hv_bus)
+            lv_bus = _to_int(trafo.lv_bus)
+            remote_bus_id = lv_bus if bus_id == hv_bus else hv_bus
+            remote_bus_name = str(net.bus.at[remote_bus_id, "name"])
+            element_name = str(trafo["name"])
+            parent_kind = "trafo"
+            side = "hv" if bus_id == hv_bus else "lv"
+            side_label = "strona WN" if side == "hv" else "strona NN"
+        elif switch_type == "b" and element_id in net.bus.index:
+            remote_bus_id = element_id
+            remote_bus_name = str(net.bus.at[remote_bus_id, "name"])
+            parent_kind = "bus"
+            side = "bus"
+            side_label = "łącznik szynowy"
+
+        out.append({
+            "id": switch_id,
+            "name": str(row.get("name") or f"Switch {switch_id}"),
+            "busId": bus_id,
+            "busName": bus_name,
+            "remoteBusId": remote_bus_id,
+            "remoteBusName": remote_bus_name,
+            "elementId": element_id,
+            "elementName": element_name,
+            "elementType": switch_type,
+            "parentKind": parent_kind,
+            "side": side,
+            "sideLabel": side_label,
+            "closed": bool(row.get("closed", False)),
+            "voltage": voltage,
+            "type": str(row.get("type") or ""),
+        })
+    return out
+
+
 def _safe_float(value: Any) -> float | None:
     if isinstance(value, bool):
         f = float(value)
@@ -448,6 +523,60 @@ def _compute_diagnostics(net: pp.pandapowerNet) -> dict[str, Any]:
     return {
         "voltage": voltage,
         "loading": loading,
+    }
+
+
+def _compute_topology(net: pp.pandapowerNet) -> dict[str, Any]:
+    graph = create_nxgraph(
+        net,
+        respect_switches=True,
+        include_out_of_service=False,
+        multi=False,
+    )
+    for bus_id in _active_bus_ids(net):
+        if bus_id not in graph:
+            graph.add_node(bus_id)
+
+    slack_bus_ids = _active_slack_bus_ids(net)
+    unsupplied = {
+        _to_int(bus_id)
+        for bus_id in unsupplied_buses(
+            net,
+            mg=graph,
+            respect_switches=True,
+            slacks=slack_bus_ids or None,
+        )
+    }
+
+    components = [
+        sorted(_to_int(bus_id) for bus_id in component)
+        for component in nx.connected_components(graph)
+    ]
+    components.sort(key=lambda component: (-len(component), component[0] if component else -1))
+
+    islands: list[dict[str, Any]] = []
+    for island_idx, bus_ids in enumerate(components, start=1):
+        island_slacks = [bus_id for bus_id in bus_ids if bus_id in slack_bus_ids]
+        island_unsupplied = [bus_id for bus_id in bus_ids if bus_id in unsupplied]
+        islands.append({
+            "id": island_idx,
+            "busCount": len(bus_ids),
+            "hasSlack": bool(island_slacks),
+            "slackBusIds": island_slacks,
+            "unsuppliedBusCount": len(island_unsupplied),
+            "sampleBusIds": bus_ids[:5],
+        })
+
+    closed_switches = int(net.switch["closed"].fillna(False).astype(bool).sum()) if not net.switch.empty else 0
+    return {
+        "islandCount": len(islands),
+        "energizedIslandCount": int(sum(island["unsuppliedBusCount"] == 0 for island in islands)),
+        "unsuppliedIslandCount": int(sum(island["unsuppliedBusCount"] > 0 for island in islands)),
+        "unsuppliedBusCount": len(unsupplied),
+        "switchCount": int(len(net.switch)),
+        "closedSwitchCount": closed_switches,
+        "openSwitchCount": int(len(net.switch) - closed_switches),
+        "islands": islands,
     }
 
 
@@ -572,6 +701,31 @@ def _count_overloads(net: pp.pandapowerNet) -> int:
     if not net.res_trafo.empty:
         total += int((net.res_trafo["loading_percent"].fillna(0.0) > _OVERLOAD_PCT).sum())
     return total
+
+
+def _active_bus_ids(net: pp.pandapowerNet) -> list[int]:
+    if "in_service" not in net.bus.columns:
+        return [_to_int(bus_id) for bus_id in net.bus.index]
+    mask = net.bus["in_service"].fillna(False).astype(bool)
+    return [_to_int(bus_id) for bus_id in net.bus.index[mask]]
+
+
+def _active_slack_bus_ids(net: pp.pandapowerNet) -> set[int]:
+    slack_buses: set[int] = set()
+    if not net.ext_grid.empty:
+        if "in_service" in net.ext_grid.columns:
+            active = net.ext_grid["in_service"].fillna(False).astype(bool)
+            rows = net.ext_grid.loc[active]
+        else:
+            rows = net.ext_grid
+        slack_buses.update(_to_int(row.bus) for _, row in rows.iterrows())
+    if not net.gen.empty and "slack" in net.gen.columns:
+        slack_mask = net.gen["slack"].fillna(False).astype(bool)
+        if "in_service" in net.gen.columns:
+            slack_mask &= net.gen["in_service"].fillna(False).astype(bool)
+        rows = net.gen.loc[slack_mask]
+        slack_buses.update(_to_int(row.bus) for _, row in rows.iterrows())
+    return slack_buses
 
 
 def _status(value: float, warn: float, bad: float) -> str:

@@ -39,7 +39,7 @@ class KSEGrid:
 
     # ------------------------------------------------------------------
     def run_powerflow(self,
-                      algorithm: str = "iwamoto_nr",
+                      algorithm: str = "nr",
                       max_iteration: int = 100,
                       tolerance_mva: float = 1.5) -> "KSEGrid": ## w PSE 1.5 MWA jest akceptowalne
         """Uruchamia obliczenia load flow (opcjonalnie, wzbogaca wizualizację)."""
