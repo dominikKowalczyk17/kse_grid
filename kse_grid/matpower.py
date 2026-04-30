@@ -18,6 +18,7 @@ def load_matpower_case(case_file: str | Path, f_hz: int = 50) -> pp.pandapowerNe
     setattr(net, "_case_path", str(case_path))
     _normalize_imported_net(net)
     _load_geo_sidecar(net, case_path)
+    seed_operational_switches(net)
     return net
 
 
@@ -121,6 +122,229 @@ def _load_geo_sidecar(net: pp.pandapowerNet, case_path: Path) -> None:
         _apply_geojson_sidecar(net, sidecar_path)
         setattr(net, "_geo_source", str(sidecar_path))
         break
+
+
+def seed_operational_switches(net: pp.pandapowerNet) -> None:
+    """
+    Dodaje do sieci operacyjne switche pandapower na końcach linii i transformatorów.
+
+    MATPOWER opisuje gałęzie głównie jako elementy typu branch z flagą aktywności
+    (`branch status`). Po imporcie przez `from_mpc()` dostajemy więc poprawne tabele
+    `net.line` / `net.trafo` oraz ich `in_service`, ale tabela `net.switch` zostaje
+    pusta. To utrudnia późniejsze sterowanie topologią przez API, bo nie ma czego
+    "otwierać" i "zamykać" bez bezpośredniego ruszania samych linii lub traf.
+
+    Ten helper uzupełnia brakujący poziom topologiczny:
+    - dla każdej linii tworzy po jednym switchu typu `l` na obu końcach,
+    - dla każdego transformatora tworzy po jednym switchu typu `t` na obu końcach.
+
+    Dzięki temu można później:
+    - rozcinać sieć na wyspy przez `net.switch.closed = False`,
+    - analizować komponenty spójne z `respect_switches=True`,
+    - uruchamiać load flow dla różnych stanów łączeniowych bez usuwania elementów.
+
+    Funkcja jest idempotentna: jeżeli jakiś switch już istnieje, nie doda duplikatu.
+    Stan początkowy switcha odzwierciedla `in_service` danego elementu, ale helper
+    celowo nie zmienia samego `in_service` — dostępność techniczna elementu i jego
+    stan łączeniowy to w pandapower dwa różne poziomy modelu.
+
+    Parameters
+    ----------
+    net:
+        Sieć pandapower po imporcie MATPOWER, przygotowana do dalszej manipulacji
+        topologią na poziomie switchy.
+    """
+    # Najpierw zbieramy wszystkie już istniejące switche. Dzięki temu helper można
+    # wywołać wiele razy bez ryzyka, że każda próba doda kolejny zestaw duplikatów.
+    existing_switches = {
+        (_to_int(row.bus), _to_int(row.element), str(row.et))
+        for _, row in net.switch.iterrows()
+    }
+
+    # Każdą aktywną linię chcemy móc rozłączyć od obu stron, więc seedujemy dwa
+    # switche bus-line: jeden przy busie początkowym, drugi przy końcowym.
+    for line_idx, row in net.line.iterrows():
+        # Pandas daje nam indeks wiersza tabeli line; normalizujemy go do zwykłego
+        # int, bo taki identyfikator będzie potem przekazywany do create_switch().
+        line_id = _to_int(line_idx)
+
+        # Początkowy stan switcha wyprowadzamy z in_service linii:
+        # - linia aktywna   -> switch startuje jako zamknięty,
+        # - linia wyłączona -> switch startuje jako otwarty.
+        # Dzięki temu świeżo zaimportowana sieć zachowuje ten sam stan pracy.
+        closed = _initial_switch_state(row)
+
+        # Nazwę bierzemy z modelu, a jeśli jej brakuje, budujemy prosty fallback.
+        # Ten tekst trafia do net.switch.name i później ułatwia debugowanie.
+        line_name = str(row.get("name") or f"Line {line_id + 1}")
+
+        # Switch po stronie "from" oznacza możliwość otwarcia pola liniowego od
+        # strony busa początkowego.
+        _create_bus_element_switch(
+            net=net,
+            bus_id=_to_int(row.from_bus),
+            element_id=line_id,
+            et="l",
+            closed=closed,
+            name=f"{line_name} [from]",
+            existing_switches=existing_switches,
+        )
+
+        # Analogiczny switch po stronie "to" daje niezależną kontrolę od drugiego
+        # końca tej samej linii.
+        _create_bus_element_switch(
+            net=net,
+            bus_id=_to_int(row.to_bus),
+            element_id=line_id,
+            et="l",
+            closed=closed,
+            name=f"{line_name} [to]",
+            existing_switches=existing_switches,
+        )
+
+    # Dla transformatorów robimy dokładnie to samo, tylko używamy typu switcha `t`
+    # i podpinamy go do strony HV oraz LV. To pozwala później otwierać pole trafo
+    # tak samo, jak w operacjach sieciowych robi się to dla linii.
+    for trafo_idx, row in net.trafo.iterrows():
+        # Identyfikator transformatora z tabeli net.trafo.
+        trafo_id = _to_int(trafo_idx)
+
+        # Początkowy stan switchy trafo także dziedziczymy po in_service.
+        closed = _initial_switch_state(row)
+
+        # Czytelna nazwa pomaga rozpoznać, który switch odpowiada której stronie
+        # transformatora.
+        trafo_name = str(row.get("name") or f"Trafo {trafo_id + 1}")
+
+        # Strona wysokiego napięcia (HV).
+        _create_bus_element_switch(
+            net=net,
+            bus_id=_to_int(row.hv_bus),
+            element_id=trafo_id,
+            et="t",
+            closed=closed,
+            name=f"{trafo_name} [hv]",
+            existing_switches=existing_switches,
+        )
+
+        # Strona niskiego napięcia (LV).
+        _create_bus_element_switch(
+            net=net,
+            bus_id=_to_int(row.lv_bus),
+            element_id=trafo_id,
+            et="t",
+            closed=closed,
+            name=f"{trafo_name} [lv]",
+            existing_switches=existing_switches,
+        )
+
+
+def _initial_switch_state(row: object) -> bool:
+    """
+    Wyznacza stan początkowy switcha na podstawie wiersza elementu z pandapower.
+
+    Helper jest mały, ale pełni ważną rolę tłumacza między dwoma poziomami modelu:
+    `line/trafo.in_service` mówi, czy element jest technicznie aktywny po imporcie,
+    a my z tej informacji budujemy startowy stan logiczny nowego switcha (`closed`).
+
+    Parameters
+    ----------
+    row:
+        Wiersz pandas reprezentujący element sieci, zwykle z `net.line` albo
+        `net.trafo`.
+
+    Returns
+    -------
+    bool
+        `True`, jeśli switch powinien wystartować jako zamknięty, w przeciwnym razie
+        `False`.
+    """
+    # Oczekujemy obiektu podobnego do pandas.Series, który ma metodę get().
+    # Jeśli ktoś poda tu inny obiekt, wybieramy bezpieczne domyślne zachowanie:
+    # traktujemy element jako aktywny i zostawiamy switch zamknięty.
+    if not hasattr(row, "get"):
+        return True
+
+    # Czytamy flagę in_service. Gdy kolumny nie ma, też zakładamy stan aktywny,
+    # bo tak zachowuje się większość importów do pandapower.
+    raw = row.get("in_service", True)
+
+    # Pandas zwykle zwraca bool, ale pomocniczo obsługujemy też stringi, żeby
+    # helper był odporny na niestandardowe lub ręcznie modyfikowane dane.
+    if isinstance(raw, str):
+        return raw.strip().lower() not in {"false", "0", "no"}
+
+    # Dla bool / numpy.bool_ / liczb wystarczy zwykłe rzutowanie na bool.
+    return bool(raw)
+
+
+def _create_bus_element_switch(
+    net: pp.pandapowerNet,
+    bus_id: int,
+    element_id: int,
+    et: str,
+    closed: bool,
+    name: str,
+    existing_switches: set[tuple[int, int, str]],
+) -> None:
+    """
+    Tworzy pojedynczy switch bus-element, jeśli taki switch jeszcze nie istnieje.
+
+    To jest najniższy poziom "fabryki switchy". `seed_operational_switches()`
+    decyduje *dla jakich* elementów tworzyć switche, a ten helper odpowiada już za
+    sam bezpieczny zapis do `net.switch`.
+
+    Unikalność switcha definiujemy jako trójkę:
+    `(bus_id, element_id, et)`, czyli:
+    - przy którym busie jesteśmy,
+    - do którego elementu się odnosimy,
+    - jakiego typu jest połączenie (`l` albo `t`).
+
+    Parameters
+    ----------
+    net:
+        Sieć pandapower, do której ma zostać dopisany switch.
+    bus_id:
+        Indeks busa, po którego stronie switch ma być wstawiony.
+    element_id:
+        Indeks linii albo transformatora, do którego switch należy.
+    et:
+        Typ switcha pandapower: `l` dla linii albo `t` dla transformatora.
+    closed:
+        Początkowy stan łączeniowy switcha.
+    name:
+        Czytelna nazwa techniczna zapisywana w `net.switch.name`.
+    existing_switches:
+        Zbiór już istniejących kluczy switchy, używany do kontroli duplikatów.
+    """
+    # Budujemy klucz logiczny opisujący "ten konkretny switch przy tym końcu
+    # tego konkretnego elementu".
+    key = (bus_id, element_id, et)
+
+    # Jeśli taki wpis już istnieje, nic nie robimy. Dzięki temu wywołanie helpera
+    # jest bezpieczne nawet wtedy, gdy loader lub test odpali go drugi raz.
+    if key in existing_switches:
+        return
+
+    # Tworzymy switch typu bus-element:
+    # - bus wskazuje szynę po tej stronie,
+    # - element wskazuje linię albo trafo,
+    # - et określa, jak interpretować pole element.
+    # `type="CB"` traktujemy tu jako rozsądny domyślny aparat łączeniowy
+    # do operacji topologicznych.
+    pp.create_switch(
+        net,
+        bus=bus_id,
+        element=element_id,
+        et=et,
+        closed=closed,
+        type="CB",
+        name=name,
+    )
+
+    # Po pomyślnym utworzeniu switcha od razu dopisujemy jego klucz do cache'u,
+    # żeby kolejne wywołania w tej samej sesji nie utworzyły dubla.
+    existing_switches.add(key)
 
 
 def _candidate_geo_sidecars(case_path: Path) -> list[Path]:
