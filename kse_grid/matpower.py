@@ -11,7 +11,7 @@ from pandapower.converter.matpower import from_mpc
 
 
 def load_matpower_case(case_file: str | Path, f_hz: int = 50) -> pp.pandapowerNet:
-    """Ładuje przypadek MATPOWER (.m) do pandapower."""
+    """Ładuje przypadek matpower (.m) do pandapower."""
     case_path = Path(case_file).expanduser().resolve()
     net = _import_matpower_case(case_path, f_hz=f_hz)
     net.name = case_path.stem
@@ -34,7 +34,7 @@ def _import_matpower_case(case_path: Path, f_hz: int) -> pp.pandapowerNet:
 def _import_without_gencost(case_path: Path, f_hz: int) -> pp.pandapowerNet:
     text = case_path.read_text(encoding="utf-8", errors="ignore")
     stripped, replacements = re.subn(
-        r"(?ms)^mpc\.gencost\s*=\s*\[.*?^\];\s*",
+        r"(?ms)^mpc\.gencost\s*=\s*\[.*?^];\s*",
         "",
         text,
     )
@@ -128,7 +128,7 @@ def seed_operational_switches(net: pp.pandapowerNet) -> None:
     """
     Dodaje do sieci operacyjne switche pandapower na końcach linii i transformatorów.
 
-    MATPOWER opisuje gałęzie głównie jako elementy typu branch z flagą aktywności
+    Matpower opisuje gałęzie głównie jako elementy typu branch z flagą aktywności
     (`branch status`). Po imporcie przez `from_mpc()` dostajemy więc poprawne tabele
     `net.line` / `net.trafo` oraz ich `in_service`, ale tabela `net.switch` zostaje
     pusta. To utrudnia późniejsze sterowanie topologią przez API, bo nie ma czego
@@ -140,7 +140,7 @@ def seed_operational_switches(net: pp.pandapowerNet) -> None:
 
     Dzięki temu można później:
     - rozcinać sieć na wyspy przez `net.switch.closed = False`,
-    - analizować komponenty spójne z `respect_switches=True`,
+    - analizować komponenty spójne z `respect_switches = True`,
     - uruchamiać load flow dla różnych stanów łączeniowych bez usuwania elementów.
 
     Funkcja jest idempotentna: jeżeli jakiś switch już istnieje, nie doda duplikatu.
@@ -169,7 +169,7 @@ def seed_operational_switches(net: pp.pandapowerNet) -> None:
         line_id = _to_int(line_idx)
 
         # Początkowy stan switcha wyprowadzamy z in_service linii:
-        # - linia aktywna   -> switch startuje jako zamknięty,
+        # - linia aktywna -> switch startuje jako zamknięty,
         # - linia wyłączona -> switch startuje jako otwarty.
         # Dzięki temu świeżo zaimportowana sieć zachowuje ten sam stan pracy.
         closed = _initial_switch_state(row)
@@ -216,7 +216,7 @@ def seed_operational_switches(net: pp.pandapowerNet) -> None:
         # transformatora.
         trafo_name = str(row.get("name") or f"Trafo {trafo_id + 1}")
 
-        # Strona wysokiego napięcia (HV).
+        # strona wysokiego napięcia (HV).
         _create_bus_element_switch(
             net=net,
             bus_id=_to_int(row.hv_bus),
@@ -227,7 +227,7 @@ def seed_operational_switches(net: pp.pandapowerNet) -> None:
             existing_switches=existing_switches,
         )
 
-        # Strona niskiego napięcia (LV).
+        # strona niskiego napięcia (LV).
         _create_bus_element_switch(
             net=net,
             bus_id=_to_int(row.lv_bus),
@@ -243,7 +243,7 @@ def _initial_switch_state(row: object) -> bool:
     """
     Wyznacza stan początkowy switcha na podstawie wiersza elementu z pandapower.
 
-    Helper jest mały, ale pełni ważną rolę tłumacza między dwoma poziomami modelu:
+    Helper jest mały, ale pełni ważną funkcję tłumacza między dwoma poziomami modelu:
     `line/trafo.in_service` mówi, czy element jest technicznie aktywny po imporcie,
     a my z tej informacji budujemy startowy stan logiczny nowego switcha (`closed`).
 
@@ -259,7 +259,7 @@ def _initial_switch_state(row: object) -> bool:
         `True`, jeśli switch powinien wystartować jako zamknięty, w przeciwnym razie
         `False`.
     """
-    # Oczekujemy obiektu podobnego do pandas.Series, który ma metodę get().
+    # Oczekujemy obiektu podobnego do pandas. Series, który ma metodę get().
     # Jeśli ktoś poda tu inny obiekt, wybieramy bezpieczne domyślne zachowanie:
     # traktujemy element jako aktywny i zostawiamy switch zamknięty.
     if not hasattr(row, "get"):
@@ -295,7 +295,7 @@ def _create_bus_element_switch(
     sam bezpieczny zapis do `net.switch`.
 
     Unikalność switcha definiujemy jako trójkę:
-    `(bus_id, element_id, et)`, czyli:
+    ` (bus_id, element_id, et)`, czyli:
     - przy którym busie jesteśmy,
     - do którego elementu się odnosimy,
     - jakiego typu jest połączenie (`l` albo `t`).

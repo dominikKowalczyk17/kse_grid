@@ -84,7 +84,7 @@ Szyna (*ang. bus*) to węzeł sieci — punkt gdzie coś jest podłączone: lini
 | `vn_kv` | float | Napięcie znamionowe [kV], np. `400.0`, `220.0`, `110.0` |
 | `geo`   | str   | Współrzędne GPS w formacie GeoJSON (opcjonalne) |
 
-Kolumna `geo` jest sprawdzana w `plotting.py` — jeśli **wszystkie** szyny mają `geo`, sieć rysowana jest na prawdziwych współrzędnych geograficznych. Jeśli nie (tak jest dla `case3120sp.m`) — generowany jest układ poglądowy algorytmem sprężynowym (networkx `spring_layout`).
+Kolumna `geo` jest wykorzystywana przez `serializer.py` do budowy layoutu geograficznego (`geo`). Jeśli **wszystkie** szyny mają `geo`, frontend Vue.js rysuje sieć na prawdziwych współrzędnych geograficznych (OpenStreetMap). Jeśli nie — używany jest układ poglądowy wyliczony algorytmem sprężynowym (networkx `spring_layout`).
 
 Po imporcie z pliku `.m` funkcja `_normalize_imported_net()` uzupełnia puste nazwy:
 
@@ -109,7 +109,7 @@ Linia to połączenie elektryczne między dwiema szynami — może to być kabel
 | `c_nf_per_km`    | float | Pojemność [nF/km] — generuje moc bierną pojemnościową |
 | `max_i_ka`       | float | Maksymalny prąd [kA] — baza do obliczenia `loading_percent` |
 
-W kodzie `plotting.py` napięcie znamionowe linii odczytywane jest z szyny startowej:
+W kodzie `serializer.py` napięcie znamionowe linii odczytywane jest z szyny startowej:
 
 ```python
 net.bus.loc[net.line.from_bus, "vn_kv"]
@@ -457,13 +457,13 @@ pandapowerNet (net) — uzupełniony o wyniki
     └── net.res_ext_grid  (p_mw — import/eksport)
     │
     ▼
-plotting.py — buduje wykres Plotly
+serializer.py → JSON → Frontend Vue.js
+    ├── Layout grafowy (spring layout) lub geo (współrzędne GPS)
     ├── Kolor szyn         ← vm_pu  (skala Turbo 0.9–1.1)
     ├── Kolor linii        ← loading_percent (zielony→żółty→pomarańczowy→czerwony)
     ├── Tooltip szyny      ← vm_pu, va_degree, gen_mw, load_mw
     ├── Tooltip linii      ← loading_percent, p_from_mw, length_km
-    ├── Tooltip trafo      ← loading_percent, p_hv_mw, sn_mva
-    └── Panel boczny       ← suma linii/szyn/trafo, bilans mocy, naruszenia U
+    └── Tooltip trafo      ← loading_percent, p_hv_mw, sn_mva
 ```
 
 ---
