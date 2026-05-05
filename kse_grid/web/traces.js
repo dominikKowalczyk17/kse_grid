@@ -301,10 +301,10 @@ export function buildTraces(network, viewMode = 'graph', filters = {}, theme = '
     const meta = [];
     const shapes = [];
 
-    let trafoRadius = 0.04;
+    let trafoRadius = 0.07;
     if (viewMode !== 'geo' && graphBounds?.x) {
         const dx = graphBounds.x[1] - graphBounds.x[0];
-        trafoRadius = Math.max(dx * 0.00020, 0.00100);
+        trafoRadius = Math.max(dx * 0.00040, 0.00200);
     }
 
     // ----- linie
