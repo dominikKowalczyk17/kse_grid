@@ -41,15 +41,26 @@ function tracePalette(theme = 'dark') {
                 { label: '>150%', lower: 150, upper: Infinity, color: '#B71C1C' },
             ]
             : TRAFO_BINS,
-        switchClosedFill: isLight ? '#16A34A' : '#4ADE80',
-        switchClosedStroke: isLight ? '#14532D' : '#14532D',
-        switchOpenFill: isLight ? '#DC2626' : '#F87171',
-        switchOpenStroke: isLight ? '#7F1D1D' : '#7F1D1D',
+        switchFill: isLight ? '#0EA5E9' : '#38BDF8',
+        switchStroke: isLight ? '#0C4A6E' : '#0C4A6E',
         busNoResults: isLight ? '#64748B' : '#5b6472',
         busStroke: isLight ? '#F8FAFC' : '#0e1116',
         selectionOuter: isLight ? '#2563EB' : '#8fc7ea',
         selectionInner: isLight ? '#1D4ED8' : '#4ea1ff',
     };
+}
+
+function disconnectedBranchIds(switches = []) {
+    const disconnected = {
+        line: new Set(),
+        trafo: new Set(),
+    };
+    for (const sw of switches) {
+        if ((sw.parentKind === 'line' || sw.parentKind === 'trafo') && sw.closed === false) {
+            disconnected[sw.parentKind].add(sw.elementId);
+        }
+    }
+    return disconnected;
 }
 
 function lineWidth(voltage) {
@@ -265,6 +276,7 @@ export function buildTraces(network, viewMode = 'graph', filters = {}, theme = '
     const trafoById = Object.fromEntries(trafos.map(trafo => [trafo.id, trafo]));
     const keys = pointKeys(viewMode);
     const palette = tracePalette(theme);
+    const disconnectedIds = disconnectedBranchIds(switches);
 
     const minLineLoading = Math.max(0, Number(filters.minLineLoading) || 0);
     const minBusPower = Math.max(0, Number(filters.minBusPower) || 0);
@@ -315,38 +327,42 @@ export function buildTraces(network, viewMode = 'graph', filters = {}, theme = '
         for (const bin of LINE_BINS) {
             const inBin = linesAtLevel.filter(l => loadingValue(l.loading) >= bin.lower && loadingValue(l.loading) < bin.upper);
             if (!inBin.length) continue;
+            for (const disconnected of [false, true]) {
+                const inState = inBin.filter(l => disconnectedIds.line.has(l.id) === disconnected);
+                if (!inState.length) continue;
 
-            const xs = [], ys = [], midX = [], midY = [], hovers = [], ids = [];
-            for (const ln of inBin) {
-                const f = busById[ln.fromBus], t = busById[ln.toBus];
-                const from = f ? busCoords(f, viewMode) : null;
-                const to = t ? busCoords(t, viewMode) : null;
-                if (!from || !to) continue;
-                xs.push(from.x, to.x, null);
-                ys.push(from.y, to.y, null);
-                midX.push((from.x + to.x) / 2);
-                midY.push((from.y + to.y) / 2);
-                hovers.push(lineHover({ ...ln }, hasResults));
-                ids.push(ln.id);
+                const xs = [], ys = [], midX = [], midY = [], hovers = [], ids = [];
+                for (const ln of inState) {
+                    const f = busById[ln.fromBus], t = busById[ln.toBus];
+                    const from = f ? busCoords(f, viewMode) : null;
+                    const to = t ? busCoords(t, viewMode) : null;
+                    if (!from || !to) continue;
+                    xs.push(from.x, to.x, null);
+                    ys.push(from.y, to.y, null);
+                    midX.push((from.x + to.x) / 2);
+                    midY.push((from.y + to.y) / 2);
+                    hovers.push(lineHover({ ...ln }, hasResults));
+                    ids.push(ln.id);
+                }
+                if (!ids.length) continue;
+
+                traces.push({
+                    type: keys.traceType, [keys.x]: xs, [keys.y]: ys, mode: 'lines',
+                    line: { color: bin.color, width: lineWidth(level), dash: disconnected ? 'dot' : 'solid' },
+                    hoverinfo: 'skip',
+                    showlegend: false,
+                });
+                meta.push({ kind: 'line', voltage: level, ids: [] });
+
+                traces.push({
+                    type: keys.traceType, [keys.x]: midX, [keys.y]: midY, mode: 'markers',
+                    marker: { size: Math.max(lineWidth(level) * 2.5, 8), color: bin.color, opacity: 0.25 },
+                    text: hovers,
+                    hovertemplate: '%{text}<extra></extra>',
+                    showlegend: false,
+                });
+                meta.push({ kind: 'line', voltage: level, ids });
             }
-            if (!ids.length) continue;
-
-            traces.push({
-                type: keys.traceType, [keys.x]: xs, [keys.y]: ys, mode: 'lines',
-                line: { color: bin.color, width: lineWidth(level) },
-                hoverinfo: 'skip',
-                showlegend: false,
-            });
-            meta.push({ kind: 'line', voltage: level, ids: [] });
-
-            traces.push({
-                type: keys.traceType, [keys.x]: midX, [keys.y]: midY, mode: 'markers',
-                marker: { size: Math.max(lineWidth(level) * 2.5, 8), color: bin.color, opacity: 0.25 },
-                text: hovers,
-                hovertemplate: '%{text}<extra></extra>',
-                showlegend: false,
-            });
-            meta.push({ kind: 'line', voltage: level, ids });
         }
     }
 
@@ -360,50 +376,53 @@ export function buildTraces(network, viewMode = 'graph', filters = {}, theme = '
         for (const bin of palette.trafoBins) {
             const inBin = atLv.filter(t => loadingValue(t.loading) >= bin.lower && loadingValue(t.loading) < bin.upper);
             if (!inBin.length) continue;
+            for (const disconnected of [false, true]) {
+                const inState = inBin.filter(t => disconnectedIds.trafo.has(t.id) === disconnected);
+                if (!inState.length) continue;
 
-            const xs = [], ys = [], midX = [], midY = [], hovers = [], ids = [];
-            for (const tr of inBin) {
-                const hv = busById[tr.hvBus], lvBus = busById[tr.lvBus];
-                const from = hv ? busCoords(hv, viewMode) : null;
-                const to = lvBus ? busCoords(lvBus, viewMode) : null;
-                if (!from || !to) continue;
-                xs.push(from.x, to.x, null);
-                ys.push(from.y, to.y, null);
-                const mx = (from.x + to.x) / 2;
-                const my = (from.y + to.y) / 2;
-                midX.push(mx);
-                midY.push(my);
-                hovers.push(trafoHover(tr, hasResults));
-                ids.push(tr.id);
-                if (useShapes) {
-                    shapes.push(...trafoShapeCircles(from, to, bin.color, trafoRadius));
+                const xs = [], ys = [], midX = [], midY = [], hovers = [], ids = [];
+                for (const tr of inState) {
+                    const hv = busById[tr.hvBus], lvBus = busById[tr.lvBus];
+                    const from = hv ? busCoords(hv, viewMode) : null;
+                    const to = lvBus ? busCoords(lvBus, viewMode) : null;
+                    if (!from || !to) continue;
+                    xs.push(from.x, to.x, null);
+                    ys.push(from.y, to.y, null);
+                    const mx = (from.x + to.x) / 2;
+                    const my = (from.y + to.y) / 2;
+                    midX.push(mx);
+                    midY.push(my);
+                    hovers.push(trafoHover(tr, hasResults));
+                    ids.push(tr.id);
+                    if (useShapes) {
+                        shapes.push(...trafoShapeCircles(from, to, bin.color, trafoRadius));
+                    }
                 }
+                if (!ids.length) continue;
+
+                traces.push({
+                    type: keys.traceType, [keys.x]: xs, [keys.y]: ys, mode: 'lines',
+                    line: { color: bin.color, width: 2.2, dash: disconnected ? 'dot' : 'solid' },
+                    hoverinfo: 'skip',
+                    showlegend: false,
+                });
+                meta.push({ kind: 'trafo', voltage: lv, ids: [] });
+
+                // pojedynczy punkt hovera/klikania nad symbolem IEC (jeden tooltip per trafo)
+                // - w trybie graph: niewidoczny (symbol rysowany przez layout.shapes)
+                // - w trybie geo: widoczny marker (mapbox nie wspiera shapes)
+                const hoverMarker = useShapes
+                    ? { size: 24, color: 'rgba(0,0,0,0)', line: { width: 0 } }
+                    : { size: 12, color: bin.color, opacity: 0.9, symbol: 'circle' };
+                traces.push({
+                    type: keys.traceType, [keys.x]: midX, [keys.y]: midY, mode: 'markers',
+                    marker: hoverMarker,
+                    text: hovers,
+                    hovertemplate: '%{text}<extra></extra>',
+                    showlegend: false,
+                });
+                meta.push({ kind: 'trafo', voltage: lv, ids });
             }
-            if (!ids.length) continue;
-
-            // linia kropkowana między szynami
-            traces.push({
-                type: keys.traceType, [keys.x]: xs, [keys.y]: ys, mode: 'lines',
-                line: { color: bin.color, width: 2.2, dash: 'dot' },
-                hoverinfo: 'skip',
-                showlegend: false,
-            });
-            meta.push({ kind: 'trafo', voltage: lv, ids: [] });
-
-            // pojedynczy punkt hovera/klikania nad symbolem IEC (jeden tooltip per trafo)
-            // - w trybie graph: niewidoczny (symbol rysowany przez layout.shapes)
-            // - w trybie geo: widoczny marker (mapbox nie wspiera shapes)
-            const hoverMarker = useShapes
-                ? { size: 24, color: 'rgba(0,0,0,0)', line: { width: 0 } }
-                : { size: 12, color: bin.color, opacity: 0.9, symbol: 'circle' };
-            traces.push({
-                type: keys.traceType, [keys.x]: midX, [keys.y]: midY, mode: 'markers',
-                marker: hoverMarker,
-                text: hovers,
-                hovertemplate: '%{text}<extra></extra>',
-                showlegend: false,
-            });
-            meta.push({ kind: 'trafo', voltage: lv, ids });
         }
     }
 
@@ -424,41 +443,38 @@ export function buildTraces(network, viewMode = 'graph', filters = {}, theme = '
 
         for (const parentKind of ['line', 'trafo']) {
             const inParent = atLevel.filter(sw => sw.parentKind === parentKind);
-            for (const closed of [true, false]) {
-                const inState = inParent.filter(sw => sw.closed === closed);
-                if (!inState.length) continue;
+            if (!inParent.length) continue;
 
-                const xs = [];
-                const ys = [];
-                const hovers = [];
-                const ids = [];
-                for (const sw of inState) {
-                    const coords = switchMarkerCoords(sw, busById, viewMode);
-                    if (!coords) continue;
-                    xs.push(coords.x);
-                    ys.push(coords.y);
-                    hovers.push(switchHover(sw));
-                    ids.push(sw.id);
-                }
-                if (!ids.length) continue;
-
-                traces.push({
-                    type: keys.traceType,
-                    [keys.x]: xs,
-                    [keys.y]: ys,
-                    mode: 'markers',
-                    marker: {
-                        size: closed ? 8 : 10,
-                        color: closed ? palette.switchClosedFill : palette.switchOpenFill,
-                        opacity: 0.95,
-                        line: { width: 1.5, color: closed ? palette.switchClosedStroke : palette.switchOpenStroke },
-                    },
-                    text: hovers,
-                    hovertemplate: '%{text}<extra></extra>',
-                    showlegend: false,
-                });
-                meta.push({ kind: 'switch', parentKind, voltage: level, ids });
+            const xs = [];
+            const ys = [];
+            const hovers = [];
+            const ids = [];
+            for (const sw of inParent) {
+                const coords = switchMarkerCoords(sw, busById, viewMode);
+                if (!coords) continue;
+                xs.push(coords.x);
+                ys.push(coords.y);
+                hovers.push(switchHover(sw));
+                ids.push(sw.id);
             }
+            if (!ids.length) continue;
+
+            traces.push({
+                type: keys.traceType,
+                [keys.x]: xs,
+                [keys.y]: ys,
+                mode: 'markers',
+                marker: {
+                    size: 8,
+                    color: palette.switchFill,
+                    opacity: 0.95,
+                    line: { width: 1.5, color: palette.switchStroke },
+                },
+                text: hovers,
+                hovertemplate: '%{text}<extra></extra>',
+                showlegend: false,
+            });
+            meta.push({ kind: 'switch', parentKind, voltage: level, ids });
         }
     }
 
