@@ -25,7 +25,7 @@ const PLOT_LAYOUT_BASE = {
     uirevision: 'kse-grid',
     margin: { l: 0, r: 0, t: 0, b: 0 },
     xaxis: { visible: false },
-    yaxis: { visible: false, scaleanchor: 'x', scaleratio: 1 },
+    yaxis: { visible: false, scaleanchor: 'x', scaleratio: 1 },buildTraces
 };
 
 function themedLayout (theme) {
