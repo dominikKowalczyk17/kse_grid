@@ -14,6 +14,7 @@ export const App = {
         const selectedVoltages = ref([]);
         const selectedTypes = ref(['line', 'trafo', 'bus']);
         const viewMode = ref('graph');
+        const editMode = ref(false);
         const atlasCategories = ref(['osp', 'osd', 'jw']);
         const minLineLoading = ref(0);
         const minBusPower = ref(0);
@@ -122,6 +123,7 @@ export const App = {
             selectedVoltages,
             selectedTypes,
             viewMode,
+            editMode,
             atlasCategories,
             minLineLoading,
             minBusPower,
@@ -155,6 +157,14 @@ export const App = {
             </div>
 
             <div class="header-spacer"></div>
+
+            <button class="btn"
+                    type="button"
+                    :class="{ 'btn-active': editMode }"
+                    :title="editMode ? 'Tryb edycji włączony — drag busa, łamanie linii' : 'Włącz tryb edycji (drag busa, łamanie linii)'"
+                    @click="editMode = !editMode">
+                {{ editMode ? 'Edycja: WŁ' : 'Edycja: WYŁ' }}
+            </button>
 
             <button class="btn"
                     type="button"
@@ -211,6 +221,7 @@ export const App = {
                 :show-switches="showSwitches"
                 :topology-busy="topologyBusy"
                 :theme="theme"
+                :edit-mode="editMode"
                 @set-switch-state="onSetSwitchState"
                 @set-switches-state="onSetSwitchesState" />
         </div>

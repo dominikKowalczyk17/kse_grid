@@ -1,6 +1,7 @@
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { buildTraces } from '/traces.js';
 import { SelectionCard } from '/components/selection-card.js';
+import { mountPixi } from '/renderers/pixi/index.js';
 import {
     ATLAS_CATEGORIES,
     ATLAS_DEFAULT_VIEW,
@@ -79,6 +80,7 @@ export const GraphPanel = {
         minBusPower: { type: Number, default: 0 },
         showSwitches: { type: Boolean, default: false },
         topologyBusy: { type: Boolean, default: false },
+        editMode: { type: Boolean, default: false },
     },
     emits: ['set-switch-state', 'set-switches-state'],
     setup (props) {
@@ -92,6 +94,20 @@ export const GraphPanel = {
         const preservedViewport = ref(null);
         const ready = ref(false);
         const atlasData = ref(null);
+        // Pixi controller is non-null when the WebGL renderer is active
+        // (currently for viewMode === 'graph'). Atlas/geo stay on Plotly.
+        const pixiCtrl = ref(null);
+        const usePixi = computed(() => props.viewMode === 'graph');
+
+        function pixiFilters () {
+            return {
+                selectedVoltages: props.selectedVoltages,
+                selectedTypes: props.selectedTypes,
+                minLineLoading: props.minLineLoading,
+                minBusPower: props.minBusPower,
+                showSwitches: props.showSwitches,
+            };
+        }
 
         const onMouseDown = () => graphEl.value?.classList.add('is-dragging');
         const onMouseUp = () => graphEl.value?.classList.remove('is-dragging');
@@ -330,16 +346,29 @@ export const GraphPanel = {
             // Każdy redraw — po filtrach, zmianie payloadu, motywie czy przełącznikach —
             // powinien zachować aktualny viewport, jeśli użytkownik sam nie poprosił
             // o reset. Dlatego snapshot kamery/range robimy centralnie tutaj.
-            if (ready.value) {
+            if (ready.value && !pixiCtrl.value) {
                 preservedViewport.value = captureViewport();
             }
+            // Pixi: capture camera before destroy so remount restores it.
+            const prevPixiView = pixiCtrl.value ? pixiCtrl.value.getView() : null;
 
             ready.value = false;
             selection.value = null;
             traceMeta.value = [];
             allTraces.value = [];
 
-            Plotly.purge(graphEl.value);
+            // Dispose any previously-active backend so we can switch cleanly.
+            if (pixiCtrl.value) {
+                pixiCtrl.value.destroy();
+                pixiCtrl.value = null;
+            }
+            if (graphEl.value) Plotly.purge(graphEl.value);
+
+            if (usePixi.value) {
+                await buildPixi(prevPixiView);
+                ready.value = true;
+                return;
+            }
 
             if (props.viewMode === 'atlas' && !atlasData.value) {
                 try {
@@ -389,7 +418,40 @@ export const GraphPanel = {
             ready.value = true;
         }
 
+        async function buildPixi (initialView = null) {
+            // Mount the Pixi renderer onto the same container; it manages its
+            // own canvas. Selection events are routed through `setSelection`
+            // so the SelectionCard sees the same shape as the Plotly path.
+            pixiCtrl.value = await mountPixi(graphEl.value, props.network, {
+                theme: props.theme,
+                viewMode: props.viewMode,
+                editMode: props.editMode,
+                filters: pixiFilters(),
+                initialView,
+                onSelect: sel => {
+                    if (!sel) { selection.value = null; return; }
+                    if (sel.kind === 'bus') {
+                        const bus = props.network.buses.find(b => b.id === sel.id);
+                        if (bus) selection.value = { kind: 'bus', payload: bus };
+                    } else if (sel.kind === 'line') {
+                        const line = props.network.lines.find(l => l.id === sel.id);
+                        if (line) selection.value = { kind: 'line', payload: line };
+                    } else if (sel.kind === 'trafo') {
+                        const trafo = props.network.trafos.find(t => t.id === sel.id);
+                        if (trafo) selection.value = { kind: 'trafo', payload: trafo };
+                    } else if (sel.kind === 'switch') {
+                        const sw = (props.network.switches || []).find(s => s.id === sel.id);
+                        if (sw) selection.value = { kind: 'switch', payload: sw };
+                    }
+                },
+            });
+        }
+
         function applyVisibility () {
+            if (pixiCtrl.value) {
+                pixiCtrl.value.setFilters(pixiFilters());
+                return;
+            }
             if (!ready.value && allTraces.value.length === 0) return;
             const voltageSet = new Set(props.selectedVoltages);
             const typeSet = new Set(props.selectedTypes);
@@ -413,6 +475,7 @@ export const GraphPanel = {
         }
 
         function clearHighlight () {
+            if (pixiCtrl.value) { pixiCtrl.value.setSelection(null); return; }
             const indices = selectionTraceIndices();
             if (!indices.length) return;
             const keys = coordKeys(props.viewMode);
@@ -423,6 +486,7 @@ export const GraphPanel = {
         }
 
         function highlightAt (x, y, baseSize) {
+            if (pixiCtrl.value) { pixiCtrl.value.refreshSelection(); return; }
             const indices = selectionTraceIndices();
             if (!indices.length) return;
             const outerRingSize = Math.max(baseSize * 1.3, 16);
@@ -477,6 +541,7 @@ export const GraphPanel = {
 
         function focusPoint (targetX, targetY, focus) {
             if (!focus) return;
+            if (pixiCtrl.value) return; // Pixi focus handled via ctrl.focus()
             if (props.viewMode === 'geo' || props.viewMode === 'atlas') {
                 Plotly.relayout(graphEl.value, {
                     'mapbox.center': { lon: targetX, lat: targetY },
@@ -497,6 +562,12 @@ export const GraphPanel = {
             if (!bus) return;
             selection.value = { kind: 'bus', payload: bus };
 
+            if (pixiCtrl.value) {
+                pixiCtrl.value.setSelection({ kind: 'bus', id: busId });
+                if (focus) pixiCtrl.value.focus({ kind: 'bus', id: busId });
+                return;
+            }
+
             const traceIndex = findBusTraceIndex(bus.vn_kv);
             const baseSize = traceIndex >= 0 ? allTraces.value[traceIndex].marker.size : 12;
             const keys = coordKeys(props.viewMode);
@@ -510,6 +581,12 @@ export const GraphPanel = {
         function selectLine (lineId, focus) {
             const line = props.network.lines.find(item => item.id === lineId);
             if (!line) return;
+            if (pixiCtrl.value) {
+                selection.value = { kind: 'line', payload: line };
+                pixiCtrl.value.setSelection({ kind: 'line', id: lineId });
+                if (focus) pixiCtrl.value.focus({ kind: 'line', id: lineId });
+                return;
+            }
             const from = props.network.buses.find(item => item.id === line.fromBus);
             const to = props.network.buses.find(item => item.id === line.toBus);
             if (!from || !to) return;
@@ -525,6 +602,12 @@ export const GraphPanel = {
         function selectTrafo (trafoId, focus) {
             const trafo = props.network.trafos.find(item => item.id === trafoId);
             if (!trafo) return;
+            if (pixiCtrl.value) {
+                selection.value = { kind: 'trafo', payload: trafo };
+                pixiCtrl.value.setSelection({ kind: 'trafo', id: trafoId });
+                if (focus) pixiCtrl.value.focus({ kind: 'trafo', id: trafoId });
+                return;
+            }
             const hv = props.network.buses.find(item => item.id === trafo.hvBus);
             const lv = props.network.buses.find(item => item.id === trafo.lvBus);
             if (!hv || !lv) return;
@@ -549,6 +632,11 @@ export const GraphPanel = {
 
         function resetView () {
             preservedViewport.value = null;
+            if (pixiCtrl.value) {
+                pixiCtrl.value.resetView();
+                clearSelection();
+                return;
+            }
             if (props.viewMode === 'geo' || props.viewMode === 'atlas') {
                 if (!defaultMapView.value) return;
                 Plotly.relayout(graphEl.value, {
@@ -571,6 +659,10 @@ export const GraphPanel = {
         }
 
         watch(() => [props.selectedVoltages, props.selectedTypes, props.showSwitches], () => {
+            if (pixiCtrl.value) {
+                pixiCtrl.value.setFilters(pixiFilters());
+                return;
+            }
             if (ready.value) buildPlot();
         }, { deep: true });
 
@@ -583,7 +675,15 @@ export const GraphPanel = {
         });
 
         watch(() => [props.minLineLoading, props.minBusPower], async () => {
+            if (pixiCtrl.value) {
+                pixiCtrl.value.setFilters(pixiFilters());
+                return;
+            }
             await buildPlot();
+        });
+
+        watch(() => props.editMode, on => {
+            if (pixiCtrl.value) pixiCtrl.value.setEditMode(!!on);
         });
 
         watch(() => props.atlasCategories, () => {
@@ -615,8 +715,20 @@ export const GraphPanel = {
             window.addEventListener('keydown', onKey);
             window.addEventListener('mouseup', onMouseUp);
             window.addEventListener('resize', () => {
-                if (ready.value) Plotly.Plots.resize(graphEl.value);
+                if (!ready.value) return;
+                if (pixiCtrl.value) {
+                    // Pixi scene's ResizeObserver handles internal resizing.
+                    return;
+                }
+                Plotly.Plots.resize(graphEl.value);
             });
+        });
+
+        onBeforeUnmount(() => {
+            if (pixiCtrl.value) {
+                pixiCtrl.value.destroy();
+                pixiCtrl.value = null;
+            }
         });
 
         return { graphEl, selection, clearSelection, selectBus, selectLine, selectTrafo, selectElement, resetView, visibleCounts };
