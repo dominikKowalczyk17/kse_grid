@@ -58,6 +58,7 @@ export function buildSwitchTraces(ctx) {
                 [keys.y]: ys,
                 mode: 'markers',
                 marker: {
+                    symbol: 'square',
                     size: SWITCH_MARKER_SIZE,
                     color: palette.switchFill,
                     opacity: SWITCH_MARKER_OPACITY,

@@ -75,6 +75,14 @@ export const SWITCH_MARKER_STROKE_WIDTH = 1.5;
 // Otoczka i obrys markerów busa.
 export const BUS_MARKER_STROKE_WIDTH = 1.2;
 
+// Strzałki kierunku przepływu mocy na liniach/trafach.
+// Rysowane jako osobny trace markerowy (symbol 'arrow') w środku odcinka.
+// Próg w MW poniżej którego strzałkę pomijamy (szum/pływ jałowy).
+export const FLOW_ARROW_MIN_MW = 0.1;
+export const FLOW_ARROW_SIZE_LINE = 14;
+export const FLOW_ARROW_SIZE_TRAFO = 12;
+export const FLOW_ARROW_OUTLINE_WIDTH = 1.0;
+
 // Markery „placeholder” podświetlenia selekcji rysowane na końcu listy traces.
 export const SELECTION_OUTER_SIZE = 18;
 export const SELECTION_INNER_SIZE = 12;

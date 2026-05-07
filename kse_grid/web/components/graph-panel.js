@@ -396,6 +396,7 @@ export const GraphPanel = {
             const update = traceMeta.value.map(meta => {
                 if (meta.kind === 'selection' || meta.kind === 'atlas-station') return undefined;
                 if (meta.kind === 'switch') return props.showSwitches && typeSet.has(meta.parentKind) && voltageSet.has(meta.voltage);
+                if (meta.kind === 'flow-arrow') return typeSet.has(meta.parentKind) && voltageSet.has(meta.voltage);
                 return typeSet.has(meta.kind) && voltageSet.has(meta.voltage);
             });
             const indices = update.map((_, index) => index).filter(index => update[index] !== undefined);
