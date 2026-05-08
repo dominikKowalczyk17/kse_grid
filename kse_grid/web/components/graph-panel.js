@@ -80,6 +80,7 @@ export const GraphPanel = {
         minBusPower: { type: Number, default: 0 },
         showSwitches: { type: Boolean, default: false },
         topologyBusy: { type: Boolean, default: false },
+        topologyRevision: { type: Number, default: 0 },
         editMode: { type: Boolean, default: false },
     },
     emits: ['set-switch-state', 'set-switches-state'],
@@ -699,6 +700,13 @@ export const GraphPanel = {
         }, { deep: true });
 
         watch(() => props.network, async () => {
+            await buildPlot();
+        });
+
+        // Switch toggles mutate the network in place (preserving user layout
+        // edits like dragged buses or bent lines), so the watcher above doesn't
+        // fire. The revision counter triggers a rebuild for those updates.
+        watch(() => props.topologyRevision, async () => {
             await buildPlot();
         });
 

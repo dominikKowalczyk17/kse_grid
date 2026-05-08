@@ -21,6 +21,7 @@ export const App = {
         const showSwitches = ref(true);
         const topologyBusy = ref(false);
         const topologyError = ref('');
+        const topologyRevision = ref(0);
         const graphPanelRef = ref(null);
 
         const storedTheme = (typeof localStorage !== 'undefined' && localStorage.getItem(THEME_STORAGE_KEY)) || 'dark';
@@ -51,6 +52,58 @@ export const App = {
             if (viewMode.value === 'geo' && !data.geoAvailable) viewMode.value = data.defaultViewMode || 'graph';
         }
 
+        function applyTopologyUpdate (update) {
+            const net = network.value;
+            if (!net || !update) return;
+
+            if ('hasResults' in update) net.hasResults = update.hasResults;
+            if (update.stats) net.stats = update.stats;
+            if (update.totals) net.totals = update.totals;
+            if (update.diagnostics) net.diagnostics = update.diagnostics;
+            if (update.topology) net.topology = update.topology;
+
+            if (Array.isArray(update.switches) && Array.isArray(net.switches)) {
+                const byId = new Map(net.switches.map(sw => [sw.id, sw]));
+                for (const patch of update.switches) {
+                    const sw = byId.get(patch.id);
+                    if (sw) sw.closed = patch.closed;
+                }
+            }
+
+            if (Array.isArray(update.busResults) && Array.isArray(net.buses)) {
+                const byId = new Map(net.buses.map(b => [b.id, b]));
+                for (const patch of update.busResults) {
+                    const bus = byId.get(patch.id);
+                    if (!bus) continue;
+                    bus.vmPu = patch.vmPu ?? null;
+                    bus.vaDeg = patch.vaDeg ?? null;
+                    if ('genMvar' in patch) bus.genMvar = patch.genMvar;
+                }
+            }
+
+            if (Array.isArray(update.lineResults) && Array.isArray(net.lines)) {
+                const byId = new Map(net.lines.map(l => [l.id, l]));
+                for (const patch of update.lineResults) {
+                    const line = byId.get(patch.id);
+                    if (!line) continue;
+                    line.loading = patch.loading ?? 0;
+                    line.pFromMw = patch.pFromMw ?? null;
+                }
+            }
+
+            if (Array.isArray(update.trafoResults) && Array.isArray(net.trafos)) {
+                const byId = new Map(net.trafos.map(t => [t.id, t]));
+                for (const patch of update.trafoResults) {
+                    const trafo = byId.get(patch.id);
+                    if (!trafo) continue;
+                    trafo.loading = patch.loading ?? 0;
+                    trafo.pHvMw = patch.pHvMw ?? null;
+                }
+            }
+
+            topologyRevision.value += 1;
+        }
+
         async function loadNetwork () {
             try {
                 applyNetwork(await fetchNetwork());
@@ -64,7 +117,7 @@ export const App = {
             topologyBusy.value = true;
             topologyError.value = '';
             try {
-                applyNetwork(await setSwitchState(switchId, closed));
+                applyTopologyUpdate(await setSwitchState(switchId, closed));
             } catch (requestError) {
                 topologyError.value = String(requestError);
             } finally {
@@ -76,11 +129,11 @@ export const App = {
             topologyBusy.value = true;
             topologyError.value = '';
             try {
-                let payload = network.value;
+                let payload = null;
                 for (const switchId of switchIds) {
                     payload = await setSwitchState(switchId, closed);
                 }
-                applyNetwork(payload);
+                if (payload) applyTopologyUpdate(payload);
             } catch (requestError) {
                 topologyError.value = String(requestError);
             } finally {
@@ -92,7 +145,7 @@ export const App = {
             topologyBusy.value = true;
             topologyError.value = '';
             try {
-                applyNetwork(await resetTopology());
+                applyTopologyUpdate(await resetTopology());
             } catch (requestError) {
                 topologyError.value = String(requestError);
             } finally {
@@ -130,6 +183,7 @@ export const App = {
             showSwitches,
             topologyBusy,
             topologyError,
+            topologyRevision,
             graphPanelRef,
             theme,
             toggleTheme,
@@ -220,6 +274,7 @@ export const App = {
                 :min-bus-power="minBusPower"
                 :show-switches="showSwitches"
                 :topology-busy="topologyBusy"
+                :topology-revision="topologyRevision"
                 :theme="theme"
                 :edit-mode="editMode"
                 @set-switch-state="onSetSwitchState"

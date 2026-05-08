@@ -9,7 +9,11 @@ import pandas as pd
 import pandapower as pp
 import pandapower.auxiliary as pp_aux
 
-from kse_grid.serializer import compute_graph_positions, serialize_network
+from kse_grid.serializer import (
+    compute_graph_positions,
+    serialize_network,
+    serialize_topology_update,
+)
 
 
 _DEFAULT_POWERFLOW_OPTIONS = {
@@ -61,10 +65,23 @@ class SwitchingSession:
     def build_payload(self) -> dict[str, Any]:
         """Zwraca pełny payload sieci wraz ze stanem sesji przełączeniowej."""
         payload = serialize_network(self.working_net, graph_positions=self._graph_positions)
-        payload["topology"]["lastRunSucceeded"] = self._last_run_succeeded
-        payload["topology"]["lastRunMessage"] = self._last_run_message
-        payload["topology"]["powerflowOptions"] = dict(self._powerflow_options)
+        self._inject_session_state(payload["topology"])
         return payload
+
+    def build_update_payload(self) -> dict[str, Any]:
+        """
+        Zwraca slim payload zmian po przełączeniu switcha — bez pól layoutu.
+        Frontend wstrzykuje go do istniejącej sieci, dzięki czemu ręczne edycje
+        pozycji szyn i łamań linii nie są tracone po każdym `runpp()`.
+        """
+        payload = serialize_topology_update(self.working_net)
+        self._inject_session_state(payload["topology"])
+        return payload
+
+    def _inject_session_state(self, topology: dict[str, Any]) -> None:
+        topology["lastRunSucceeded"] = self._last_run_succeeded
+        topology["lastRunMessage"] = self._last_run_message
+        topology["powerflowOptions"] = dict(self._powerflow_options)
 
     def set_switch_state(self, switch_id: int, closed: bool) -> dict[str, Any]:
         """Ustawia stan jednego switcha i od razu przelicza working net."""
@@ -78,7 +95,7 @@ class SwitchingSession:
         self.working_net = deepcopy(self.base_net)
         self._recalculate_in_place(self.working_net)
         self._last_run_message = "Topologia przywrócona do stanu bazowego."
-        return self.build_payload()
+        return self.build_update_payload()
 
     def _apply_change(
         self,
@@ -94,7 +111,7 @@ class SwitchingSession:
         if self._last_run_succeeded:
             self._last_run_message = success_message
         self.working_net = candidate
-        return self.build_payload()
+        return self.build_update_payload()
 
     def _recalculate_in_place(self, net: pp.pandapowerNet) -> None:
         # Stare wyniki po poprzednim stanie topologii byłyby mylące, więc przed

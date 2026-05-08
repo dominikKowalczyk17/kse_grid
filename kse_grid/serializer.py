@@ -25,6 +25,80 @@ def compute_graph_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, flo
     return _compute_positions(net)
 
 
+def serialize_topology_update(net: pp.pandapowerNet) -> dict[str, Any]:
+    """
+    Zwraca slim payload z polami, które zmieniają się po zmianie stanu switcha
+    i ponownym load flow. Celowo nie zawiera pozycji szyn, geometrii linii ani
+    innych pól layoutu — frontend mutuje istniejący obiekt sieci w miejscu, żeby
+    zachować edycje użytkownika (drag busa, łamanie linii).
+    """
+    has_bus_results = not net.res_bus.empty
+    has_line_results = not net.res_line.empty
+    has_trafo_results = not net.res_trafo.empty
+    gen_buses = set(net.gen.bus.tolist()) if not net.gen.empty else set()
+
+    bus_results: list[dict[str, Any]] = []
+    for bus_idx in net.bus.index:
+        bus_id = _to_int(bus_idx)
+        item: dict[str, Any] = {"id": bus_id}
+        if has_bus_results:
+            item["vmPu"] = _safe_float(net.res_bus.at[bus_id, "vm_pu"])
+            item["vaDeg"] = _safe_float(net.res_bus.at[bus_id, "va_degree"])
+        else:
+            item["vmPu"] = None
+            item["vaDeg"] = None
+        if bus_id in gen_buses:
+            gen_mvar: float | None = None
+            if has_bus_results and not net.res_gen.empty:
+                gen_indices = net.gen.index[net.gen.bus == bus_id]
+                q_values = net.res_gen.loc[gen_indices, "q_mvar"].dropna()
+                if not q_values.empty:
+                    gen_mvar = float(q_values.sum())
+            item["genMvar"] = gen_mvar
+        bus_results.append(item)
+
+    line_results: list[dict[str, Any]] = []
+    for line_idx in net.line.index:
+        line_id = _to_int(line_idx)
+        item = {"id": line_id}
+        if has_line_results:
+            item["loading"] = _safe_float(net.res_line.at[line_id, "loading_percent"])
+            item["pFromMw"] = _safe_float(net.res_line.at[line_id, "p_from_mw"])
+        else:
+            item["loading"] = 0.0
+            item["pFromMw"] = None
+        line_results.append(item)
+
+    trafo_results: list[dict[str, Any]] = []
+    for trafo_idx in net.trafo.index:
+        trafo_id = _to_int(trafo_idx)
+        item = {"id": trafo_id}
+        if has_trafo_results:
+            item["loading"] = _safe_float(net.res_trafo.at[trafo_id, "loading_percent"])
+            item["pHvMw"] = _safe_float(net.res_trafo.at[trafo_id, "p_hv_mw"])
+        else:
+            item["loading"] = 0.0
+            item["pHvMw"] = None
+        trafo_results.append(item)
+
+    switch_states = [
+        {"id": _to_int(idx), "closed": bool(row.get("closed", False))}
+        for idx, row in net.switch.iterrows()
+    ]
+
+    return {
+        "hasResults": has_bus_results,
+        "stats": _compute_stats(net),
+        "totals": _compute_totals(net),
+        "diagnostics": _compute_diagnostics(net),
+        "topology": _compute_topology(net),
+        "switches": switch_states,
+        "busResults": bus_results,
+        "lineResults": line_results,
+        "trafoResults": trafo_results,
+    }
+
+
 def serialize_network(
     net: pp.pandapowerNet,
     *,
