@@ -56,7 +56,7 @@ export default function SwitchesScreen() {
   function confirmReset() {
     Alert.alert(
       'Reset topologii',
-      'Czy na pewno chcesz przywrócić wszystkie łączniki do stanu bazowego i przeliczył nowy rozpływ?',
+      'Czy na pewno chcesz przywrócić wszystkie łączniki do stanu bazowego i przeliczyć nowy rozpływ?',
       [
         { text: 'Anuluj', style: 'cancel' },
         { text: 'Resetuj', style: 'destructive', onPress: handleResetTopology },
