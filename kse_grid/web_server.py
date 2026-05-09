@@ -9,6 +9,7 @@ from threading import Timer
 import pandapower as pp
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,6 +31,13 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
     session = SwitchingSession(net)
     payload = session.build_payload()
     app = FastAPI(title=f"{payload['name']} – KSE Grid", docs_url=None, redoc_url=None)
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["GET", "PATCH", "POST"],
+        allow_headers=["Content-Type"],
+    )
 
     @app.get("/api/network")
     def get_network() -> JSONResponse:
