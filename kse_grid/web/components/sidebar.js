@@ -283,6 +283,17 @@ export const Sidebar = {
             return Math.ceil(max);
         });
 
+        const lineLoadingFill = computed(() => {
+            const value = Math.max(0, Math.min(200, Number(props.minLineLoading) || 0));
+            return (value / 200) * 100;
+        });
+        const busPowerFill = computed(() => {
+            const max = maxBusPower.value;
+            if (!max) return 0;
+            const value = Math.max(0, Math.min(max, Number(props.minBusPower) || 0));
+            return (value / max) * 100;
+        });
+
         function setMinLineLoading (value) {
             const num = Math.max(0, Number(value) || 0);
             emit('update:minLineLoading', num);
@@ -321,6 +332,7 @@ export const Sidebar = {
             canFocusBus, focusBus, histogramBarStyle, focusHistogramBin, navigateHistogramBin,
             formatMw,
             maxBusPower, setMinLineLoading, setMinBusPower,
+            lineLoadingFill, busPowerFill,
             sortedBranches, activeBranch, activeBranchCursor, canFocusElement, focusBranchAt, navigateBranches,
         };
     },
@@ -550,47 +562,59 @@ export const Sidebar = {
 
         <section class="section-card">
             <h3 class="section-title">Filtry mocy / obciążenia</h3>
-            <div class="filter-row">
-                <label class="filter-label" for="flt-line-loading">
-                    Min. obciążenie linii / trafo
-                    <span class="diag-value tabular">{{ minLineLoading.toFixed(0) }}%</span>
-                </label>
-                <div class="filter-controls">
-                    <input
-                        id="flt-line-loading"
-                        type="range"
-                        min="0" max="200" step="1"
-                        :value="minLineLoading"
-                        @input="setMinLineLoading($event.target.value)" />
-                    <input
-                        type="number"
-                        min="0" max="200" step="1"
-                        class="filter-num"
-                        :value="minLineLoading"
-                        @input="setMinLineLoading($event.target.value)" />
+            <div class="filter-row" :class="{ 'is-active': minLineLoading > 0 }">
+                <div class="filter-label">
+                    <label for="flt-line-loading">Min. obciążenie linii / trafo</label>
+                    <div class="filter-value">
+                        <input
+                            type="number"
+                            min="0" max="200" step="1"
+                            class="filter-value-input tabular"
+                            :value="minLineLoading"
+                            @input="setMinLineLoading($event.target.value)"
+                            aria-label="Min. obciążenie w procentach" />
+                        <span class="filter-value-unit">%</span>
+                    </div>
+                </div>
+                <input
+                    id="flt-line-loading"
+                    class="range-slider"
+                    type="range"
+                    min="0" max="200" step="1"
+                    :value="minLineLoading"
+                    :style="{ '--fill': lineLoadingFill + '%' }"
+                    @input="setMinLineLoading($event.target.value)" />
+                <div class="filter-scale" aria-hidden="true">
+                    <span>0%</span><span>100%</span><span>200%</span>
                 </div>
                 <p class="helper" v-if="!hasResults">Brak wyników rozpływu — filtr ukryje wszystko przy wartości &gt; 0.</p>
             </div>
-            <div class="filter-row">
-                <label class="filter-label" for="flt-bus-power">
-                    Min. moc na szynie (max{P obc., P gen.})
-                    <span class="diag-value tabular">{{ formatMw(minBusPower) }}</span>
-                </label>
-                <div class="filter-controls">
-                    <input
-                        id="flt-bus-power"
-                        type="range"
-                        min="0" :max="maxBusPower" step="1"
-                        :value="minBusPower"
-                        @input="setMinBusPower($event.target.value)" />
-                    <input
-                        type="number"
-                        min="0" :max="maxBusPower" step="1"
-                        class="filter-num"
-                        :value="minBusPower"
-                        @input="setMinBusPower($event.target.value)" />
+            <div class="filter-row" :class="{ 'is-active': minBusPower > 0 }">
+                <div class="filter-label">
+                    <label for="flt-bus-power">Min. moc na szynie (max{P obc., P gen.})</label>
+                    <div class="filter-value">
+                        <input
+                            type="number"
+                            min="0" :max="maxBusPower" step="1"
+                            class="filter-value-input tabular"
+                            :value="minBusPower"
+                            @input="setMinBusPower($event.target.value)"
+                            aria-label="Min. moc na szynie w MW" />
+                        <span class="filter-value-unit">MW</span>
+                    </div>
                 </div>
-                <p class="helper">Maks. w sieci: {{ formatMw(maxBusPower) }}. Linie z ukrytymi szynami też znikają.</p>
+                <input
+                    id="flt-bus-power"
+                    class="range-slider"
+                    type="range"
+                    min="0" :max="maxBusPower" step="1"
+                    :value="minBusPower"
+                    :style="{ '--fill': busPowerFill + '%' }"
+                    @input="setMinBusPower($event.target.value)" />
+                <div class="filter-scale" aria-hidden="true">
+                    <span>0</span><span>{{ formatMw(maxBusPower) }}</span>
+                </div>
+                <p class="helper">Linie z ukrytymi szynami też znikają.</p>
             </div>
             <div class="btn-search-row">
                 <button class="btn btn-block" type="button" @click="setMinLineLoading(0); setMinBusPower(0);">
