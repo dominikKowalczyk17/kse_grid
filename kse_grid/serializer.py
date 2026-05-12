@@ -64,9 +64,15 @@ def serialize_topology_update(net: pp.pandapowerNet) -> dict[str, Any]:
         if has_line_results:
             item["loading"] = _safe_float(net.res_line.at[line_id, "loading_percent"])
             item["pFromMw"] = _safe_float(net.res_line.at[line_id, "p_from_mw"])
+            item["qFromMvar"] = _safe_float(net.res_line.at[line_id, "q_from_mvar"])
+            item["pToMw"] = _safe_float(net.res_line.at[line_id, "p_to_mw"])
+            item["qToMvar"] = _safe_float(net.res_line.at[line_id, "q_to_mvar"])
         else:
             item["loading"] = 0.0
             item["pFromMw"] = None
+            item["qFromMvar"] = None
+            item["pToMw"] = None
+            item["qToMvar"] = None
         line_results.append(item)
 
     trafo_results: list[dict[str, Any]] = []
@@ -76,9 +82,15 @@ def serialize_topology_update(net: pp.pandapowerNet) -> dict[str, Any]:
         if has_trafo_results:
             item["loading"] = _safe_float(net.res_trafo.at[trafo_id, "loading_percent"])
             item["pHvMw"] = _safe_float(net.res_trafo.at[trafo_id, "p_hv_mw"])
+            item["qHvMvar"] = _safe_float(net.res_trafo.at[trafo_id, "q_hv_mvar"])
+            item["pLvMw"] = _safe_float(net.res_trafo.at[trafo_id, "p_lv_mw"])
+            item["qLvMvar"] = _safe_float(net.res_trafo.at[trafo_id, "q_lv_mvar"])
         else:
             item["loading"] = 0.0
             item["pHvMw"] = None
+            item["qHvMvar"] = None
+            item["pLvMw"] = None
+            item["qLvMvar"] = None
         trafo_results.append(item)
 
     switch_states = [
@@ -402,6 +414,9 @@ def _serialize_lines(
         if has_results:
             item["loading"] = _safe_float(net.res_line.at[line_id, "loading_percent"])
             item["pFromMw"] = _safe_float(net.res_line.at[line_id, "p_from_mw"])
+            item["qFromMvar"] = _safe_float(net.res_line.at[line_id, "q_from_mvar"])
+            item["pToMw"] = _safe_float(net.res_line.at[line_id, "p_to_mw"])
+            item["qToMvar"] = _safe_float(net.res_line.at[line_id, "q_to_mvar"])
         else:
             item["loading"] = 0.0
         out.append(item)
@@ -424,6 +439,9 @@ def _serialize_trafos(net: pp.pandapowerNet, has_results: bool) -> list[dict[str
         if has_results:
             item["loading"] = _safe_float(net.res_trafo.at[trafo_id, "loading_percent"])
             item["pHvMw"] = _safe_float(net.res_trafo.at[trafo_id, "p_hv_mw"])
+            item["qHvMvar"] = _safe_float(net.res_trafo.at[trafo_id, "q_hv_mvar"])
+            item["pLvMw"] = _safe_float(net.res_trafo.at[trafo_id, "p_lv_mw"])
+            item["qLvMvar"] = _safe_float(net.res_trafo.at[trafo_id, "q_lv_mvar"])
         else:
             item["loading"] = 0.0
         out.append(item)

@@ -88,6 +88,9 @@ export const App = {
                     if (!line) continue;
                     line.loading = patch.loading ?? 0;
                     line.pFromMw = patch.pFromMw ?? null;
+                    line.qFromMvar = patch.qFromMvar ?? null;
+                    line.pToMw = patch.pToMw ?? null;
+                    line.qToMvar = patch.qToMvar ?? null;
                 }
             }
 
@@ -98,6 +101,9 @@ export const App = {
                     if (!trafo) continue;
                     trafo.loading = patch.loading ?? 0;
                     trafo.pHvMw = patch.pHvMw ?? null;
+                    trafo.qHvMvar = patch.qHvMvar ?? null;
+                    trafo.pLvMw = patch.pLvMw ?? null;
+                    trafo.qLvMvar = patch.qLvMvar ?? null;
                 }
             }
 

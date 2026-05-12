@@ -1,8 +1,15 @@
 /**
- * Flow direction arrows layer — triangle sprites at the polyline midpoint,
- * rotated along the local tangent in the direction of sign(P).
+ * Flow direction arrows layer — triangle sprites placed near each branch endpoint
+ * (offset along the line tangent, like switch markers).
  *
- * Skipped for branches without sufficient |P| or that are disconnected.
+ *   - red triangle near the "from" end (HV for trafo) — active power P
+ *     direction = sign(p_from) × tangent_into_line
+ *     i.e. arrow points INTO the line if power flows from from-bus into the line.
+ *   - green triangle near the "to" end (LV for trafo) — reactive power Q
+ *     direction = sign(q_to) × tangent_into_line (from the to-bus toward from-bus)
+ *
+ * Skipped per channel when the magnitude is below FLOW_ARROW_MIN_MW or the
+ * branch is disconnected.
  */
 
 import { Sprite } from 'pixi.js';
@@ -11,10 +18,18 @@ import {
     FLOW_ARROW_OUTLINE_WIDTH,
     FLOW_ARROW_SIZE_LINE,
     FLOW_ARROW_SIZE_TRAFO,
-    LINE_BINS,
+    SWITCH_OFFSET_LENGTH_FACTOR,
+    SWITCH_MIN_OFFSET_GEO,
+    SWITCH_MAX_OFFSET_GEO,
+    SWITCH_MIN_OFFSET_GRAPH,
+    SWITCH_MAX_OFFSET_GRAPH,
 } from '/traces/constants.js';
-import { loadingValue } from '/traces/formatters.js';
-import { busPos, midpoint, polylineMidpointAndTangent, unitVector } from '../geometry.js';
+import { busPos, isGeo, unitVector } from '../geometry.js';
+
+const COLOR_P = 0xEF4444; // red-500  — active power
+const COLOR_Q = 0x22C55E; // green-500 — reactive power
+const ARROW_OFFSET_FACTOR = 2.2;          // multiplier over switch offset
+const ARROW_MAX_OFFSET_FRACTION = 0.45;   // never push past 45% of segment length
 
 export class ArrowsLayer {
     constructor ({ container, viewport, network, busById, textures, palette, project, getLinePoints }) {
@@ -27,8 +42,8 @@ export class ArrowsLayer {
         this.project = project;
         this.getLinePoints = getLinePoints;
         this.viewMode = 'graph';
-        this._sprites = new Map(); // key (`line:id`/`trafo:id`) -> Sprite
-        this._meta = new Map();    // key -> { kind, id, color, sign, size }
+        this._sprites = new Map(); // key (`line:id:P` etc.) -> Sprite
+        this._meta = new Map();    // key -> { kind, id, channel, sign, size, end: 'from'|'to' }
     }
 
     setViewMode (m) { this.viewMode = m; }
@@ -44,82 +59,84 @@ export class ArrowsLayer {
         for (const ln of this.network.lines) {
             if (!filterCtx.lineOk(ln)) continue;
             if (disconnectedIds.line.has(ln.id)) continue;
-            const p = ln.pFromMw;
-            if (!Number.isFinite(p) || Math.abs(p) < FLOW_ARROW_MIN_MW) continue;
-            const sign = p >= 0 ? 1 : -1;
-            const lv = loadingValue(ln.loading);
-            const bin = pickBinByLoading(LINE_BINS, lv);
-            const tex = this.textures.arrowTriangle(
-                FLOW_ARROW_SIZE_LINE,
-                parseColor(bin.color),
-                0x000000,
-                FLOW_ARROW_OUTLINE_WIDTH,
-            );
-            const sp = Sprite.from(tex);
-            sp.anchor.set(0.5);
-            this.container.addChild(sp);
-            const key = `line:${ln.id}`;
-            this._sprites.set(key, sp);
-            this._meta.set(key, { kind: 'line', id: ln.id, sign, size: FLOW_ARROW_SIZE_LINE });
+            this._addArrow('line', ln.id, 'P', ln.pFromMw, FLOW_ARROW_SIZE_LINE, COLOR_P, 'from');
+            this._addArrow('line', ln.id, 'Q', ln.qToMvar, FLOW_ARROW_SIZE_LINE, COLOR_Q, 'to');
         }
         for (const tr of this.network.trafos) {
             if (!filterCtx.trafoOk(tr)) continue;
             if (disconnectedIds.trafo.has(tr.id)) continue;
-            const p = tr.pHvMw;
-            if (!Number.isFinite(p) || Math.abs(p) < FLOW_ARROW_MIN_MW) continue;
-            const sign = p >= 0 ? 1 : -1;
-            const lv = loadingValue(tr.loading);
-            const bin = pickBinByLoading(this.palette.trafoBins, lv);
-            const tex = this.textures.arrowTriangle(
-                FLOW_ARROW_SIZE_TRAFO,
-                parseColor(bin.color),
-                0x000000,
-                FLOW_ARROW_OUTLINE_WIDTH,
-            );
-            const sp = Sprite.from(tex);
-            sp.anchor.set(0.5);
-            this.container.addChild(sp);
-            const key = `trafo:${tr.id}`;
-            this._sprites.set(key, sp);
-            this._meta.set(key, { kind: 'trafo', id: tr.id, sign, size: FLOW_ARROW_SIZE_TRAFO });
+            this._addArrow('trafo', tr.id, 'P', tr.pHvMw, FLOW_ARROW_SIZE_TRAFO, COLOR_P, 'from');
+            this._addArrow('trafo', tr.id, 'Q', tr.qLvMvar, FLOW_ARROW_SIZE_TRAFO, COLOR_Q, 'to');
         }
         this.applyZoom();
         this.updateAllPositions();
+    }
+
+    _addArrow (kind, id, channel, value, size, color, end) {
+        if (!Number.isFinite(value) || Math.abs(value) < FLOW_ARROW_MIN_MW) return;
+        const sign = value >= 0 ? 1 : -1;
+        const tex = this.textures.arrowTriangle(size, color, 0x000000, FLOW_ARROW_OUTLINE_WIDTH);
+        const sp = Sprite.from(tex);
+        sp.anchor.set(0.5);
+        this.container.addChild(sp);
+        const key = `${kind}:${id}:${channel}`;
+        this._sprites.set(key, sp);
+        this._meta.set(key, { kind, id, channel, sign, size, end });
     }
 
     updateAllPositions () {
         for (const key of this._sprites.keys()) this.updateOne(key);
     }
 
+    /** Anchor a sprite at (busPoint + tangent_into_line × offset).
+     *  Offset is ~2× the switch offset so arrows sit past the switch markers. */
+    _endpointAnchor (busPoint, neighborPoint) {
+        const u = unitVector(busPoint, neighborPoint);
+        if (u.len === 0) return null;
+        const minOffset = isGeo(this.viewMode) ? SWITCH_MIN_OFFSET_GEO : SWITCH_MIN_OFFSET_GRAPH;
+        const maxOffset = isGeo(this.viewMode) ? SWITCH_MAX_OFFSET_GEO : SWITCH_MAX_OFFSET_GRAPH;
+        const switchOffset = Math.min(Math.max(u.len * SWITCH_OFFSET_LENGTH_FACTOR, minOffset), maxOffset);
+        const offset = Math.min(switchOffset * ARROW_OFFSET_FACTOR, u.len * ARROW_MAX_OFFSET_FRACTION);
+        return {
+            pos: { x: busPoint.x + u.x * offset, y: busPoint.y + u.y * offset },
+            into: u,
+        };
+    }
+
     updateOne (key) {
         const sp = this._sprites.get(key);
         const meta = this._meta.get(key);
         if (!sp || !meta) return;
-        let mid, tangent;
+
+        let busPoint, neighborPoint;
         if (meta.kind === 'line') {
             const pts = this.getLinePoints(meta.id);
             if (!pts || pts.length < 2) return;
-            const mt = polylineMidpointAndTangent(pts);
-            mid = mt.mid;
-            tangent = mt.tangent;
+            if (meta.end === 'from') {
+                busPoint = pts[0];
+                neighborPoint = pts[1];
+            } else {
+                busPoint = pts[pts.length - 1];
+                neighborPoint = pts[pts.length - 2];
+            }
         } else {
             const tr = this.network.trafos.find(t => t.id === meta.id);
             if (!tr) return;
-            const hv = this.busById.get(tr.hvBus);
-            const lvBus = this.busById.get(tr.lvBus);
-            const from = busPos(hv, this.viewMode, this.project);
-            const to = busPos(lvBus, this.viewMode, this.project);
-            if (!from || !to) return;
-            mid = midpoint(from, to);
-            tangent = unitVector(from, to);
+            const hv = busPos(this.busById.get(tr.hvBus), this.viewMode, this.project);
+            const lv = busPos(this.busById.get(tr.lvBus), this.viewMode, this.project);
+            if (!hv || !lv) return;
+            if (meta.end === 'from') { busPoint = hv; neighborPoint = lv; }
+            else                     { busPoint = lv; neighborPoint = hv; }
         }
-        sp.position.set(mid.x, mid.y);
-        if (tangent.len !== 0) {
-            const dx = tangent.x * meta.sign;
-            const dy = tangent.y * meta.sign;
-            // texture points "up" (negative-y); we rotate so up aligns with (dx,dy)
-            sp.rotation = Math.atan2(dy, dx) + Math.PI / 2;
-        }
+
+        const anchor = this._endpointAnchor(busPoint, neighborPoint);
+        if (!anchor) return;
+        sp.position.set(anchor.pos.x, anchor.pos.y);
+
+        const dx = anchor.into.x * meta.sign;
+        const dy = anchor.into.y * meta.sign;
+        // texture points "up" (negative-y); rotate so up aligns with (dx,dy)
+        sp.rotation = Math.atan2(dy, dx) + Math.PI / 2;
     }
 
     onBusMoved (busIds) {
@@ -147,9 +164,3 @@ export class ArrowsLayer {
         this._meta.clear();
     }
 }
-
-function pickBinByLoading (bins, lv) {
-    for (const b of bins) if (lv >= b.lower && lv < b.upper) return b;
-    return bins[0];
-}
-function parseColor (hex) { return parseInt(hex.replace('#', ''), 16); }
