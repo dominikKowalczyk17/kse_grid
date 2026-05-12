@@ -34,6 +34,9 @@ export const App = {
         const uploadInputRef = ref(null);
         const uploadBusy = ref(false);
         const uploadError = ref('');
+        const uploadProgress = ref(0);
+        const uploadPhase = ref('upload');
+        const uploadFileName = ref('');
 
         const elementSchema = ref({});
         const elementParams = ref(null);
@@ -246,18 +249,29 @@ export const App = {
             if (!file) return;
             uploadBusy.value = true;
             uploadError.value = '';
+            uploadProgress.value = 0;
+            uploadPhase.value = 'upload';
+            uploadFileName.value = file.name;
             error.value = null;
             try {
-                const payload = await uploadNetwork(file);
-                // wymuszamy ścieżkę "first load", żeby filtry napięć itp.
-                // przeładowały się dla nowej sieci
+                const payload = await uploadNetwork(file, ({ phase, percent }) => {
+                    uploadPhase.value = phase;
+                    if (phase === 'upload' && typeof percent === 'number') {
+                        uploadProgress.value = Math.min(100, Math.max(0, percent));
+                    } else if (phase === 'process') {
+                        uploadProgress.value = 100;
+                    }
+                });
                 network.value = null;
                 applyNetwork(payload);
                 topologyRevision.value += 1;
             } catch (requestError) {
-                uploadError.value = String(requestError);
+                uploadError.value = String(requestError.message || requestError);
             } finally {
                 uploadBusy.value = false;
+                uploadProgress.value = 0;
+                uploadPhase.value = 'upload';
+                uploadFileName.value = '';
                 if (input) input.value = '';
             }
         }
@@ -298,6 +312,9 @@ export const App = {
             uploadInputRef,
             uploadBusy,
             uploadError,
+            uploadProgress,
+            uploadPhase,
+            uploadFileName,
             elementSchema,
             elementParams,
             editError,
@@ -430,5 +447,22 @@ export const App = {
         <div class="spinner"></div>
         <span>Ładowanie sieci...</span>
     </div>
+    <transition name="upload-fade">
+        <div v-if="uploadBusy" class="upload-backdrop" role="dialog" aria-modal="true" aria-label="Wgrywanie pliku">
+            <div class="upload-modal">
+                <div class="upload-title">
+                    {{ uploadPhase === 'process' ? 'Przetwarzanie sieci…' : 'Wgrywanie pliku…' }}
+                </div>
+                <div v-if="uploadFileName" class="upload-filename" :title="uploadFileName">{{ uploadFileName }}</div>
+                <div class="upload-progress" :class="{ indeterminate: uploadPhase === 'process' }">
+                    <div class="upload-progress-bar" :style="{ width: (uploadPhase === 'process' ? 100 : uploadProgress) + '%' }"></div>
+                </div>
+                <div class="upload-status tabular">
+                    <span v-if="uploadPhase === 'upload'">{{ uploadProgress.toFixed(0) }}%</span>
+                    <span v-else>Uruchamiam rozpływ mocy…</span>
+                </div>
+            </div>
+        </div>
+    </transition>
     `,
 };
