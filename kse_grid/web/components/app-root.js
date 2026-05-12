@@ -2,7 +2,15 @@ import { computed, ref, watchEffect } from 'vue';
 import { Sidebar } from '/components/sidebar.js';
 import { GraphPanel } from '/components/graph-panel.js';
 import { IconSun, IconMoon } from '/icons.js';
-import { fetchNetwork, resetTopology, setSwitchState, uploadNetwork } from '/lib/api.js';
+import {
+    fetchElementParams,
+    fetchElementSchema,
+    fetchNetwork,
+    resetTopology,
+    setSwitchState,
+    updateElement,
+    uploadNetwork,
+} from '/lib/api.js';
 
 const THEME_STORAGE_KEY = 'kse_grid:theme';
 
@@ -26,6 +34,11 @@ export const App = {
         const uploadInputRef = ref(null);
         const uploadBusy = ref(false);
         const uploadError = ref('');
+
+        const elementSchema = ref({});
+        const elementParams = ref(null);
+        const editError = ref('');
+        const editBusy = ref(false);
 
         const storedTheme = (typeof localStorage !== 'undefined' && localStorage.getItem(THEME_STORAGE_KEY)) || 'dark';
         const theme = ref(storedTheme === 'light' ? 'light' : 'dark');
@@ -110,7 +123,26 @@ export const App = {
                 }
             }
 
+            if (update.changedElement) {
+                applyChangedElement(net, update.changedElement);
+            }
+
             topologyRevision.value += 1;
+        }
+
+        function applyChangedElement (net, change) {
+            const arrayKey = change.kind === 'bus' ? 'buses'
+                : change.kind === 'line' ? 'lines'
+                    : change.kind === 'trafo' ? 'trafos'
+                        : change.kind === 'switch' ? 'switches' : null;
+            if (!arrayKey || !Array.isArray(net[arrayKey])) return;
+            const target = net[arrayKey].find(item => item.id === change.id);
+            if (!target) return;
+            // Mutujemy element w miejscu, żeby aktywne `selection.payload` w GraphPanel
+            // (który trzyma referencję do tego samego obiektu) od razu się odświeżyło.
+            for (const [key, value] of Object.entries(change.payload || {})) {
+                target[key] = value;
+            }
         }
 
         async function loadNetwork () {
@@ -119,6 +151,47 @@ export const App = {
                 error.value = null;
             } catch (fetchError) {
                 error.value = String(fetchError);
+            }
+        }
+
+        async function loadElementSchema () {
+            try {
+                elementSchema.value = await fetchElementSchema();
+            } catch (_) {
+                // Schemat nie jest krytyczny dla podstawowego widoku — przy braku
+                // ukryjemy tylko przycisk edycji w karcie selekcji.
+                elementSchema.value = {};
+            }
+        }
+
+        async function onRequestEditParams ({ kind, id }) {
+            editError.value = '';
+            elementParams.value = null;
+            try {
+                elementParams.value = await fetchElementParams(kind, id);
+            } catch (requestError) {
+                editError.value = String(requestError);
+            }
+        }
+
+        function onCancelEdit () {
+            elementParams.value = null;
+            editError.value = '';
+        }
+
+        async function onSubmitEdit ({ kind, id, fields, done }) {
+            editBusy.value = true;
+            editError.value = '';
+            try {
+                const payload = await updateElement(kind, id, fields);
+                applyTopologyUpdate(payload);
+                elementParams.value = null;
+                if (typeof done === 'function') done(true);
+            } catch (requestError) {
+                editError.value = String(requestError);
+                if (typeof done === 'function') done(false);
+            } finally {
+                editBusy.value = false;
             }
         }
 
@@ -190,6 +263,7 @@ export const App = {
         }
 
         loadNetwork();
+        loadElementSchema();
 
         const stats = computed(() => network.value?.stats || {});
 
@@ -224,6 +298,10 @@ export const App = {
             uploadInputRef,
             uploadBusy,
             uploadError,
+            elementSchema,
+            elementParams,
+            editError,
+            editBusy,
             theme,
             toggleTheme,
             onSetSwitchState,
@@ -232,6 +310,9 @@ export const App = {
             onSelectBus,
             onSelectElement,
             onResetView,
+            onRequestEditParams,
+            onSubmitEdit,
+            onCancelEdit,
             triggerUpload,
             onUploadFile,
         };
@@ -331,8 +412,15 @@ export const App = {
                 :topology-revision="topologyRevision"
                 :theme="theme"
                 :edit-mode="editMode"
+                :element-schema="elementSchema"
+                :element-params="elementParams"
+                :edit-error="editError"
+                :edit-busy="editBusy"
                 @set-switch-state="onSetSwitchState"
-                @set-switches-state="onSetSwitchesState" />
+                @set-switches-state="onSetSwitchesState"
+                @request-edit-params="onRequestEditParams"
+                @submit-edit="onSubmitEdit"
+                @cancel-edit="onCancelEdit" />
         </div>
     </div>
     <div v-else-if="error" class="overlay">

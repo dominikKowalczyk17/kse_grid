@@ -1089,6 +1089,313 @@ body {
     border-top: 1px solid var(--border);
 }
 
+/* ---------- Edycja parametrów elementu --------------------------- */
+
+.card-icon-btn {
+    width: 22px;
+    height: 22px;
+    border: 0;
+    background: transparent;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.1s;
+}
+
+.card-icon-btn:hover {
+    background: var(--accent-soft);
+    color: var(--foreground);
+}
+
+.card-icon-btn .icon {
+    width: 14px;
+    height: 14px;
+}
+
+.selection-edit-cta {
+    margin-top: 0.85rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: center;
+}
+
+.btn-cta {
+    height: 38px;
+    min-width: 70%;
+    padding: 0 1.1rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    background: var(--primary-15);
+    color: var(--primary);
+    border-color: var(--primary-30);
+    letter-spacing: 0.02em;
+}
+
+.btn-cta:hover {
+    background: var(--primary-30);
+    color: var(--foreground);
+    border-color: var(--primary);
+}
+
+.btn-cta .icon {
+    width: 15px;
+    height: 15px;
+}
+
+.selection-edit {
+    margin-top: 0.75rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.selection-edit-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.selection-edit-title {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--primary);
+}
+
+.selection-edit-hint {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--muted-foreground);
+}
+
+.edit-row {
+    display: grid;
+    grid-template-columns: 1fr 110px;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.edit-lbl {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+}
+
+.edit-lbl-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.edit-help-btn {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted-foreground);
+    border-radius: 50%;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s;
+}
+
+.edit-help-btn:hover {
+    background: var(--primary-15);
+    color: var(--primary);
+    border-color: var(--primary-30);
+}
+
+.edit-unit {
+    color: var(--foreground-muted, var(--muted-foreground));
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.edit-input {
+    height: 26px;
+    padding: 0 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    background: var(--background);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.edit-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-15);
+}
+
+.edit-input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.edit-checkbox {
+    justify-self: end;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.edit-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.selection-edit-error {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--bad);
+    background: oklch(0.55 0.18 25 / 0.10);
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid oklch(0.55 0.18 25 / 0.30);
+}
+
+.selection-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    margin-top: 0.25rem;
+}
+
+.btn-ghost {
+    background: transparent;
+    color: var(--muted-foreground);
+}
+
+.btn-primary {
+    background: var(--primary-15);
+    color: var(--primary);
+    border-color: var(--primary-30);
+}
+
+.btn-primary:hover {
+    background: var(--primary-30);
+}
+
+/* ---------- Modal pomocy parametru --------------------------- */
+
+.param-help-overlay {
+    position: fixed;
+    inset: 0;
+    background: oklch(0 0 0 / 0.55);
+    backdrop-filter: blur(3px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    animation: cardIn 0.15s ease-out;
+}
+
+.param-help-modal {
+    background: var(--selection-card-bg);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    box-shadow:
+        0 1px 0 var(--selection-card-inset) inset,
+        0 24px 60px var(--selection-card-shadow);
+    width: min(440px, calc(100vw - 2rem));
+    padding: 1rem 1.1rem;
+    color: var(--foreground);
+}
+
+.param-help-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.param-help-kind {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--primary);
+    margin-bottom: 0.2rem;
+}
+
+.param-help-title {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    color: var(--foreground);
+}
+
+.param-help-field {
+    margin-top: 0.15rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--muted-foreground);
+}
+
+.param-help-body {
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: var(--foreground);
+    white-space: pre-line;
+    margin: 0;
+}
+
+.param-help-options {
+    margin-top: 0.85rem;
+    padding-top: 0.65rem;
+    border-top: 1px dashed var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.param-help-options-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted-foreground);
+    margin-right: 0.2rem;
+}
+
+.param-help-opt {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.15rem 0.45rem;
+    background: var(--muted-40);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--foreground);
+}
+
 /* =============================================================
    Loading / error overlay
    ============================================================= */

@@ -9,6 +9,11 @@ import pandas as pd
 import pandapower as pp
 import pandapower.auxiliary as pp_aux
 
+from kse_grid.element_editing import (
+    apply_element_update,
+    field_schema,
+    read_element_params,
+)
 from kse_grid.serializer import (
     compute_graph_positions,
     serialize_network,
@@ -68,13 +73,46 @@ class SwitchingSession:
         self._inject_session_state(payload["topology"])
         return payload
 
-    def build_update_payload(self) -> dict[str, Any]:
+    def get_element_params(self, kind: str, element_id: int) -> dict[str, Any]:
+        """Zwraca bieżące parametry elementu w postaci nadającej się do edycji."""
+        return read_element_params(self.working_net, kind, element_id)
+
+    def update_element(
+        self,
+        kind: str,
+        element_id: int,
+        fields: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Aktualizuje parametry elementu i przelicza load flow.
+
+        Zwracany payload zawiera dodatkowe pole `changedElement` z pełną re-serializacją
+        zmienionego obiektu, dzięki czemu frontend może wstrzyknąć zmiany w istniejącą
+        sieć bez utraty layoutu (drag busa, łamania linii).
+        """
+        update = self._apply_change(
+            lambda net: apply_element_update(net, kind, element_id, fields),
+            success_message=f"Zaktualizowano parametry {kind} #{element_id}.",
+            changed_element=(kind, element_id),
+        )
+        update["changedElementParams"] = read_element_params(self.working_net, kind, element_id)
+        return update
+
+    @staticmethod
+    def field_schema() -> dict[str, list[dict[str, Any]]]:
+        """Schemat edytowalnych pól dla wszystkich typów elementów."""
+        return field_schema()
+
+    def build_update_payload(
+        self,
+        *,
+        changed_element: tuple[str, int] | None = None,
+    ) -> dict[str, Any]:
         """
         Zwraca slim payload zmian po przełączeniu switcha — bez pól layoutu.
         Frontend wstrzykuje go do istniejącej sieci, dzięki czemu ręczne edycje
         pozycji szyn i łamań linii nie są tracone po każdym `runpp()`.
         """
-        payload = serialize_topology_update(self.working_net)
+        payload = serialize_topology_update(self.working_net, changed_element=changed_element)
         self._inject_session_state(payload["topology"])
         return payload
 
@@ -102,6 +140,7 @@ class SwitchingSession:
         mutator: Callable[[pp.pandapowerNet], None],
         *,
         success_message: str,
+        changed_element: tuple[str, int] | None = None,
     ) -> dict[str, Any]:
         # Każdą operację wykonujemy na kopii roboczej. Jeśli coś pójdzie źle
         # podczas mutacji lub load flow, stary `working_net` zostanie nienaruszony.
@@ -111,7 +150,7 @@ class SwitchingSession:
         if self._last_run_succeeded:
             self._last_run_message = success_message
         self.working_net = candidate
-        return self.build_update_payload()
+        return self.build_update_payload(changed_element=changed_element)
 
     def _recalculate_in_place(self, net: pp.pandapowerNet) -> None:
         # Stare wyniki po poprzednim stanie topologii byłyby mylące, więc przed

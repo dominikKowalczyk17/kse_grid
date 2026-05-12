@@ -82,8 +82,12 @@ export const GraphPanel = {
         topologyBusy: { type: Boolean, default: false },
         topologyRevision: { type: Number, default: 0 },
         editMode: { type: Boolean, default: false },
+        elementSchema: { type: Object, default: () => ({}) },
+        elementParams: { type: Object, default: null },
+        editError: { type: String, default: '' },
+        editBusy: { type: Boolean, default: false },
     },
-    emits: ['set-switch-state', 'set-switches-state'],
+    emits: ['set-switch-state', 'set-switches-state', 'request-edit-params', 'submit-edit', 'cancel-edit'],
     setup (props) {
         const graphEl = ref(null);
         const traceMeta = ref([]);
@@ -749,9 +753,16 @@ export const GraphPanel = {
             :switches="network.switches || []"
             :has-results="network.hasResults"
             :topology-busy="topologyBusy"
+            :element-schema="elementSchema"
+            :element-params="elementParams"
+            :edit-error="editError"
+            :edit-busy="editBusy"
             @close="clearSelection"
             @set-switch-state="$emit('set-switch-state', $event)"
-            @set-switches-state="$emit('set-switches-state', $event)" />
+            @set-switches-state="$emit('set-switches-state', $event)"
+            @request-edit-params="$emit('request-edit-params', $event)"
+            @submit-edit="$emit('submit-edit', $event)"
+            @cancel-edit="$emit('cancel-edit')" />
         <div class="graph-hud">
             pokazano {{ visibleCounts.buses }}/{{ visibleCounts.totalBuses }} szyn ·
             {{ visibleCounts.lines }}/{{ visibleCounts.totalLines }} gałęzi

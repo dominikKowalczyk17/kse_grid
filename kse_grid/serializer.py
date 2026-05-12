@@ -25,7 +25,11 @@ def compute_graph_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, flo
     return _compute_positions(net)
 
 
-def serialize_topology_update(net: pp.pandapowerNet) -> dict[str, Any]:
+def serialize_topology_update(
+    net: pp.pandapowerNet,
+    *,
+    changed_element: tuple[str, int] | None = None,
+) -> dict[str, Any]:
     """
     Zwraca slim payload z polami, które zmieniają się po zmianie stanu switcha
     i ponownym load flow. Celowo nie zawiera pozycji szyn, geometrii linii ani
@@ -108,7 +112,48 @@ def serialize_topology_update(net: pp.pandapowerNet) -> dict[str, Any]:
         "busResults": bus_results,
         "lineResults": line_results,
         "trafoResults": trafo_results,
+        "changedElement": _serialize_changed_element(net, changed_element),
     }
+
+
+def _serialize_changed_element(
+    net: pp.pandapowerNet,
+    changed_element: tuple[str, int] | None,
+) -> dict[str, Any] | None:
+    """Re-serializuje pojedynczy element po edycji parametrów.
+
+    Frontend używa tego do nadpisania bieżącego payloadu szyny/linii/trafa/switcha
+    bez utraty pozycji ustawionych ręcznie przez użytkownika.
+    """
+    if changed_element is None:
+        return None
+    kind, element_id = changed_element
+    geo_positions = _extract_geo_positions(net)
+    has_bus_results = not net.res_bus.empty
+    has_line_results = not net.res_line.empty
+    has_trafo_results = not net.res_trafo.empty
+    if kind == "bus" and element_id in net.bus.index:
+        # Pozycje grafowe trzymamy po stronie sesji – tu nie mamy ich pod ręką,
+        # więc element wraca bez `x`/`y`. Frontend zachowa istniejące pozycje.
+        items = _serialize_buses(net, {element_id: (0.0, 0.0)}, geo_positions, has_bus_results)
+        for item in items:
+            if item["id"] == element_id:
+                item.pop("x", None)
+                item.pop("y", None)
+                return {"kind": "bus", "id": element_id, "payload": item}
+    if kind == "line" and element_id in net.line.index:
+        for item in _serialize_lines(net, has_line_results, geo_positions):
+            if item["id"] == element_id:
+                return {"kind": "line", "id": element_id, "payload": item}
+    if kind == "trafo" and element_id in net.trafo.index:
+        for item in _serialize_trafos(net, has_trafo_results):
+            if item["id"] == element_id:
+                return {"kind": "trafo", "id": element_id, "payload": item}
+    if kind == "switch" and element_id in net.switch.index:
+        for item in _serialize_switches(net):
+            if item["id"] == element_id:
+                return {"kind": "switch", "id": element_id, "payload": item}
+    return None
 
 
 def serialize_network(

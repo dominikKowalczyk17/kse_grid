@@ -35,3 +35,19 @@ export async function uploadNetwork(file) {
         body: form,
     }));
 }
+
+export async function fetchElementSchema() {
+    return parseJson(await fetch('/api/elements/schema'));
+}
+
+export async function fetchElementParams(kind, elementId) {
+    return parseJson(await fetch(`/api/elements/${kind}/${elementId}`));
+}
+
+export async function updateElement(kind, elementId, fields) {
+    return parseJson(await fetch(`/api/elements/${kind}/${elementId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields }),
+    }));
+}

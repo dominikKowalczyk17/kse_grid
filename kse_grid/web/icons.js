@@ -21,9 +21,12 @@ export const IconSun        = makeIcon('IconSun',        `<circle cx="12" cy="12
 export const IconMoon       = makeIcon('IconMoon',       `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`);
 export const IconClose      = makeIcon('IconClose',      `<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`);
 export const IconBolt       = makeIcon('IconBolt',       `<path d="M13 3 4 14h7l-1 7 9-11h-7l1-7Z"/>`);
+export const IconEdit       = makeIcon('IconEdit',       `<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z"/>`);
+export const IconCheck      = makeIcon('IconCheck',      `<path d="M20 6 9 17l-5-5"/>`);
 
 export const ALL_ICONS = {
     IconActivity, IconSearch, IconRotate,
     IconCable, IconZap, IconCircleDot,
     IconClose, IconBolt, IconSun, IconMoon,
+    IconEdit, IconCheck,
 };

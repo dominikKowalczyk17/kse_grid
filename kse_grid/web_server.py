@@ -10,7 +10,7 @@ from threading import Lock, Timer
 import pandapower as pp
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -27,6 +27,15 @@ class SwitchStateUpdate(BaseModel):
     """Payload PATCH dla pojedynczego switcha."""
 
     closed: bool
+
+
+class ElementUpdate(BaseModel):
+    """Payload PATCH dla edycji parametrów elementu sieci."""
+
+    fields: dict[str, object] = Field(default_factory=dict)
+
+
+_ELEMENT_KINDS = {"bus", "line", "trafo", "switch"}
 
 
 def create_app(net: pp.pandapowerNet) -> FastAPI:
@@ -54,6 +63,32 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
     @app.post("/api/topology/reset")
     def reset_topology() -> JSONResponse:
         return JSONResponse(current_session().reset())
+
+    @app.get("/api/elements/schema")
+    def get_element_schema() -> JSONResponse:
+        return JSONResponse(SwitchingSession.field_schema())
+
+    @app.get("/api/elements/{kind}/{element_id}")
+    def get_element_params(kind: str, element_id: int) -> JSONResponse:
+        if kind not in _ELEMENT_KINDS:
+            raise HTTPException(status_code=404, detail=f"Nieznany typ elementu: {kind}.")
+        try:
+            params = current_session().get_element_params(kind, element_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return JSONResponse({"kind": kind, "id": element_id, "params": params})
+
+    @app.patch("/api/elements/{kind}/{element_id}")
+    def patch_element(kind: str, element_id: int, update: ElementUpdate) -> JSONResponse:
+        if kind not in _ELEMENT_KINDS:
+            raise HTTPException(status_code=404, detail=f"Nieznany typ elementu: {kind}.")
+        try:
+            payload = current_session().update_element(kind, element_id, update.fields)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return JSONResponse(payload)
 
     @app.post("/api/network/upload")
     async def upload_network(file: UploadFile = File(...)) -> JSONResponse:
