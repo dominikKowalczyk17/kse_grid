@@ -106,7 +106,7 @@ export function setupBend ({
         linesLayer.updateLinePoints(lineId);
         linesLayer.redrawDirty();
         switchesLayer.updateSwitchesForLine(lineId);
-        arrowsLayer.updateOne(`line:${lineId}`);
+        arrowsLayer.updateBranch('line', lineId);
         selectionLayer.refresh();
         bendLayer.refresh();
         // re-attach handlers since refresh recreates sprites

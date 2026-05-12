@@ -88,6 +88,14 @@ export class ArrowsLayer {
         for (const key of this._sprites.keys()) this.updateOne(key);
     }
 
+    /** Update all arrows belonging to a single branch (both P and Q channels). */
+    updateBranch (kind, id) {
+        const prefix = `${kind}:${id}:`;
+        for (const key of this._sprites.keys()) {
+            if (key.startsWith(prefix)) this.updateOne(key);
+        }
+    }
+
     /** Anchor a sprite at (busPoint + tangent_into_line × offset).
      *  Offset is ~2× the switch offset so arrows sit past the switch markers. */
     _endpointAnchor (busPoint, neighborPoint) {
