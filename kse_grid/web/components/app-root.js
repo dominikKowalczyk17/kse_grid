@@ -55,8 +55,8 @@ export const App = {
             theme.value = theme.value === 'dark' ? 'light' : 'dark';
         }
 
-        function applyNetwork (data) {
-            const isFirstLoad = !network.value;
+        function applyNetwork (data, opts = {}) {
+            const isFirstLoad = opts.firstLoad ?? !network.value;
             network.value = data;
             document.title = `${data.name} – kse_grid`;
 
@@ -262,9 +262,11 @@ export const App = {
                         uploadProgress.value = 100;
                     }
                 });
-                network.value = null;
-                applyNetwork(payload);
-                topologyRevision.value += 1;
+                // Wymuszamy reset filtrów / viewMode jak przy pierwszym ładowaniu,
+                // ale BEZ zerowania network.value (to powodowało wyścig dwóch
+                // równoczesnych buildPlot — z watcha network i topologyRevision —
+                // przez co handlery bend/selection w pixi gubiły się).
+                applyNetwork(payload, { firstLoad: true });
             } catch (requestError) {
                 uploadError.value = String(requestError.message || requestError);
             } finally {
