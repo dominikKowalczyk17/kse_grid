@@ -2,7 +2,7 @@ import { computed, ref, watchEffect } from 'vue';
 import { Sidebar } from '/components/sidebar.js';
 import { GraphPanel } from '/components/graph-panel.js';
 import { IconSun, IconMoon } from '/icons.js';
-import { fetchNetwork, resetTopology, setSwitchState } from '/lib/api.js';
+import { fetchNetwork, resetTopology, setSwitchState, uploadNetwork } from '/lib/api.js';
 
 const THEME_STORAGE_KEY = 'kse_grid:theme';
 
@@ -23,6 +23,9 @@ export const App = {
         const topologyError = ref('');
         const topologyRevision = ref(0);
         const graphPanelRef = ref(null);
+        const uploadInputRef = ref(null);
+        const uploadBusy = ref(false);
+        const uploadError = ref('');
 
         const storedTheme = (typeof localStorage !== 'undefined' && localStorage.getItem(THEME_STORAGE_KEY)) || 'dark';
         const theme = ref(storedTheme === 'light' ? 'light' : 'dark');
@@ -159,6 +162,33 @@ export const App = {
             }
         }
 
+        function triggerUpload () {
+            uploadError.value = '';
+            uploadInputRef.value?.click();
+        }
+
+        async function onUploadFile (event) {
+            const input = event.target;
+            const file = input?.files?.[0];
+            if (!file) return;
+            uploadBusy.value = true;
+            uploadError.value = '';
+            error.value = null;
+            try {
+                const payload = await uploadNetwork(file);
+                // wymuszamy ścieżkę "first load", żeby filtry napięć itp.
+                // przeładowały się dla nowej sieci
+                network.value = null;
+                applyNetwork(payload);
+                topologyRevision.value += 1;
+            } catch (requestError) {
+                uploadError.value = String(requestError);
+            } finally {
+                uploadBusy.value = false;
+                if (input) input.value = '';
+            }
+        }
+
         loadNetwork();
 
         const stats = computed(() => network.value?.stats || {});
@@ -191,6 +221,9 @@ export const App = {
             topologyError,
             topologyRevision,
             graphPanelRef,
+            uploadInputRef,
+            uploadBusy,
+            uploadError,
             theme,
             toggleTheme,
             onSetSwitchState,
@@ -199,6 +232,8 @@ export const App = {
             onSelectBus,
             onSelectElement,
             onResetView,
+            triggerUpload,
+            onUploadFile,
         };
     },
     template: `
@@ -217,6 +252,19 @@ export const App = {
             </div>
 
             <div class="header-spacer"></div>
+
+            <button class="btn"
+                    type="button"
+                    :disabled="uploadBusy"
+                    :title="uploadError || 'Załaduj plik MATPOWER (.m) z dysku'"
+                    @click="triggerUpload">
+                {{ uploadBusy ? 'Wgrywam…' : 'Wczytaj plik .m' }}
+            </button>
+            <input ref="uploadInputRef"
+                   type="file"
+                   accept=".m,text/plain"
+                   style="display:none"
+                   @change="onUploadFile" />
 
             <button class="btn"
                     type="button"

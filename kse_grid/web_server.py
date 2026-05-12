@@ -2,21 +2,25 @@
 
 from __future__ import annotations
 
+import tempfile
 import webbrowser
 from pathlib import Path
-from threading import Timer
+from threading import Lock, Timer
 
 import pandapower as pp
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from kse_grid.matpower import load_matpower_case
+from kse_grid.runner import PowerFlowRunner
 from kse_grid.switching import SwitchingSession
 
 
 _WEB_DIR = Path(__file__).parent / "web"
+_MAX_UPLOAD_BYTES = 32 * 1024 * 1024  # 32 MiB
 
 
 class SwitchStateUpdate(BaseModel):
@@ -27,25 +31,67 @@ class SwitchStateUpdate(BaseModel):
 
 def create_app(net: pp.pandapowerNet) -> FastAPI:
     """Tworzy aplikację FastAPI dla danej sieci."""
-    session = SwitchingSession(net)
-    payload = session.build_payload()
+    state: dict[str, SwitchingSession] = {"session": SwitchingSession(net)}
+    state_lock = Lock()
+    payload = state["session"].build_payload()
     app = FastAPI(title=f"{payload['name']} – KSE Grid", docs_url=None, redoc_url=None)
+
+    def current_session() -> SwitchingSession:
+        return state["session"]
 
     @app.get("/api/network")
     def get_network() -> JSONResponse:
-        return JSONResponse(session.build_payload())
+        return JSONResponse(current_session().build_payload())
 
     @app.patch("/api/switches/{switch_id}")
     def patch_switch(switch_id: int, update: SwitchStateUpdate) -> JSONResponse:
         try:
-            payload = session.set_switch_state(switch_id, update.closed)
+            payload = current_session().set_switch_state(switch_id, update.closed)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return JSONResponse(payload)
 
     @app.post("/api/topology/reset")
     def reset_topology() -> JSONResponse:
-        return JSONResponse(session.reset())
+        return JSONResponse(current_session().reset())
+
+    @app.post("/api/network/upload")
+    async def upload_network(file: UploadFile = File(...)) -> JSONResponse:
+        filename = file.filename or "uploaded.m"
+        if not filename.lower().endswith(".m"):
+            raise HTTPException(status_code=400, detail="Oczekiwano pliku MATPOWER (.m).")
+
+        contents = await file.read(_MAX_UPLOAD_BYTES + 1)
+        if len(contents) > _MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Plik przekracza limit 32 MiB.")
+        if not contents:
+            raise HTTPException(status_code=400, detail="Pusty plik.")
+
+        suffix = ".m"
+        stem = Path(filename).stem or "uploaded"
+        with tempfile.NamedTemporaryFile(
+            "wb", suffix=suffix, prefix=f"{stem}_", delete=False
+        ) as handle:
+            handle.write(contents)
+            temp_path = Path(handle.name)
+
+        try:
+            new_net = load_matpower_case(temp_path)
+            new_net.name = stem
+            PowerFlowRunner(new_net).run()
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400, detail=f"Nie udało się załadować pliku: {exc}"
+            ) from exc
+        finally:
+            temp_path.unlink(missing_ok=True)
+
+        with state_lock:
+            state["session"] = SwitchingSession(new_net)
+            payload = state["session"].build_payload()
+        return JSONResponse(payload)
 
     @app.get("/")
     def index() -> FileResponse:

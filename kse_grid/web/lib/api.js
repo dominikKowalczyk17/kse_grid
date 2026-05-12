@@ -26,3 +26,12 @@ export async function setSwitchState(switchId, closed) {
 export async function resetTopology() {
     return parseJson(await fetch('/api/topology/reset', { method: 'POST' }));
 }
+
+export async function uploadNetwork(file) {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return parseJson(await fetch('/api/network/upload', {
+        method: 'POST',
+        body: form,
+    }));
+}
