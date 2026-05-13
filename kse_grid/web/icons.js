@@ -19,6 +19,8 @@ export const IconZap        = makeIcon('IconZap',        `<path d="M4 14a1 1 0 0
 export const IconCircleDot  = makeIcon('IconCircleDot',  `<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/>`);
 export const IconSun        = makeIcon('IconSun',        `<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>`);
 export const IconMoon       = makeIcon('IconMoon',       `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`);
+export const IconChevronLeft = makeIcon('IconChevronLeft', `<path d="m15 18-6-6 6-6"/>`);
+export const IconChevronRight = makeIcon('IconChevronRight', `<path d="m9 18 6-6-6-6"/>`);
 export const IconClose      = makeIcon('IconClose',      `<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`);
 export const IconBolt       = makeIcon('IconBolt',       `<path d="M13 3 4 14h7l-1 7 9-11h-7l1-7Z"/>`);
 export const IconEdit       = makeIcon('IconEdit',       `<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z"/>`);
@@ -28,5 +30,6 @@ export const ALL_ICONS = {
     IconActivity, IconSearch, IconRotate,
     IconCable, IconZap, IconCircleDot,
     IconClose, IconBolt, IconSun, IconMoon,
+    IconChevronLeft, IconChevronRight,
     IconEdit, IconCheck,
 };

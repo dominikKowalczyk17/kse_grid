@@ -305,7 +305,7 @@ export const SelectionCard = {
                 type="button"
                 :disabled="topologyBusy"
                 @click="$emit('set-switch-state', { switchId: selection.payload.id, closed: !selection.payload.closed })">
-                {{ topologyBusy ? 'Przeliczam…' : switchActionLabel }}
+                {{ topologyBusy ? 'Aktualizuję…' : switchActionLabel }}
             </button>
         </div>
         <div v-else-if="!editing && selection.kind === 'trafo' && relatedTrafoSwitches.length" class="selection-actions">
@@ -314,7 +314,7 @@ export const SelectionCard = {
                 type="button"
                 :disabled="topologyBusy"
                 @click="$emit('set-switches-state', { switchIds: relatedTrafoSwitches.map(sw => sw.id), closed: !trafoConnected })">
-                {{ topologyBusy ? 'Przeliczam…' : trafoActionLabel }}
+                {{ topologyBusy ? 'Aktualizuję…' : trafoActionLabel }}
             </button>
             <button
                 v-for="sw in relatedTrafoSwitches"
@@ -323,7 +323,7 @@ export const SelectionCard = {
                 type="button"
                 :disabled="topologyBusy"
                 @click="$emit('set-switch-state', { switchId: sw.id, closed: !sw.closed })">
-                {{ topologyBusy ? 'Przeliczam…' : (sw.closed ? 'Otwórz ' : 'Zamknij ') + (sw.sideLabel || sw.name) }}
+                {{ topologyBusy ? 'Aktualizuję…' : (sw.closed ? 'Otwórz ' : 'Zamknij ') + (sw.sideLabel || sw.name) }}
             </button>
         </div>
 

@@ -34,7 +34,7 @@ export const Sidebar = {
         topologyBusy: { type: Boolean, default: false },
         topologyError: { type: String, default: '' },
     },
-    emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'update:atlasCategories', 'update:minLineLoading', 'update:minBusPower', 'update:showSwitches', 'reset-view', 'reset-topology', 'select-bus', 'select-element'],
+    emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'update:atlasCategories', 'update:minLineLoading', 'update:minBusPower', 'update:showSwitches', 'reset-view', 'select-bus', 'select-element'],
     setup (props, { emit }) {
         const search = ref('');
         const showSuggestions = ref(false);
@@ -342,8 +342,7 @@ export const Sidebar = {
         <SwitchingPanel
             :topology="topology"
             :busy="topologyBusy"
-            :request-error="topologyError"
-            @reset-topology="$emit('reset-topology')" />
+            :request-error="topologyError" />
 
         <section class="section-card">
             <h3 class="section-title">Bilans mocy</h3>

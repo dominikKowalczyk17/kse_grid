@@ -1,16 +1,28 @@
 import { computed } from 'vue';
 
+function polishPlural(count, one, few, many) {
+    if (count === 1) return one;
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return few;
+    return many;
+}
+
 export const SwitchingPanel = {
     props: {
         topology: Object,
         busy: Boolean,
         requestError: String,
     },
-    emits: ['reset-topology'],
     setup (props) {
         const topology = computed(() => props.topology || {});
-        const runMessageClass = computed(() => topology.value.lastRunSucceeded === false ? 'helper helper-bad' : 'helper');
-        return { topology, runMessageClass };
+        const pendingRecalc = computed(() => Boolean(topology.value.pendingRecalc));
+        const pendingChangeCount = computed(() => Number(topology.value.pendingChangeCount || 0));
+        const pendingChangeLabel = computed(() => polishPlural(pendingChangeCount.value, 'zmianę', 'zmiany', 'zmian'));
+        const runMessageClass = computed(() => pendingRecalc.value
+            ? 'helper helper-warn'
+            : topology.value.lastRunSucceeded === false ? 'helper helper-bad' : 'helper');
+        return { topology, pendingRecalc, pendingChangeCount, pendingChangeLabel, runMessageClass };
     },
     template: `
     <section class="section-card">
@@ -47,14 +59,12 @@ export const SwitchingPanel = {
         </div>
 
         <p class="helper">Odłączniki pokazują stan łączeniowy wysp. Klik marker na diagramie, potem użyj akcji Otwórz / Zamknij w karcie szczegółów.</p>
+        <p v-if="pendingRecalc" class="helper helper-warn">
+            Wprowadzono {{ pendingChangeCount }} {{ pendingChangeLabel }}.
+            Wyniki rozpływu mocy są ukryte do czasu ponownego przeliczenia.
+        </p>
         <p v-if="topology.lastRunMessage" :class="runMessageClass">{{ topology.lastRunMessage }}</p>
         <p v-if="requestError" class="helper helper-bad">{{ requestError }}</p>
-
-        <div class="btn-search-row">
-            <button class="btn btn-block" type="button" :disabled="busy" @click="$emit('reset-topology')">
-                {{ busy ? 'Przeliczam…' : 'Reset topologii' }}
-            </button>
-        </div>
     </section>
     `,
 };

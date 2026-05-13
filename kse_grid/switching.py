@@ -1,4 +1,4 @@
-"""Warstwa backendowa do sterowania switchami i przeliczania topologii."""
+"""Warstwa backendowa do sterowania odłącznikami i ręcznego przeliczania load flow."""
 
 from __future__ import annotations
 
@@ -34,8 +34,9 @@ class SwitchingSession:
 
     Model pracy jest prosty:
     - `base_net` przechowuje stan bazowy po imporcie i pierwszym load flow,
-    - `working_net` jest kopią roboczą, na której otwieramy / zamykamy switche,
-    - po każdej zmianie topologii robimy nowy `runpp()` i budujemy świeży payload.
+    - `working_net` jest kopią roboczą, na której odkładamy zmiany topologii
+      i parametrów elementów,
+    - load flow uruchamia się dopiero na jawne żądanie użytkownika.
 
     Dzięki temu API nie mutuje bezpośrednio jedynego egzemplarza sieci "w miejscu".
     Każda operacja działa na kopii, a dopiero po udanym przeliczeniu stan jest
@@ -59,8 +60,10 @@ class SwitchingSession:
         # je zachować przy kolejnych przeliczeniach po zmianach topologii.
         self._powerflow_options = _extract_powerflow_options(net)
 
-        self._last_run_succeeded = _has_results(self.working_net)
+        self._last_run_succeeded: bool | None = _has_results(self.working_net)
         self._last_run_message: str | None = None
+        self._pending_recalc = False
+        self._pending_change_count = 0
 
         # Gdy serwer dostanie sieć bez wyników, liczymy stan startowy od razu,
         # żeby frontend nie zaczynał od pustych tabel wynikowych.
@@ -83,15 +86,15 @@ class SwitchingSession:
         element_id: int,
         fields: dict[str, Any],
     ) -> dict[str, Any]:
-        """Aktualizuje parametry elementu i przelicza load flow.
+        """Aktualizuje parametry elementu i odkłada przeliczenie load flow.
 
         Zwracany payload zawiera dodatkowe pole `changedElement` z pełną re-serializacją
         zmienionego obiektu, dzięki czemu frontend może wstrzyknąć zmiany w istniejącą
         sieć bez utraty layoutu (drag busa, łamania linii).
         """
-        update = self._apply_change(
+        update = self._stage_change(
             lambda net: apply_element_update(net, kind, element_id, fields),
-            success_message=f"Zaktualizowano parametry {kind} #{element_id}.",
+            pending_message=f"Zmieniono parametry {kind} #{element_id}.",
             changed_element=(kind, element_id),
         )
         update["changedElementParams"] = read_element_params(self.working_net, kind, element_id)
@@ -120,36 +123,57 @@ class SwitchingSession:
         topology["lastRunSucceeded"] = self._last_run_succeeded
         topology["lastRunMessage"] = self._last_run_message
         topology["powerflowOptions"] = dict(self._powerflow_options)
+        topology["pendingRecalc"] = self._pending_recalc
+        topology["pendingChangeCount"] = self._pending_change_count
 
     def set_switch_state(self, switch_id: int, closed: bool) -> dict[str, Any]:
-        """Ustawia stan jednego switcha i od razu przelicza working net."""
-        return self._apply_change(
+        """Ustawia stan jednego odłącznika i odkłada przeliczenie working net."""
+        return self._stage_change(
             lambda net: _set_switch_state(net, switch_id=switch_id, closed=closed),
-            success_message=f"Switch #{switch_id} ustawiony na {'zamknięty' if closed else 'otwarty'}.",
+            pending_message=f"Ustawiono odłącznik #{switch_id} na {'zamknięty' if closed else 'otwarty'}.",
         )
+
+    def recalculate(self) -> dict[str, Any]:
+        """Uruchamia load flow dla aktualnego stanu roboczego."""
+        candidate = deepcopy(self.working_net)
+        self._recalculate_in_place(candidate)
+        self.working_net = candidate
+        if self._last_run_succeeded:
+            self._pending_recalc = False
+            self._pending_change_count = 0
+            self._last_run_message = "Przeliczono rozpływ mocy dla bieżącego stanu sieci."
+        else:
+            self._pending_recalc = True
+        return self.build_update_payload()
 
     def reset(self) -> dict[str, Any]:
         """Przywraca working net do stanu bazowego i odświeża payload."""
         self.working_net = deepcopy(self.base_net)
         self._recalculate_in_place(self.working_net)
+        self._pending_recalc = False
+        self._pending_change_count = 0
         self._last_run_message = "Topologia przywrócona do stanu bazowego."
-        return self.build_update_payload()
+        return self.build_payload()
 
-    def _apply_change(
+    def _stage_change(
         self,
         mutator: Callable[[pp.pandapowerNet], None],
         *,
-        success_message: str,
+        pending_message: str,
         changed_element: tuple[str, int] | None = None,
     ) -> dict[str, Any]:
         # Każdą operację wykonujemy na kopii roboczej. Jeśli coś pójdzie źle
-        # podczas mutacji lub load flow, stary `working_net` zostanie nienaruszony.
+        # podczas mutacji, stary `working_net` zostanie nienaruszony.
         candidate = deepcopy(self.working_net)
         mutator(candidate)
-        self._recalculate_in_place(candidate)
-        if self._last_run_succeeded:
-            self._last_run_message = success_message
+        _clear_results(candidate)
         self.working_net = candidate
+        self._pending_recalc = True
+        self._pending_change_count += 1
+        self._last_run_succeeded = None
+        self._last_run_message = (
+            f"{pending_message} Zmiany oczekują na ręczne przeliczenie rozpływu mocy."
+        )
         return self.build_update_payload(changed_element=changed_element)
 
     def _recalculate_in_place(self, net: pp.pandapowerNet) -> None:

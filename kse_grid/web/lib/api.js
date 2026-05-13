@@ -27,6 +27,10 @@ export async function resetTopology() {
     return parseJson(await fetch('/api/topology/reset', { method: 'POST' }));
 }
 
+export async function recalculatePowerflow() {
+    return parseJson(await fetch('/api/powerflow/recalculate', { method: 'POST' }));
+}
+
 export function uploadNetwork(file, onProgress) {
     return new Promise((resolve, reject) => {
         const form = new FormData();

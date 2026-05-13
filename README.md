@@ -194,6 +194,8 @@ Panel po lewej stronie udostępnia:
 - przełączanie trybu widoku,
 - reset widoku i reset topologii.
 
+Panel można zwinąć małym uchwytem ze strzałką przy jego prawej krawędzi; ponowne kliknięcie rozwija go z animacją, a wybór jest zapamiętywany w przeglądarce.
+
 ### Karta szczegółów i edycja
 
 Po kliknięciu elementu pojawia się karta szczegółów. W zależności od typu elementu można:

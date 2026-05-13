@@ -663,6 +663,11 @@ export const GraphPanel = {
             clearHighlight();
         }
 
+        function handleLayoutChange () {
+            if (!ready.value || !graphEl.value || pixiCtrl.value) return;
+            Plotly.Plots.resize(graphEl.value);
+        }
+
         watch(() => [props.selectedVoltages, props.selectedTypes, props.showSwitches], () => {
             if (pixiCtrl.value) {
                 pixiCtrl.value.setFilters(pixiFilters());
@@ -743,7 +748,7 @@ export const GraphPanel = {
             }
         });
 
-        return { graphEl, selection, clearSelection, selectBus, selectLine, selectTrafo, selectElement, resetView, visibleCounts };
+        return { graphEl, selection, clearSelection, selectBus, selectLine, selectTrafo, selectElement, resetView, handleLayoutChange, visibleCounts };
     },
     template: `
     <div class="graph-panel">

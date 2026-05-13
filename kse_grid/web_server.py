@@ -64,6 +64,10 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
     def reset_topology() -> JSONResponse:
         return JSONResponse(current_session().reset())
 
+    @app.post("/api/powerflow/recalculate")
+    def recalculate_powerflow() -> JSONResponse:
+        return JSONResponse(current_session().recalculate())
+
     @app.get("/api/elements/schema")
     def get_element_schema() -> JSONResponse:
         return JSONResponse(SwitchingSession.field_schema())

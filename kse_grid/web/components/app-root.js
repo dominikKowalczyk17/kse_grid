@@ -1,11 +1,12 @@
-import { computed, ref, watchEffect } from 'vue';
+import { computed, nextTick, ref, watchEffect } from 'vue';
 import { Sidebar } from '/components/sidebar.js';
 import { GraphPanel } from '/components/graph-panel.js';
-import { IconSun, IconMoon } from '/icons.js';
+import { IconChevronLeft, IconChevronRight, IconSun, IconMoon } from '/icons.js';
 import {
     fetchElementParams,
     fetchElementSchema,
     fetchNetwork,
+    recalculatePowerflow,
     resetTopology,
     setSwitchState,
     updateElement,
@@ -13,9 +14,18 @@ import {
 } from '/lib/api.js';
 
 const THEME_STORAGE_KEY = 'kse_grid:theme';
+const SIDEBAR_STORAGE_KEY = 'kse_grid:sidebar-hidden';
+
+function polishPlural(count, one, few, many) {
+    if (count === 1) return one;
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return few;
+    return many;
+}
 
 export const App = {
-    components: { Sidebar, GraphPanel, IconSun, IconMoon },
+    components: { Sidebar, GraphPanel, IconChevronLeft, IconChevronRight, IconSun, IconMoon },
     setup () {
         const network = ref(null);
         const error = ref(null);
@@ -37,6 +47,7 @@ export const App = {
         const uploadProgress = ref(0);
         const uploadPhase = ref('upload');
         const uploadFileName = ref('');
+        const powerflowBusy = ref(false);
 
         const elementSchema = ref({});
         const elementParams = ref(null);
@@ -44,15 +55,27 @@ export const App = {
         const editBusy = ref(false);
 
         const storedTheme = (typeof localStorage !== 'undefined' && localStorage.getItem(THEME_STORAGE_KEY)) || 'dark';
+        const storedSidebar = (typeof localStorage !== 'undefined' && localStorage.getItem(SIDEBAR_STORAGE_KEY)) || 'false';
         const theme = ref(storedTheme === 'light' ? 'light' : 'dark');
+        const sidebarHidden = ref(storedSidebar === 'true');
 
         watchEffect(() => {
             document.documentElement.dataset.theme = theme.value;
             try { localStorage.setItem(THEME_STORAGE_KEY, theme.value); } catch (_) {}
         });
 
+        watchEffect(() => {
+            try { localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarHidden.value)); } catch (_) {}
+        });
+
         function toggleTheme () {
             theme.value = theme.value === 'dark' ? 'light' : 'dark';
+        }
+
+        async function toggleSidebar () {
+            sidebarHidden.value = !sidebarHidden.value;
+            await nextTick();
+            graphPanelRef.value?.handleLayoutChange?.();
         }
 
         function applyNetwork (data, opts = {}) {
@@ -230,10 +253,27 @@ export const App = {
             topologyBusy.value = true;
             topologyError.value = '';
             try {
-                applyTopologyUpdate(await resetTopology());
+                const payload = await resetTopology();
+                applyNetwork(payload);
+                elementParams.value = null;
+                editError.value = '';
             } catch (requestError) {
                 topologyError.value = String(requestError);
             } finally {
+                topologyBusy.value = false;
+            }
+        }
+
+        async function onRecalculatePowerflow () {
+            topologyBusy.value = true;
+            powerflowBusy.value = true;
+            topologyError.value = '';
+            try {
+                applyTopologyUpdate(await recalculatePowerflow());
+            } catch (requestError) {
+                topologyError.value = String(requestError);
+            } finally {
+                powerflowBusy.value = false;
                 topologyBusy.value = false;
             }
         }
@@ -282,6 +322,12 @@ export const App = {
         loadElementSchema();
 
         const stats = computed(() => network.value?.stats || {});
+        const pendingRecalc = computed(() => Boolean(network.value?.topology?.pendingRecalc));
+        const pendingChangeCount = computed(() => Number(network.value?.topology?.pendingChangeCount || 0));
+        const pendingHeaderLabel = computed(() => {
+            const count = pendingChangeCount.value;
+            return `${count} ${polishPlural(count, 'zmiana oczekuje', 'zmiany oczekują', 'zmian oczekuje')}`;
+        });
 
         function onSelectBus (busId) {
             graphPanelRef.value?.selectBus(busId, true);
@@ -299,6 +345,9 @@ export const App = {
             network,
             error,
             stats,
+            pendingRecalc,
+            pendingChangeCount,
+            pendingHeaderLabel,
             selectedVoltages,
             selectedTypes,
             viewMode,
@@ -317,15 +366,19 @@ export const App = {
             uploadProgress,
             uploadPhase,
             uploadFileName,
+            powerflowBusy,
             elementSchema,
             elementParams,
             editError,
             editBusy,
             theme,
+            sidebarHidden,
             toggleTheme,
+            toggleSidebar,
             onSetSwitchState,
             onSetSwitchesState,
             onResetTopology,
+            onRecalculatePowerflow,
             onSelectBus,
             onSelectElement,
             onResetView,
@@ -349,6 +402,10 @@ export const App = {
                 <span class="header-stat"><span class="v tabular">{{ stats.nBus }}</span> szyn</span>
                 <span class="header-stat"><span class="v tabular">{{ stats.nLine }}</span> linii</span>
                 <span class="header-stat"><span class="v tabular">{{ stats.nTrafo }}</span> trafo</span>
+                <span v-if="pendingRecalc" class="status-pill warn">
+                    <span class="dot"></span>
+                    {{ pendingHeaderLabel }}
+                </span>
             </div>
 
             <div class="header-spacer"></div>
@@ -375,6 +432,14 @@ export const App = {
             </button>
 
             <button class="btn"
+                    v-if="pendingRecalc"
+                    type="button"
+                    :disabled="topologyBusy"
+                    @click="onRecalculatePowerflow">
+                {{ topologyBusy ? 'Przeliczam…' : 'Przelicz rozpływ' }}
+            </button>
+
+            <button class="btn"
                     type="button"
                     :disabled="topologyBusy"
                     @click="onResetTopology">
@@ -390,33 +455,43 @@ export const App = {
                 <IconMoon v-else />
             </button>
         </header>
-        <div class="app-body">
-            <Sidebar
-                :stats="stats"
-                :totals="network.totals"
-                :diagnostics="network.diagnostics"
-                :topology="network.topology"
-                :voltage-levels="network.voltageLevels"
-                :default-voltage-filter="network.defaultVoltageFilter"
-                :buses="network.buses"
-                :lines="network.lines"
-                :trafos="network.trafos"
-                :has-results="network.hasResults"
-                :view-mode="viewMode"
-                :geo-available="network.geoAvailable"
-                v-model:selected-voltages="selectedVoltages"
-                v-model:selected-types="selectedTypes"
-                v-model:view-mode="viewMode"
-                v-model:atlas-categories="atlasCategories"
-                v-model:min-line-loading="minLineLoading"
-                v-model:min-bus-power="minBusPower"
-                v-model:show-switches="showSwitches"
+        <div class="app-body" :class="{ 'sidebar-hidden': sidebarHidden }">
+            <div class="sidebar-shell">
+                <Sidebar
+                    class="sidebar-panel"
+                    :stats="stats"
+                    :totals="network.totals"
+                    :diagnostics="network.diagnostics"
+                    :topology="network.topology"
+                    :voltage-levels="network.voltageLevels"
+                    :default-voltage-filter="network.defaultVoltageFilter"
+                    :buses="network.buses"
+                    :lines="network.lines"
+                    :trafos="network.trafos"
+                    :has-results="network.hasResults"
+                    :view-mode="viewMode"
+                    :geo-available="network.geoAvailable"
+                    v-model:selected-voltages="selectedVoltages"
+                    v-model:selected-types="selectedTypes"
+                    v-model:view-mode="viewMode"
+                    v-model:atlas-categories="atlasCategories"
+                    v-model:min-line-loading="minLineLoading"
+                    v-model:min-bus-power="minBusPower"
+                    v-model:show-switches="showSwitches"
                 :topology-busy="topologyBusy"
                 :topology-error="topologyError"
                 @reset-view="onResetView"
-                @reset-topology="onResetTopology"
                 @select-bus="onSelectBus"
                 @select-element="onSelectElement" />
+            </div>
+            <button class="sidebar-toggle"
+                    type="button"
+                    :aria-label="sidebarHidden ? 'Rozwiń panel boczny' : 'Zwiń panel boczny'"
+                    :title="sidebarHidden ? 'Pokaż panel boczny' : 'Ukryj panel boczny'"
+                    @click="toggleSidebar">
+                <IconChevronRight v-if="sidebarHidden" />
+                <IconChevronLeft v-else />
+            </button>
             <GraphPanel
                 ref="graphPanelRef"
                 :network="network"
@@ -463,6 +538,17 @@ export const App = {
                     <span v-if="uploadPhase === 'upload'">{{ uploadProgress.toFixed(0) }}%</span>
                     <span v-else>Uruchamiam rozpływ mocy…</span>
                 </div>
+            </div>
+        </div>
+    </transition>
+    <transition name="upload-fade">
+        <div v-if="powerflowBusy" class="upload-backdrop" role="dialog" aria-modal="true" aria-label="Przeliczanie rozpływu mocy">
+            <div class="upload-modal">
+                <div class="upload-title">Przeliczanie rozpływu mocy…</div>
+                <div class="upload-progress indeterminate">
+                    <div class="upload-progress-bar" style="width:100%"></div>
+                </div>
+                <div class="upload-status tabular">Uruchamiam obliczenia…</div>
             </div>
         </div>
     </transition>
