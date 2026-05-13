@@ -1,7 +1,9 @@
-import { computed, nextTick, ref, watchEffect } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
+import { ErrorModal } from '/components/error-modal.js';
 import { Sidebar } from '/components/sidebar.js';
 import { GraphPanel } from '/components/graph-panel.js';
 import { IconChevronLeft, IconChevronRight, IconSun, IconMoon } from '/icons.js';
+import { formatError } from '/lib/errors.js';
 import {
     fetchElementParams,
     fetchElementSchema,
@@ -25,10 +27,11 @@ function polishPlural(count, one, few, many) {
 }
 
 export const App = {
-    components: { Sidebar, GraphPanel, IconChevronLeft, IconChevronRight, IconSun, IconMoon },
+    components: { ErrorModal, Sidebar, GraphPanel, IconChevronLeft, IconChevronRight, IconSun, IconMoon },
     setup () {
         const network = ref(null);
         const error = ref(null);
+        const activeError = ref(null);
         const selectedVoltages = ref([]);
         const selectedTypes = ref(['line', 'trafo', 'bus']);
         const viewMode = ref('graph');
@@ -76,6 +79,50 @@ export const App = {
             sidebarHidden.value = !sidebarHidden.value;
             await nextTick();
             graphPanelRef.value?.handleLayoutChange?.();
+        }
+
+        function presentError (rawError, title, info = '') {
+            const formatted = formatError(rawError, title);
+            if (info) formatted.detail = [info, formatted.detail].filter(Boolean).join('\n\n');
+            activeError.value = formatted;
+            return formatted;
+        }
+
+        function dismissErrorModal () {
+            activeError.value = null;
+        }
+
+        function handleRuntimeError (payload) {
+            if (!payload) return;
+            const isWrapped = typeof payload === 'object' && payload !== null && ('error' in payload || 'title' in payload || 'info' in payload);
+            const formatted = isWrapped
+                ? presentError(payload.error, payload.title || 'Błąd aplikacji', payload.info || '')
+                : presentError(payload, 'Błąd aplikacji');
+            if (!network.value) error.value = formatted.message;
+        }
+
+        function onWindowError (event) {
+            const location = event?.filename
+                ? `${event.filename}:${event.lineno || 0}:${event.colno || 0}`
+                : 'window.error';
+            handleRuntimeError({
+                title: 'Nieobsłużony błąd JavaScript',
+                info: location,
+                error: event?.error || new Error(event?.message || 'Nieznany błąd JavaScript'),
+            });
+        }
+
+        function onUnhandledRejection (event) {
+            event?.preventDefault?.();
+            handleRuntimeError({
+                title: 'Nieobsłużone odrzucenie Promise',
+                info: 'window.unhandledrejection',
+                error: event?.reason || new Error('Promise rejected without a handler'),
+            });
+        }
+
+        function onRuntimeErrorEvent (event) {
+            handleRuntimeError(event?.detail || null);
         }
 
         function applyNetwork (data, opts = {}) {
@@ -176,16 +223,15 @@ export const App = {
                 applyNetwork(await fetchNetwork());
                 error.value = null;
             } catch (fetchError) {
-                error.value = String(fetchError);
+                error.value = presentError(fetchError, 'Błąd ładowania sieci').message;
             }
         }
 
         async function loadElementSchema () {
             try {
                 elementSchema.value = await fetchElementSchema();
-            } catch (_) {
-                // Schemat nie jest krytyczny dla podstawowego widoku — przy braku
-                // ukryjemy tylko przycisk edycji w karcie selekcji.
+            } catch (schemaError) {
+                presentError(schemaError, 'Błąd pobierania schematu edycji');
                 elementSchema.value = {};
             }
         }
@@ -196,7 +242,7 @@ export const App = {
             try {
                 elementParams.value = await fetchElementParams(kind, id);
             } catch (requestError) {
-                editError.value = String(requestError);
+                editError.value = presentError(requestError, `Błąd pobierania parametrów ${kind} #${id}`).message;
             }
         }
 
@@ -214,7 +260,7 @@ export const App = {
                 elementParams.value = null;
                 if (typeof done === 'function') done(true);
             } catch (requestError) {
-                editError.value = String(requestError);
+                editError.value = presentError(requestError, `Błąd zapisu parametrów ${kind} #${id}`).message;
                 if (typeof done === 'function') done(false);
             } finally {
                 editBusy.value = false;
@@ -227,7 +273,7 @@ export const App = {
             try {
                 applyTopologyUpdate(await setSwitchState(switchId, closed));
             } catch (requestError) {
-                topologyError.value = String(requestError);
+                topologyError.value = presentError(requestError, `Błąd aktualizacji odłącznika #${switchId}`).message;
             } finally {
                 topologyBusy.value = false;
             }
@@ -243,7 +289,7 @@ export const App = {
                 }
                 if (payload) applyTopologyUpdate(payload);
             } catch (requestError) {
-                topologyError.value = String(requestError);
+                topologyError.value = presentError(requestError, 'Błąd aktualizacji stanu łączeniowego').message;
             } finally {
                 topologyBusy.value = false;
             }
@@ -258,7 +304,7 @@ export const App = {
                 elementParams.value = null;
                 editError.value = '';
             } catch (requestError) {
-                topologyError.value = String(requestError);
+                topologyError.value = presentError(requestError, 'Błąd resetu topologii').message;
             } finally {
                 topologyBusy.value = false;
             }
@@ -271,7 +317,7 @@ export const App = {
             try {
                 applyTopologyUpdate(await recalculatePowerflow());
             } catch (requestError) {
-                topologyError.value = String(requestError);
+                topologyError.value = presentError(requestError, 'Błąd przeliczania rozpływu mocy').message;
             } finally {
                 powerflowBusy.value = false;
                 topologyBusy.value = false;
@@ -308,7 +354,7 @@ export const App = {
                 // przez co handlery bend/selection w pixi gubiły się).
                 applyNetwork(payload, { firstLoad: true });
             } catch (requestError) {
-                uploadError.value = String(requestError.message || requestError);
+                uploadError.value = presentError(requestError, 'Błąd uploadu pliku').message;
             } finally {
                 uploadBusy.value = false;
                 uploadProgress.value = 0;
@@ -320,6 +366,18 @@ export const App = {
 
         loadNetwork();
         loadElementSchema();
+
+        onMounted(() => {
+            window.addEventListener('error', onWindowError);
+            window.addEventListener('unhandledrejection', onUnhandledRejection);
+            window.addEventListener('kse-grid:error', onRuntimeErrorEvent);
+        });
+
+        onBeforeUnmount(() => {
+            window.removeEventListener('error', onWindowError);
+            window.removeEventListener('unhandledrejection', onUnhandledRejection);
+            window.removeEventListener('kse-grid:error', onRuntimeErrorEvent);
+        });
 
         const stats = computed(() => network.value?.stats || {});
         const pendingRecalc = computed(() => Boolean(network.value?.topology?.pendingRecalc));
@@ -344,6 +402,7 @@ export const App = {
         return {
             network,
             error,
+            activeError,
             stats,
             pendingRecalc,
             pendingChangeCount,
@@ -375,6 +434,8 @@ export const App = {
             sidebarHidden,
             toggleTheme,
             toggleSidebar,
+            dismissErrorModal,
+            handleRuntimeError,
             onSetSwitchState,
             onSetSwitchesState,
             onResetTopology,
@@ -512,6 +573,7 @@ export const App = {
                 :edit-busy="editBusy"
                 @set-switch-state="onSetSwitchState"
                 @set-switches-state="onSetSwitchesState"
+                @runtime-error="handleRuntimeError"
                 @request-edit-params="onRequestEditParams"
                 @submit-edit="onSubmitEdit"
                 @cancel-edit="onCancelEdit" />
@@ -552,5 +614,6 @@ export const App = {
             </div>
         </div>
     </transition>
+    <ErrorModal :error="activeError" @close="dismissErrorModal" />
     `,
 };

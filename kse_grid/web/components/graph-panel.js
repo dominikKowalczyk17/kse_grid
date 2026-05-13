@@ -87,8 +87,8 @@ export const GraphPanel = {
         editError: { type: String, default: '' },
         editBusy: { type: Boolean, default: false },
     },
-    emits: ['set-switch-state', 'set-switches-state', 'request-edit-params', 'submit-edit', 'cancel-edit'],
-    setup (props) {
+    emits: ['set-switch-state', 'set-switches-state', 'request-edit-params', 'submit-edit', 'cancel-edit', 'runtime-error'],
+    setup (props, { emit }) {
         const graphEl = ref(null);
         const traceMeta = ref([]);
         const allTraces = ref([]);
@@ -379,7 +379,11 @@ export const GraphPanel = {
                 try {
                     atlasData.value = await loadAtlas();
                 } catch (error) {
-                    console.error('Atlas KSE load failed', error);
+                    emit('runtime-error', {
+                        title: 'Błąd ładowania atlasu KSE',
+                        info: 'GraphPanel.loadAtlas',
+                        error,
+                    });
                 }
             }
 
@@ -433,6 +437,11 @@ export const GraphPanel = {
                 editMode: props.editMode,
                 filters: pixiFilters(),
                 initialView,
+                onError: error => emit('runtime-error', {
+                    title: 'Błąd interakcji wykresu',
+                    info: 'GraphPanel.mountPixi',
+                    error,
+                }),
                 onSelect: sel => {
                     if (!sel) { selection.value = null; return; }
                     if (sel.kind === 'bus') {
@@ -450,6 +459,18 @@ export const GraphPanel = {
                     }
                 },
             });
+        }
+
+        async function rebuildPlot (info) {
+            try {
+                await buildPlot();
+            } catch (error) {
+                emit('runtime-error', {
+                    title: 'Błąd renderowania wykresu',
+                    info,
+                    error,
+                });
+            }
         }
 
         function applyVisibility () {
@@ -673,15 +694,15 @@ export const GraphPanel = {
                 pixiCtrl.value.setFilters(pixiFilters());
                 return;
             }
-            if (ready.value) buildPlot();
+            if (ready.value) rebuildPlot('GraphPanel.watch(filters)');
         }, { deep: true });
 
         watch(() => props.viewMode, async () => {
-            await buildPlot();
+            await rebuildPlot('GraphPanel.watch(viewMode)');
         });
 
         watch(() => props.theme, async () => {
-            await buildPlot();
+            await rebuildPlot('GraphPanel.watch(theme)');
         });
 
         watch(() => [props.minLineLoading, props.minBusPower], async () => {
@@ -689,7 +710,7 @@ export const GraphPanel = {
                 pixiCtrl.value.setFilters(pixiFilters());
                 return;
             }
-            await buildPlot();
+            await rebuildPlot('GraphPanel.watch(thresholds)');
         });
 
         watch(() => props.editMode, on => {
@@ -709,14 +730,14 @@ export const GraphPanel = {
         }, { deep: true });
 
         watch(() => props.network, async () => {
-            await buildPlot();
+            await rebuildPlot('GraphPanel.watch(network)');
         });
 
         // Switch toggles mutate the network in place (preserving user layout
         // edits like dragged buses or bent lines), so the watcher above doesn't
         // fire. The revision counter triggers a rebuild for those updates.
         watch(() => props.topologyRevision, async () => {
-            await buildPlot();
+            await rebuildPlot('GraphPanel.watch(topologyRevision)');
         });
 
         function onKey (event) {
@@ -728,7 +749,7 @@ export const GraphPanel = {
         onMounted(async () => {
             await nextTick();
             graphEl.value.addEventListener('mousedown', onMouseDown);
-            await buildPlot();
+            await rebuildPlot('GraphPanel.onMounted');
             window.addEventListener('keydown', onKey);
             window.addEventListener('mouseup', onMouseUp);
             window.addEventListener('resize', () => {

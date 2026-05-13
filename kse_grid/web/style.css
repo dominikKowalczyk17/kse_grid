@@ -1709,6 +1709,96 @@ body {
     opacity: 0;
 }
 
+.error-backdrop {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: oklch(0 0 0 / 0.62);
+    backdrop-filter: blur(5px);
+    z-index: 120;
+}
+
+.error-modal {
+    width: min(880px, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1.1rem 1.2rem;
+    background: var(--card);
+    color: var(--foreground);
+    border: 1px solid oklch(0.60 0.20 25 / 0.38);
+    border-radius: 0.65rem;
+    box-shadow:
+        0 1px 0 var(--selection-card-inset) inset,
+        0 28px 80px var(--selection-card-shadow);
+}
+
+.error-modal-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.error-modal-kind {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--bad);
+    margin-bottom: 0.25rem;
+}
+
+.error-modal-title {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    color: var(--foreground);
+}
+
+.error-modal-meta {
+    margin-top: 0.25rem;
+    font-size: 0.68rem;
+    color: var(--muted-foreground);
+}
+
+.error-modal-summary {
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--foreground);
+    white-space: pre-wrap;
+}
+
+.error-modal-detail {
+    margin: 0;
+    padding: 0.85rem 0.95rem;
+    flex: 1 1 auto;
+    min-height: 180px;
+    max-height: 55vh;
+    overflow: auto;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--foreground);
+}
+
+.error-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
 .legend-list {
     list-style: none;
     margin: 0;

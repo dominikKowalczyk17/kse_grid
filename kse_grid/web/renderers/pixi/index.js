@@ -153,6 +153,7 @@ export async function mountPixi (container, network, opts = {}) {
 
     const selection = setupSelection({
         canvas, viewport, network, segmentIndex, trafosLayer, busesLayer, switchesLayer,
+        onError: err => opts.onError?.(err),
         onSelect: sel => {
             selectionLayer.setSelection(sel);
             onSelect(sel);

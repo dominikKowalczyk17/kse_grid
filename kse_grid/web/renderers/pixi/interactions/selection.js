@@ -7,10 +7,14 @@
 const CLICK_TOL_PX = 14;
 
 export function setupSelection ({
-    canvas, viewport, network, segmentIndex, trafosLayer, busesLayer, switchesLayer, onSelect,
+    canvas, viewport, network, segmentIndex, trafosLayer, busesLayer, switchesLayer, onSelect, onError,
 }) {
     function emit (sel) {
-        try { onSelect(sel); } catch (err) { console.error(err); }
+        try {
+            onSelect(sel);
+        } catch (err) {
+            if (typeof onError === 'function') onError(err);
+        }
     }
 
     function attachIcons () {
