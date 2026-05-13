@@ -371,7 +371,7 @@ def _serialize_buses(
     out: list[dict[str, Any]] = []
     for bus_idx, row in net.bus.iterrows():
         bus_id = _to_int(bus_idx)
-        x, y = positions[bus_id]
+        x, y = positions.get(bus_id, (None, None))
         if not net.load.empty:
             mask = net.load.bus == bus_id
             load_mw = float(net.load.loc[mask, "p_mw"].sum())
