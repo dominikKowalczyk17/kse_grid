@@ -12,7 +12,7 @@ export function lineHover(line, hasResults) {
     ];
     if (hasResults) {
         lines.push(`Obciążenie: ${fmt(line.loading)}%`);
-        lines.push(`P od strony from: ${fmt(line.pFromMw)} MW`);
+        lines.push(`P od strony początkowej: ${fmt(line.pFromMw)} MW`);
     }
     return lines.join('<br>');
 }

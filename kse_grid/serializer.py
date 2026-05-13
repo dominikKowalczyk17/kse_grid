@@ -535,11 +535,15 @@ def _serialize_switches(net: pp.pandapowerNet) -> list[dict[str, Any]]:
             remote_bus_name = str(net.bus.at[remote_bus_id, "name"])
             parent_kind = "bus"
             side = "bus"
-            side_label = "łącznik szynowy"
+            side_label = "odłącznik szynowy"
+
+        display_name = str(row.get("name") or f"Odłącznik {switch_id}")
+        if side_label:
+            display_name = f"{element_name} [{side_label}]"
 
         out.append({
             "id": switch_id,
-            "name": str(row.get("name") or f"Switch {switch_id}"),
+            "name": display_name,
             "busId": bus_id,
             "busName": bus_name,
             "remoteBusId": remote_bus_id,

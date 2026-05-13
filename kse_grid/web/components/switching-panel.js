@@ -39,14 +39,14 @@ export const SwitchingPanel = {
                 </span>
             </div>
             <div class="diag-row">
-                <span class="diag-label">Switche otwarte</span>
+                <span class="diag-label">Odłączniki otwarte</span>
                 <span class="diag-value tabular" :class="(topology.openSwitchCount ?? 0) > 0 ? 'warn' : ''">
                     {{ topology.openSwitchCount ?? 0 }} / {{ topology.switchCount ?? 0 }}
                 </span>
             </div>
         </div>
 
-        <p class="helper">Switche pokazują stan łączeniowy wysp. Klik marker na diagramie, potem użyj akcji Otwórz / Zamknij w karcie szczegółów.</p>
+        <p class="helper">Odłączniki pokazują stan łączeniowy wysp. Klik marker na diagramie, potem użyj akcji Otwórz / Zamknij w karcie szczegółów.</p>
         <p v-if="topology.lastRunMessage" :class="runMessageClass">{{ topology.lastRunMessage }}</p>
         <p v-if="requestError" class="helper helper-bad">{{ requestError }}</p>
 

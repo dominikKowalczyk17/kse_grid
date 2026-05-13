@@ -76,7 +76,7 @@ export async function mountPixi (container, network, opts = {}) {
         getLinePoints: id => linesLayer.getLinePoints(id),
     });
     const selectionLayer = new SelectionLayer({
-        container: layers.selection, viewport, network, busById, textures, palette, project,
+        container: layers.selection, viewport, network, busById, lineById, textures, palette, project,
         getLinePoints: id => linesLayer.getLinePoints(id),
     });
     selectionLayer.init();

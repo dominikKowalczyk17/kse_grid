@@ -6,14 +6,15 @@
 
 import { Sprite } from 'pixi.js';
 import { SELECTION_INNER_SIZE, SELECTION_OUTER_SIZE } from '/traces/constants.js';
-import { busPos, midpoint, polylineMidpointAndTangent } from '../geometry.js';
+import { busPos, midpoint, polylineMidpointAndTangent, switchAnchorPos } from '../geometry.js';
 
 export class SelectionLayer {
-    constructor ({ container, viewport, network, busById, textures, palette, project, getLinePoints }) {
+    constructor ({ container, viewport, network, busById, lineById, textures, palette, project, getLinePoints }) {
         this.container = container;
         this.viewport = viewport;
         this.network = network;
         this.busById = busById;
+        this.lineById = lineById;
         this.textures = textures;
         this.palette = palette;
         this.project = project;
@@ -98,8 +99,7 @@ export class SelectionLayer {
         if (sel.kind === 'switch') {
             const sw = (this.network.switches || []).find(s => s.id === sel.id);
             if (!sw) return null;
-            const bus = this.busById.get(sw.busId);
-            return busPos(bus, this.viewMode, this.project);
+            return switchAnchorPos(sw, this.busById, this.lineById, this.viewMode, this.project);
         }
         return null;
     }

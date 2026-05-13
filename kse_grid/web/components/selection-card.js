@@ -142,7 +142,7 @@ export const SelectionCard = {
                 const trafoSwitches = props.switches.filter(sw => sw.parentKind === 'trafo' && sw.elementId === trafo.id);
                 for (const sw of trafoSwitches) {
                     items.push({
-                        label: `Switch ${sw.sideLabel || sw.name}`,
+                        label: `Odłącznik ${sw.sideLabel || sw.name}`,
                         value: sw.closed ? 'Zamknięty' : 'Otwarty',
                         status: sw.closed ? 'good' : 'bad',
                     });
@@ -153,7 +153,7 @@ export const SelectionCard = {
                 const sw = selection.payload;
                 return [
                     { label: 'Stan', value: sw.closed ? 'Zamknięty' : 'Otwarty', status: sw.closed ? 'good' : 'bad' },
-                    { label: 'Powiązanie', value: sw.parentKind === 'trafo' ? 'Transformator' : sw.parentKind === 'line' ? 'Linia' : 'Łącznik szyn' },
+                    { label: 'Powiązanie', value: sw.parentKind === 'trafo' ? 'Transformator' : sw.parentKind === 'line' ? 'Linia' : 'Odłącznik szynowy' },
                     { label: 'Element', value: `${sw.elementName} (#${sw.elementId})` },
                     { label: 'Bus', value: `${sw.busName} (#${sw.busId})` },
                     { label: 'Drugi koniec', value: sw.remoteBusName ? `${sw.remoteBusName} (#${sw.remoteBusId})` : '—' },
@@ -172,20 +172,20 @@ export const SelectionCard = {
             return selection.kind === 'bus' ? `Szyna #${id}`
                 : selection.kind === 'line' ? `Linia #${id}`
                     : selection.kind === 'trafo' ? `Trafo #${id}`
-                        : selection.kind === 'switch' ? `Łącznik #${id}` : '';
+                        : selection.kind === 'switch' ? `Odłącznik #${id}` : '';
         });
         const kindLabel = computed(() => {
             const kind = props.selection?.kind;
             return kind === 'bus' ? 'Szyna'
                 : kind === 'line' ? 'Linia'
                     : kind === 'trafo' ? 'Transformator'
-                        : kind === 'switch' ? 'Łącznik' : '';
+                        : kind === 'switch' ? 'Odłącznik' : '';
         });
 
         const switchActionLabel = computed(() => {
             const sw = props.selection?.kind === 'switch' ? props.selection.payload : null;
             if (!sw) return '';
-            return sw.closed ? 'Otwórz switch' : 'Zamknij switch';
+            return sw.closed ? 'Otwórz odłącznik' : 'Zamknij odłącznik';
         });
 
         const relatedTrafoSwitches = computed(() => {

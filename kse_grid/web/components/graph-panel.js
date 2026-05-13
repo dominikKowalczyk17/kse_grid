@@ -766,7 +766,7 @@ export const GraphPanel = {
         <div class="graph-hud">
             pokazano {{ visibleCounts.buses }}/{{ visibleCounts.totalBuses }} szyn ·
             {{ visibleCounts.lines }}/{{ visibleCounts.totalLines }} gałęzi
-            <template v-if="showSwitches"> · {{ visibleCounts.switches }}/{{ visibleCounts.totalSwitches }} switchy</template>
+            <template v-if="showSwitches"> · {{ visibleCounts.switches }}/{{ visibleCounts.totalSwitches }} odłączników</template>
         </div>
         <div class="kbd-hint">
             <span class="kbd">R</span> reset

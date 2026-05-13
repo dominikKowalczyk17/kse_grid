@@ -1,6 +1,6 @@
 /**
  * Pixi scene scaffolding: Application, viewport, and named layer Containers.
- * Layers are added in the order: lines → trafos → switches → arrows → buses
+ * Layers are added in the order: lines → trafos → arrows → buses → switches
  * → bend → selection (top).
  */
 
@@ -12,9 +12,9 @@ const LAYER_ORDER = [
     'lines',
     'trafoLines',
     'trafoCoils',
-    'switches',
     'arrows',
     'buses',
+    'switches',
     'bend',
     'selection',
 ];

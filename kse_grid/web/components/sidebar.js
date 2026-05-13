@@ -656,7 +656,7 @@ export const Sidebar = {
                 </label>
                 <label class="check-row">
                     <input type="checkbox" :checked="showSwitches" @change="$emit('update:showSwitches', $event.target.checked)" />
-                    <span class="label">Switche</span>
+                    <span class="label">Odłączniki</span>
                 </label>
             </div>
         </section>
