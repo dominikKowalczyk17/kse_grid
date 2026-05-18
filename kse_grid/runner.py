@@ -18,7 +18,7 @@ class PowerFlowRunner:
     def run(self,
             algorithm: str = "nr",
             max_iteration: int = 100,
-            tolerance_mva: float = 1.0) -> bool:
+            tolerance_mva: float = 1e-6) -> bool:
         """
         Uruchamia load flow z inicjalizacją AC (flat start: U=1 p.u., kąt=0°).
         Zwraca True jeśli zbieżny, False jeśli nie.

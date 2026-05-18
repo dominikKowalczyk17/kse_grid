@@ -24,7 +24,7 @@ from kse_grid.serializer import (
 _DEFAULT_POWERFLOW_OPTIONS = {
     "algorithm": "nr",
     "max_iteration": 100,
-    "tolerance_mva": 1.5,
+    "tolerance_mva": 1e-6,
 }
 
 

@@ -656,6 +656,11 @@ export const GraphPanel = {
             }
         }
 
+        function selectGen (genId) {
+            const gen = (props.network.gens || []).find(g => g.id === genId);
+            if (gen) selection.value = { kind: 'gen', payload: gen };
+        }
+
         function resetView () {
             preservedViewport.value = null;
             if (pixiCtrl.value) {
@@ -769,7 +774,7 @@ export const GraphPanel = {
             }
         });
 
-        return { graphEl, selection, clearSelection, selectBus, selectLine, selectTrafo, selectElement, resetView, handleLayoutChange, visibleCounts };
+        return { graphEl, selection, clearSelection, selectBus, selectLine, selectTrafo, selectElement, selectGen, resetView, handleLayoutChange, visibleCounts };
     },
     template: `
     <div class="graph-panel">
@@ -777,6 +782,7 @@ export const GraphPanel = {
         <SelectionCard
             :selection="selection"
             :switches="network.switches || []"
+            :gens="network.gens || []"
             :has-results="network.hasResults"
             :topology-busy="topologyBusy"
             :element-schema="elementSchema"
@@ -786,6 +792,7 @@ export const GraphPanel = {
             @close="clearSelection"
             @set-switch-state="$emit('set-switch-state', $event)"
             @set-switches-state="$emit('set-switches-state', $event)"
+            @select-gen="selectGen($event)"
             @request-edit-params="$emit('request-edit-params', $event)"
             @submit-edit="$emit('submit-edit', $event)"
             @cancel-edit="$emit('cancel-edit')" />

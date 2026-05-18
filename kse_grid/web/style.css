@@ -1271,6 +1271,50 @@ body {
     color: var(--bad);
 }
 
+.selection-section-label {
+    margin-top: 0.65rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+}
+
+.selection-gen-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    font-size: 0.75rem;
+}
+
+.selection-gen-row .gen-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--foreground);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+}
+
+.selection-gen-row .gen-status {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    white-space: nowrap;
+}
+
+.selection-gen-row .gen-status.good { color: var(--good); }
+.selection-gen-row .gen-status.bad  { color: var(--bad); }
+
+.btn-sm {
+    height: 22px;
+    padding: 0 0.45rem;
+    font-size: 0.6875rem;
+}
+
 .selection-actions {
     margin-top: 0.75rem;
     padding-top: 0.65rem;

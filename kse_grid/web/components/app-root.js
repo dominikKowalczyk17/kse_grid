@@ -207,7 +207,8 @@ export const App = {
             const arrayKey = change.kind === 'bus' ? 'buses'
                 : change.kind === 'line' ? 'lines'
                     : change.kind === 'trafo' ? 'trafos'
-                        : change.kind === 'switch' ? 'switches' : null;
+                        : change.kind === 'switch' ? 'switches'
+                            : change.kind === 'gen' ? 'gens' : null;
             if (!arrayKey || !Array.isArray(net[arrayKey])) return;
             const target = net[arrayKey].find(item => item.id === change.id);
             if (!target) return;

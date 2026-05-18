@@ -7,6 +7,7 @@ export const SelectionCard = {
     props: {
         selection: Object,
         switches: { type: Array, default: () => [] },
+        gens: { type: Array, default: () => [] },
         hasResults: Boolean,
         topologyBusy: { type: Boolean, default: false },
         elementSchema: { type: Object, default: () => ({}) },
@@ -14,7 +15,7 @@ export const SelectionCard = {
         editError: { type: String, default: '' },
         editBusy: { type: Boolean, default: false },
     },
-    emits: ['close', 'set-switch-state', 'set-switches-state', 'request-edit-params', 'submit-edit', 'cancel-edit'],
+    emits: ['close', 'set-switch-state', 'set-switches-state', 'select-gen', 'request-edit-params', 'submit-edit', 'cancel-edit'],
     setup (props, { emit }) {
         const editing = ref(false);
         const formState = reactive({ values: {} });
@@ -96,9 +97,31 @@ export const SelectionCard = {
             helpField.value = null;
         }
 
+        const busGens = computed(() => {
+            if (props.selection?.kind !== 'bus') return [];
+            const busId = props.selection.payload?.id;
+            if (busId == null) return [];
+            return (props.gens || []).filter(g => g.busId === busId);
+        });
+
         const rows = computed(() => {
             if (!props.selection) return [];
             const selection = props.selection;
+            if (selection.kind === 'gen') {
+                const gen = selection.payload;
+                const items = [];
+                if (gen.busId != null) items.push({ label: 'Szyna', value: `#${gen.busId}` });
+                items.push({ label: 'Status', value: gen.inService ? 'W ruchu' : 'Wyłączony', status: gen.inService ? 'good' : 'bad' });
+                if (gen.pMw != null) items.push({ label: 'P zadana', value: `${gen.pMw.toFixed(1)} MW` });
+                if (gen.vmPu != null) items.push({ label: 'U zadane', value: `${gen.vmPu.toFixed(3)} p.u.` });
+                if (gen.maxPMw != null) items.push({ label: 'P max', value: `${gen.maxPMw.toFixed(0)} MW` });
+                if (gen.minPMw != null) items.push({ label: 'P min', value: `${gen.minPMw.toFixed(0)} MW` });
+                if (gen.maxQMvar != null) items.push({ label: 'Q max', value: `${gen.maxQMvar.toFixed(0)} Mvar` });
+                if (gen.minQMvar != null) items.push({ label: 'Q min', value: `${gen.minQMvar.toFixed(0)} Mvar` });
+                if (gen.resPMw != null) items.push({ label: 'P (wynik)', value: `${gen.resPMw.toFixed(1)} MW`, status: 'good' });
+                if (gen.resQMvar != null) items.push({ label: 'Q (wynik)', value: `${gen.resQMvar.toFixed(1)} Mvar`, status: 'good' });
+                return items;
+            }
             if (selection.kind === 'bus') {
                 const bus = selection.payload;
                 const items = [];
@@ -172,14 +195,16 @@ export const SelectionCard = {
             return selection.kind === 'bus' ? `Szyna #${id}`
                 : selection.kind === 'line' ? `Linia #${id}`
                     : selection.kind === 'trafo' ? `Trafo #${id}`
-                        : selection.kind === 'switch' ? `Odłącznik #${id}` : '';
+                        : selection.kind === 'switch' ? `Odłącznik #${id}`
+                            : selection.kind === 'gen' ? `Generator #${id}` : '';
         });
         const kindLabel = computed(() => {
             const kind = props.selection?.kind;
             return kind === 'bus' ? 'Szyna'
                 : kind === 'line' ? 'Linia'
                     : kind === 'trafo' ? 'Transformator'
-                        : kind === 'switch' ? 'Odłącznik' : '';
+                        : kind === 'switch' ? 'Odłącznik'
+                            : kind === 'gen' ? 'Generator' : '';
         });
 
         const switchActionLabel = computed(() => {
@@ -217,6 +242,7 @@ export const SelectionCard = {
             relatedTrafoSwitches,
             trafoConnected,
             trafoActionLabel,
+            busGens,
             editing,
             schemaForKind,
             formState,
@@ -246,6 +272,19 @@ export const SelectionCard = {
             <span class="lbl">{{ row.label }}</span>
             <span class="val" :class="row.status">{{ row.value }}</span>
         </div>
+
+        <template v-if="!editing && selection.kind === 'bus' && busGens.length">
+            <div class="selection-section-label">Generatory</div>
+            <div v-for="gen in busGens" :key="gen.id" class="selection-gen-row">
+                <span class="gen-name">{{ gen.name }}</span>
+                <span class="gen-status" :class="gen.inService ? 'good' : 'bad'">
+                    {{ gen.inService ? 'W ruchu' : 'Wyłączony' }}
+                </span>
+                <button type="button" class="btn btn-sm gen-edit-btn" @click="$emit('select-gen', gen.id)">
+                    Edytuj
+                </button>
+            </div>
+        </template>
 
         <form v-if="editing" class="selection-edit" @submit.prevent="submitEdit">
             <div class="selection-edit-header">

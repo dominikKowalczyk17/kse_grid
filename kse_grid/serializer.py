@@ -153,6 +153,10 @@ def _serialize_changed_element(
         for item in _serialize_switches(net):
             if item["id"] == element_id:
                 return {"kind": "switch", "id": element_id, "payload": item}
+    if kind == "gen" and element_id in net.gen.index:
+        for item in _serialize_gens(net):
+            if item["id"] == element_id:
+                return {"kind": "gen", "id": element_id, "payload": item}
     return None
 
 
@@ -188,6 +192,7 @@ def serialize_network(
         "lines": _serialize_lines(net, has_line_results, geo_positions),
         "trafos": _serialize_trafos(net, has_trafo_results),
         "switches": _serialize_switches(net),
+        "gens": _serialize_gens(net),
         "topology": _compute_topology(net),
         "bounds": graph_bounds,
         "graphBounds": graph_bounds,
@@ -558,6 +563,36 @@ def _serialize_switches(net: pp.pandapowerNet) -> list[dict[str, Any]]:
             "voltage": voltage,
             "type": str(row.get("type") or ""),
         })
+    return out
+
+
+def _serialize_gens(net: pp.pandapowerNet) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    has_res = hasattr(net, "res_gen") and not net.res_gen.empty
+    for gen_idx, row in net.gen.iterrows():
+        gen_id = _to_int(gen_idx)
+        bus_id = _to_int(row.bus)
+        raw_name = str(row.get("name") or "").strip()
+        if not raw_name:
+            bus_name = str(net.bus.at[bus_id, "name"]) if bus_id in net.bus.index else str(bus_id)
+            raw_name = f"Gen @ {bus_name}"
+        item: dict[str, Any] = {
+            "id": gen_id,
+            "busId": bus_id,
+            "name": raw_name,
+            "pMw": _safe_float(row.get("p_mw")),
+            "vmPu": _safe_float(row.get("vm_pu")),
+            "maxPMw": _safe_float(row.get("max_p_mw")),
+            "minPMw": _safe_float(row.get("min_p_mw")),
+            "maxQMvar": _safe_float(row.get("max_q_mvar")),
+            "minQMvar": _safe_float(row.get("min_q_mvar")),
+            "inService": bool(row.get("in_service", True)),
+            "slack": bool(row.get("slack", False)),
+        }
+        if has_res and gen_id in net.res_gen.index:
+            item["resPMw"] = _safe_float(net.res_gen.at[gen_id, "p_mw"])
+            item["resQMvar"] = _safe_float(net.res_gen.at[gen_id, "q_mvar"])
+        out.append(item)
     return out
 
 

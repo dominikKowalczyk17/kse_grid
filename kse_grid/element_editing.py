@@ -161,11 +161,36 @@ _SWITCH_FIELDS: list[tuple] = [
 ]
 
 
+_GEN_FIELDS: list[tuple] = [
+    ("name", "Nazwa", "str", None, None,
+     "Etykieta generatora — pomocna do identyfikacji."),
+    ("in_service", "W eksploatacji", "bool", None, None,
+     "Gdy wyłączone, generator jest pomijany w obliczeniach (wyłączony z ruchu). "
+     "Wyłączenie zmienia szyne z PV na PQ i kasuje regulację napięcia."),
+    ("p_mw", "P zadana", "float", "MW", None,
+     "Nastawiona moc czynna generatora (MW). W load flow PV generator utrzymuje "
+     "to nastawienie do granic Pmax/Pmin."),
+    ("vm_pu", "U zadane", "float", "p.u.", None,
+     "Nastawiony poziom napięcia (p.u.) na szynie, którą generator reguluje. "
+     "Aktywne tylko gdy generator jest PV (in_service=True)."),
+    ("max_p_mw", "P max", "float", "MW", None,
+     "Maksymalna moc czynna generatora (MW). Ogranicza output w OPF."),
+    ("min_p_mw", "P min", "float", "MW", None,
+     "Minimalna moc czynna generatora (MW). Ogranicza output w OPF."),
+    ("max_q_mvar", "Q max", "float", "Mvar", None,
+     "Maksymalna moc bierna (Mvar). Po osiągnięciu limitu generator przełącza się "
+     "z regulacji napięcia na regulację Q."),
+    ("min_q_mvar", "Q min", "float", "Mvar", None,
+     "Minimalna moc bierna (Mvar). Ogranicza Q od dołu."),
+]
+
+
 _TABLES = {
     "bus": ("bus", _BUS_FIELDS),
     "line": ("line", _LINE_FIELDS),
     "trafo": ("trafo", _TRAFO_FIELDS),
     "switch": ("switch", _SWITCH_FIELDS),
+    "gen": ("gen", _GEN_FIELDS),
 }
 
 
