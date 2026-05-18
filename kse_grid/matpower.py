@@ -124,6 +124,19 @@ def _load_geo_sidecar(net: pp.pandapowerNet, case_path: Path) -> None:
         break
 
 
+def load_geo_sidecar(net: pp.pandapowerNet, base_path: str | Path) -> bool:
+    """Szuka i aplikuje sidecar GeoJSON względem podanej ścieżki bazowej.
+
+    Przydatne gdy plik .m i .geojson są w różnych lokalizacjach (np. upload
+    przez przeglądarkę zapisuje do /tmp, a sidecary trzymane są w data/).
+    Zwraca True jeśli sidecar został znaleziony i zaaplikowany.
+    """
+    before = getattr(net, "_geo_source", None)
+    _load_geo_sidecar(net, Path(base_path))
+    after = getattr(net, "_geo_source", None)
+    return after is not None and after != before
+
+
 def seed_operational_switches(net: pp.pandapowerNet) -> None:
     """
     Dodaje do sieci operacyjne switche pandapower na końcach linii i transformatorów.

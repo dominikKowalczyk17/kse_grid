@@ -16,12 +16,13 @@ from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from kse_grid.matpower import load_matpower_case
+from kse_grid.matpower import load_matpower_case, load_geo_sidecar
 from kse_grid.runner import PowerFlowRunner
 from kse_grid.switching import SwitchingSession
 
 
 _WEB_DIR = Path(__file__).parent / "web"
+_DATA_DIR = Path(__file__).parent.parent / "data"
 _MAX_UPLOAD_BYTES = 32 * 1024 * 1024  # 32 MiB
 
 
@@ -142,6 +143,8 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
         try:
             new_net = load_matpower_case(temp_path)
             new_net.name = stem
+            if not getattr(new_net, "_geo_source", None) and _DATA_DIR.is_dir():
+                load_geo_sidecar(new_net, _DATA_DIR / stem)
             PowerFlowRunner(new_net).run()
         except HTTPException:
             raise
