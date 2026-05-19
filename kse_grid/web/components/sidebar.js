@@ -1,8 +1,10 @@
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot } from '/icons.js';
 import { SwitchingPanel } from '/components/switching-panel.js';
-import { formatMw, voltageColorVar, voltageStatus } from '/lib/formatters.js';
-import { HISTOGRAM_BIN_WIDTH, HISTOGRAM_MAX, HISTOGRAM_MIN } from '/lib/thresholds.js';
+import { formatMw, voltageColorVar } from '/lib/formatters.js';
+import { useBusSearch } from '/lib/composables/use-bus-search.js';
+import { useVoltageHistogram } from '/lib/composables/use-voltage-histogram.js';
+import { useBranchRanking } from '/lib/composables/use-branch-ranking.js';
 
 export const Sidebar = {
     components: { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot, SwitchingPanel },
@@ -30,25 +32,6 @@ export const Sidebar = {
     },
     emits: ['update:selectedVoltages', 'update:selectedTypes', 'update:viewMode', 'update:atlasCategories', 'update:minLineLoading', 'update:minBusPower', 'update:showSwitches', 'reset-view', 'select-bus', 'select-element'],
     setup (props, { emit }) {
-        const search = ref('');
-        const showSuggestions = ref(false);
-        const hoveredBinIndex = ref(null);
-        const activeHistogramBinIndex = ref(null);
-        const activeHistogramBusCursor = ref(0);
-        const activeBranchCursor = ref(0);
-
-        const suggestions = computed(() => {
-            const query = search.value.trim().toLowerCase();
-            if (!query) return [];
-            return props.buses
-                .filter(bus =>
-                    (bus.name.toLowerCase().includes(query) || String(bus.id).startsWith(query)) &&
-                    ((props.viewMode !== 'geo' && props.viewMode !== 'atlas') || (bus.lat != null && bus.lon != null))
-                )
-                .sort((left, right) => right.vn_kv - left.vn_kv)
-                .slice(0, 30);
-        });
-
         const corePreset = computed(() => new Set(props.defaultVoltageFilter));
         const mediumPreset = computed(() => new Set(props.voltageLevels.filter(level => level <= 110)));
         const allPreset = computed(() => new Set(props.voltageLevels));
@@ -66,52 +49,6 @@ export const Sidebar = {
             [...selectedSet.value].every(level => allPreset.value.has(level))
         );
         const isMediumVoltage = computed(() => props.selectedVoltages.some(level => mediumPreset.value.has(level)));
-        const histogram = computed(() => {
-            const binCount = Math.round((HISTOGRAM_MAX - HISTOGRAM_MIN) / HISTOGRAM_BIN_WIDTH);
-            const bins = Array.from({ length: binCount }, (_, index) => {
-                const lo = HISTOGRAM_MIN + index * HISTOGRAM_BIN_WIDTH;
-                const hi = lo + HISTOGRAM_BIN_WIDTH;
-                const mid = (lo + hi) / 2;
-                return {
-                    lo,
-                    hi,
-                    count: 0,
-                    status: voltageStatus(mid) || 'good',
-                    busIds: [],
-                };
-            });
-
-            if (props.hasResults) {
-                for (const bus of props.buses) {
-                    if (!selectedSet.value.has(bus.vn_kv) || bus.vmPu == null) continue;
-                    const vmPu = Math.max(HISTOGRAM_MIN, Math.min(HISTOGRAM_MAX - 1e-9, bus.vmPu));
-                    const index = Math.min(binCount - 1, Math.floor((vmPu - HISTOGRAM_MIN) / HISTOGRAM_BIN_WIDTH));
-                    bins[index].count += 1;
-                    bins[index].busIds.push(bus.id);
-                }
-            }
-
-            return {
-                bins,
-                max: bins.reduce((currentMax, bin) => Math.max(currentMax, bin.count), 0) || 1,
-                total: bins.reduce((sum, bin) => sum + bin.count, 0),
-                okBandLeft: ((0.95 - HISTOGRAM_MIN) / (HISTOGRAM_MAX - HISTOGRAM_MIN)) * 100,
-                okBandWidth: ((1.05 - 0.95) / (HISTOGRAM_MAX - HISTOGRAM_MIN)) * 100,
-                nominalLeft: ((1.0 - HISTOGRAM_MIN) / (HISTOGRAM_MAX - HISTOGRAM_MIN)) * 100,
-            };
-        });
-        const hoveredBin = computed(() => hoveredBinIndex.value == null
-            ? null
-            : histogram.value.bins[hoveredBinIndex.value] ?? null);
-        const activeHistogramBin = computed(() => activeHistogramBinIndex.value == null
-            ? null
-            : histogram.value.bins[activeHistogramBinIndex.value] ?? null);
-        const activeHistogramBusIds = computed(() => activeHistogramBin.value?.busIds || []);
-        const activeHistogramBusId = computed(() => {
-            if (!activeHistogramBusIds.value.length) return null;
-            const index = Math.min(activeHistogramBusCursor.value, activeHistogramBusIds.value.length - 1);
-            return activeHistogramBusIds.value[index] ?? null;
-        });
         const lossPctLabel = computed(() => totals.value.lossPct == null ? '—' : `${totals.value.lossPct.toFixed(2)} %`);
         const slackLabel = computed(() => totals.value.slackBusId == null ? '—' : `#${totals.value.slackBusId}`);
         const minBusSub = computed(() => voltageDiag.value.minBusId == null
@@ -125,47 +62,6 @@ export const Sidebar = {
             return `${loadingDiag.value.maxKind === 'trafo' ? 'Trafo' : 'Linia'} #${loadingDiag.value.maxId}`;
         });
         const busById = computed(() => Object.fromEntries((props.buses || []).map(bus => [bus.id, bus])));
-        const sortedBranches = computed(() => {
-            if (!props.hasResults) return [];
-            const selectedVoltages = new Set(props.selectedVoltages);
-            const items = [];
-            if (props.selectedTypes.includes('line')) {
-                for (const line of props.lines || []) {
-                    if (!selectedVoltages.has(line.voltage)) continue;
-                    items.push({
-                        kind: 'line',
-                        id: line.id,
-                        name: line.name,
-                        label: `Linia #${line.id}`,
-                        loading: Number(line.loading) || 0,
-                        voltageLabel: `${line.voltage.toFixed(0)} kV`,
-                        fromBus: line.fromBus,
-                        toBus: line.toBus,
-                    });
-                }
-            }
-            if (props.selectedTypes.includes('trafo')) {
-                for (const trafo of props.trafos || []) {
-                    if (!selectedVoltages.has(trafo.vnHvKv) || !selectedVoltages.has(trafo.vnLvKv)) continue;
-                    items.push({
-                        kind: 'trafo',
-                        id: trafo.id,
-                        name: trafo.name,
-                        label: `Trafo #${trafo.id}`,
-                        loading: Number(trafo.loading) || 0,
-                        voltageLabel: `${trafo.vnHvKv.toFixed(0)}/${trafo.vnLvKv.toFixed(0)} kV`,
-                        fromBus: trafo.hvBus,
-                        toBus: trafo.lvBus,
-                    });
-                }
-            }
-            return items.sort((left, right) => right.loading - left.loading || left.kind.localeCompare(right.kind) || left.id - right.id);
-        });
-        const activeBranch = computed(() => {
-            if (!sortedBranches.value.length) return null;
-            const index = Math.min(activeBranchCursor.value, sortedBranches.value.length - 1);
-            return sortedBranches.value[index] ?? null;
-        });
 
         function applyPreset (name) {
             const next = name === 'core' ? [...props.defaultVoltageFilter]
@@ -187,12 +83,6 @@ export const Sidebar = {
                 ? props.selectedTypes.filter(value => value !== type)
                 : [...props.selectedTypes, type];
             emit('update:selectedTypes', next);
-        }
-
-        function pickSuggestion (bus) {
-            search.value = '';
-            showSuggestions.value = false;
-            emit('select-bus', bus.id);
         }
 
         function canFocusBus (busId) {
@@ -220,9 +110,22 @@ export const Sidebar = {
             emit('select-element', { kind: element.kind, id: element.id, focus: true });
         }
 
-        function blurLater () {
-            setTimeout(() => { showSuggestions.value = false; }, 200);
-        }
+        const { search, showSuggestions, suggestions, pickSuggestion, blurLater } = useBusSearch(props, {
+            onPickBus: busId => emit('select-bus', busId),
+        });
+
+        const {
+            histogram, hoveredBinIndex, hoveredBin,
+            activeHistogramBinIndex, activeHistogramBin,
+            activeHistogramBusIds, activeHistogramBusId, activeHistogramBusCursor,
+            histogramBarStyle, focusHistogramBin, navigateHistogramBin,
+            HISTOGRAM_BIN_WIDTH,
+        } = useVoltageHistogram(props, { focusBus });
+
+        const {
+            sortedBranches, activeBranch, activeBranchCursor,
+            focusBranchAt, navigateBranches,
+        } = useBranchRanking(props, { focusElement });
 
         function setViewMode (mode) {
             if (mode === 'geo' && !props.geoAvailable) return;
@@ -233,39 +136,6 @@ export const Sidebar = {
             const set = new Set(props.atlasCategories);
             if (set.has(category)) set.delete(category); else set.add(category);
             emit('update:atlasCategories', [...set]);
-        }
-
-        function histogramBarStyle (bin) {
-            return { height: `${(bin.count / histogram.value.max) * 100}%` };
-        }
-
-        function focusHistogramBin (index) {
-            const bin = histogram.value.bins[index];
-            if (!bin?.busIds?.length) return;
-            activeHistogramBinIndex.value = index;
-            activeHistogramBusCursor.value = 0;
-            focusBus(bin.busIds[0]);
-        }
-
-        function navigateHistogramBin (step) {
-            if (!activeHistogramBusIds.value.length) return;
-            const next = Math.min(
-                activeHistogramBusIds.value.length - 1,
-                Math.max(0, activeHistogramBusCursor.value + step),
-            );
-            activeHistogramBusCursor.value = next;
-            focusBus(activeHistogramBusIds.value[next]);
-        }
-
-        function focusBranchAt (index) {
-            if (!sortedBranches.value.length) return;
-            const next = Math.min(sortedBranches.value.length - 1, Math.max(0, index));
-            activeBranchCursor.value = next;
-            focusElement(sortedBranches.value[next]);
-        }
-
-        function navigateBranches (step) {
-            focusBranchAt(activeBranchCursor.value + step);
         }
 
         const maxBusPower = computed(() => {
@@ -296,23 +166,6 @@ export const Sidebar = {
             const num = Math.max(0, Number(value) || 0);
             emit('update:minBusPower', num);
         }
-
-        watch(activeHistogramBusIds, ids => {
-            if (!ids.length) {
-                activeHistogramBinIndex.value = null;
-                activeHistogramBusCursor.value = 0;
-                return;
-            }
-            activeHistogramBusCursor.value = Math.min(activeHistogramBusCursor.value, ids.length - 1);
-        });
-
-        watch(sortedBranches, items => {
-            if (!items.length) {
-                activeBranchCursor.value = 0;
-                return;
-            }
-            activeBranchCursor.value = Math.min(activeBranchCursor.value, items.length - 1);
-        });
 
         return {
             search, showSuggestions, suggestions,
