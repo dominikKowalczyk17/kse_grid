@@ -9,7 +9,7 @@ import pandapower.auxiliary as pp_aux
 
 _DEFAULT_ALGORITHM = "nr"
 _DEFAULT_MAX_ITERATION = 100
-_DEFAULT_TOLERANCE_MVA = 1e-6
+_DEFAULT_TOLERANCE_MVA = 1
 
 
 @dataclass
