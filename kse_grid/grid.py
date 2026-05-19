@@ -33,7 +33,7 @@ class KSEGrid:
         """Tworzy KSEGrid z pliku MATPOWER (.m)."""
         grid = cls()
         grid.net = load_matpower_case(case_file, f_hz=f_hz)
-        print(f"📥 Załadowano: {grid.net.name}")
+        print(f"Załadowano: {grid.net.name}")
         print(f"   Szyny: {len(grid.net.bus)}, linie: {len(grid.net.line)}, trafa: {len(grid.net.trafo)}")
         return grid
 

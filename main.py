@@ -5,7 +5,4 @@ import kse_grid
 
 if __name__ == "__main__":
     case_file = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / "data" / "case2383wp.m"
-#    kse_grid.KSEGrid.from_matpower_case(case_file).run_powerflow().report().serve()
-net = kse_grid.KSEGrid.from_matpower_case(case_file).run_powerflow()
-print(net.net.trafo.values)
-print(net.net.bus.values)
+    kse_grid.KSEGrid.from_matpower_case(case_file).run_powerflow().report().serve()
