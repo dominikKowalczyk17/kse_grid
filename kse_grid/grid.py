@@ -3,8 +3,8 @@ from typing import Optional
 
 import pandapower as pp
 
-from kse_grid.matpower import load_matpower_case
-from kse_grid.runner import PowerFlowRunner
+from kse_grid.loading.matpower import load_matpower_case
+from kse_grid.powerflow.runner import PowerFlowRunner
 
 
 class KSEGrid:

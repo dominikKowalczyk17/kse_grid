@@ -28,7 +28,7 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from kse_grid.convert_tamu_geo import _iter_sections, _parse_buses, _parse_substations
+from kse_grid.converters.tamu_geo import _iter_sections, _parse_buses, _parse_substations
 
 
 KML_NS = {"kml": "http://www.opengis.net/kml/2.2"}

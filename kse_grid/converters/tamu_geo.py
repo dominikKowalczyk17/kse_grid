@@ -2,7 +2,7 @@
 coordinates (WGS84) for the matching MATPOWER `.m` case.
 
 Usage:
-    uv run python -m kse_grid.convert_tamu_geo <case.EPC> [--out <case.geojson>]
+    uv run python -m kse_grid.converters.tamu_geo <case.EPC> [--out <case.geojson>]
 
 The EPC file contains a `substation data` section with lat/lon and a
 `bus data` section that references a substation id per bus. We resolve each

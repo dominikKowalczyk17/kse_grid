@@ -16,9 +16,9 @@ from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from kse_grid.matpower import load_matpower_case, load_geo_sidecar
-from kse_grid.runner import PowerFlowRunner
-from kse_grid.switching import SwitchingSession
+from kse_grid.loading.matpower import load_matpower_case, load_geo_sidecar
+from kse_grid.powerflow.runner import PowerFlowRunner
+from kse_grid.topology.switching import SwitchingSession
 
 
 _WEB_DIR = Path(__file__).parent / "web"

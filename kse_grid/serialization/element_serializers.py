@@ -6,7 +6,7 @@ from typing import Any
 
 import pandapower as pp
 
-from kse_grid.geo_positions import haversine_km
+from kse_grid.serialization.geo_positions import haversine_km
 from kse_grid.type_coercion import safe_float as _safe_float, to_float as _to_float, to_int as _to_int
 
 

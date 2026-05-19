@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pandapower as pp
 
-from kse_grid.network_normalizer import refresh_composite_names
+from kse_grid.loading.network_normalizer import refresh_composite_names
 from kse_grid.type_coercion import to_float as _to_float, to_int as _to_int
 
 _DEFAULT_BUS_NAME_RE = re.compile(r"^(?:Bus\s+)?\d+$", re.IGNORECASE)

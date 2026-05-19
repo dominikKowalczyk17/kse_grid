@@ -8,13 +8,13 @@ from typing import Any, Callable
 import pandas as pd
 import pandapower as pp
 
-from kse_grid.element_editing import (
+from kse_grid.topology.element_editing import (
     apply_element_update,
     field_schema,
     read_element_params,
 )
-from kse_grid.powerflow_engine import load_powerflow_options, run_powerflow
-from kse_grid.serializer import (
+from kse_grid.powerflow.engine import load_powerflow_options, run_powerflow
+from kse_grid.serialization.serializer import (
     compute_graph_positions,
     serialize_network,
     serialize_topology_update,

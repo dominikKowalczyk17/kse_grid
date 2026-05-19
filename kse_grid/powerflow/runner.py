@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pandapower as pp
 
-from kse_grid.powerflow_engine import run_powerflow
-from kse_grid.powerflow_report import print_load_flow_summary, voltage_violations
+from kse_grid.powerflow.engine import run_powerflow
+from kse_grid.powerflow.report import print_load_flow_summary, voltage_violations
 
 
 class PowerFlowRunner:

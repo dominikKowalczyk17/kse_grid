@@ -6,19 +6,19 @@ from typing import Any
 
 import pandapower as pp
 
-from kse_grid.diagnostics import compute_diagnostics as _compute_diagnostics
-from kse_grid.element_serializers import (
+from kse_grid.serialization.diagnostics import compute_diagnostics as _compute_diagnostics
+from kse_grid.serialization.element_serializers import (
     serialize_buses as _serialize_buses,
     serialize_gens as _serialize_gens,
     serialize_lines as _serialize_lines,
     serialize_switches as _serialize_switches,
     serialize_trafos as _serialize_trafos,
 )
-from kse_grid.geo_positions import compute_geo_view as _compute_geo_view, extract_geo_positions as _extract_geo_positions
-from kse_grid.graph_layout import compute_bounds as _compute_bounds, compute_graph_positions
-from kse_grid.network_stats import compute_stats as _compute_stats, compute_totals as _compute_totals
+from kse_grid.serialization.geo_positions import compute_geo_view as _compute_geo_view, extract_geo_positions as _extract_geo_positions
+from kse_grid.serialization.graph_layout import compute_bounds as _compute_bounds, compute_graph_positions
+from kse_grid.serialization.network_stats import compute_stats as _compute_stats, compute_totals as _compute_totals
 from kse_grid.thresholds import CORE_VOLTAGE_KV as _CORE_VOLTAGE_KV
-from kse_grid.topology_analysis import compute_topology as _compute_topology
+from kse_grid.serialization.topology_analysis import compute_topology as _compute_topology
 from kse_grid.type_coercion import safe_float as _safe_float, to_int as _to_int
 
 
