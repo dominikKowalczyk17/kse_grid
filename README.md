@@ -240,13 +240,13 @@ Plik powinien zawierać `FeatureCollection` z punktami `Point` opisującymi poł
 ### Konwersja danych TAMU z `.EPC`
 
 ```bash
-uv run python -m kse_grid.convert_tamu_geo "/path/case.EPC" --out data/case.geojson
+uv run python -m kse_grid.converters.tamu_geo "/path/case.EPC" --out data/case.geojson
 ```
 
 ### Dopasowanie do atlasu KSE z pliku KMZ
 
 ```bash
-uv run python -m kse_grid.convert_kse_kmz \
+uv run python -m kse_grid.converters.kse_kmz \
   --epc "/path/case.EPC" \
   --kmz "/path/KSE_2019.kmz" \
   --out data/case.geojson
@@ -255,7 +255,7 @@ uv run python -m kse_grid.convert_kse_kmz \
 ### Odświeżenie warstw atlasu KSE
 
 ```bash
-uv run python -m kse_grid.convert_kse_atlas docs/03-materialy-zrodlowe/kse-atlas/KSE_2019.kmz
+uv run python -m kse_grid.converters.kse_atlas docs/03-materialy-zrodlowe/kse-atlas/KSE_2019.kmz
 ```
 
 ---
@@ -264,18 +264,54 @@ uv run python -m kse_grid.convert_kse_atlas docs/03-materialy-zrodlowe/kse-atlas
 
 ```text
 .
-├── data/                     # przykładowe case'y i pliki pomocnicze
-├── docs/                     # materiały źródłowe i grafiki
+├── data/                          # przykładowe case'y i pliki pomocnicze
+├── docs/                          # materiały źródłowe i grafiki
 ├── kse_grid/
-│   ├── grid.py               # główna klasa KSEGrid
-│   ├── matpower.py           # import MATPOWER i sidecarów GeoJSON
-│   ├── runner.py             # obliczenia load flow
-│   ├── serializer.py         # serializacja sieci do JSON dla frontendu
-│   ├── switching.py          # sesja przełączeń i edycji
-│   ├── web_server.py         # FastAPI + REST API + static frontend
-│   └── web/                  # frontend Vue / Plotly / PixiJS
-├── main.py                   # punkt startowy aplikacji
-├── pyproject.toml            # konfiguracja projektu Python
+│   ├── grid.py                    # główna klasa KSEGrid (fasada biblioteki)
+│   ├── web_server.py              # FastAPI + REST API + static frontend
+│   ├── type_coercion.py           # współdzielone helpery konwersji typów
+│   ├── thresholds.py              # progi diagnostyczne (napięcie, obciążenie)
+│   │
+│   ├── loading/                   # wczytywanie sieci z plików
+│   │   ├── matpower.py            # orkiestrator: case.m → pandapowerNet
+│   │   ├── matpower_importer.py   # import .m + obsługa błędów gencost
+│   │   ├── network_normalizer.py  # uzupełnianie nazw, slack bus
+│   │   └── geojson_loader.py      # sidecary GeoJSON z geo szyn
+│   │
+│   ├── powerflow/                 # obliczenia rozpływu mocy
+│   │   ├── engine.py              # run_powerflow() bez prezentacji
+│   │   ├── report.py              # raport tekstowy w terminalu
+│   │   └── runner.py              # fasada PowerFlowRunner
+│   │
+│   ├── topology/                  # operacje na topologii
+│   │   ├── switching.py           # SwitchingSession — przełączenia
+│   │   └── element_editing.py     # edycja parametrów elementów
+│   │
+│   ├── serialization/             # format JSON dla frontendu
+│   │   ├── serializer.py          # serialize_network — orkiestrator
+│   │   ├── graph_layout.py        # spring layout grafu
+│   │   ├── geo_positions.py       # pozycje WGS84, widok mapy
+│   │   ├── element_serializers.py # buses/lines/trafos/switches/gens
+│   │   ├── network_stats.py       # statystyki i sumy mocy
+│   │   ├── diagnostics.py         # naruszenia napięcia i przeciążenia
+│   │   └── topology_analysis.py   # wyspy, szyny bez zasilania
+│   │
+│   ├── converters/                # konwertery zewnętrznych formatów
+│   │   ├── tamu_geo.py            # TAMU .EPC → sidecar GeoJSON
+│   │   ├── kse_kmz.py             # dopasowanie sieci do atlasu KSE
+│   │   └── kse_atlas.py           # KMZ atlasu KSE → warstwy referencyjne
+│   │
+│   └── web/                       # frontend Vue 3 / Plotly / PixiJS
+│       ├── main.js, icons.js
+│       ├── components/            # app-root, sidebar, graph-panel, ...
+│       ├── lib/
+│       │   ├── api.js, errors.js, formatters.js, thresholds.js, ...
+│       │   └── composables/       # use-network-state, use-topology-ops, ...
+│       ├── renderers/pixi/        # warstwa renderingu PixiJS
+│       ├── traces/                # konfiguracje warstw Plotly
+│       └── styles/                # 7 plików CSS podzielonych wg komponentów
+├── main.py                        # punkt startowy aplikacji
+├── pyproject.toml                 # konfiguracja projektu Python
 └── README.md
 ```
 

@@ -24,9 +24,9 @@ To jest adapter między światem `pandapower` i frontendem. Frontend nie zna Dat
 ## Realny przykład z repo
 
 ```python
-from kse_grid.matpower import load_matpower_case
-from kse_grid.runner import PowerFlowRunner
-from kse_grid.serializer import serialize_network
+from kse_grid.loading.matpower import load_matpower_case
+from kse_grid.powerflow.runner import PowerFlowRunner
+from kse_grid.serialization.serializer import serialize_network
 
 net = load_matpower_case("data/case2746wop_TAMU_Updated.m")
 PowerFlowRunner(net).run(algorithm="iwamoto_nr", max_iteration=100, tolerance_mva=1.5)

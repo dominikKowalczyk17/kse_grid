@@ -13,8 +13,8 @@ To jest warstwa obliczeniowa. Bierze już załadowany `pandapowerNet`, uruchamia
 ## Realny przykład z repo
 
 ```python
-from kse_grid.matpower import load_matpower_case
-from kse_grid.runner import PowerFlowRunner
+from kse_grid.loading.matpower import load_matpower_case
+from kse_grid.powerflow.runner import PowerFlowRunner
 
 net = load_matpower_case("data/case3120sp.m")
 runner = PowerFlowRunner(net)

@@ -6,10 +6,10 @@ Najważniejszy pipeline w projekcie wygląda tak:
 
 ```text
 plik .m / .geojson
-    -> matpower.load_matpower_case(...)
+    -> loading.matpower.load_matpower_case(...)
     -> grid.KSEGrid.from_matpower_case(...)
-    -> runner.PowerFlowRunner.run()
-    -> serializer.serialize_network(...)
+    -> powerflow.runner.PowerFlowRunner.run()
+    -> serialization.serializer.serialize_network(...)
     -> web_server.create_app(...)
     -> GET /api/network
     -> frontend Vue/Plotly
@@ -19,10 +19,10 @@ plik .m / .geojson
 
 | Etap | Wejście | Wyjście | Po co istnieje |
 |---|---|---|---|
-| `matpower` | plik MATPOWER `.m`, opcjonalny sidecar GeoJSON | `pandapowerNet` | ładowanie modelu i normalizacja nazw / geometrii |
+| `loading.matpower` | plik MATPOWER `.m`, opcjonalny sidecar GeoJSON | `pandapowerNet` | ładowanie modelu i normalizacja nazw / geometrii |
 | `grid` | ścieżka do case'a | obiekt `KSEGrid` | prosta fasada dla użytkownika biblioteki |
-| `runner` | `pandapowerNet` | wyniki load flow w `net.res_*` + raport tekstowy | obliczenia rozpływu mocy |
-| `serializer` | `pandapowerNet` | `dict[str, Any]` gotowy do JSON-a | format dla API i frontendu |
+| `powerflow.runner` | `pandapowerNet` | wyniki load flow w `net.res_*` + raport tekstowy | obliczenia rozpływu mocy |
+| `serialization.serializer` | `pandapowerNet` | `dict[str, Any]` gotowy do JSON-a | format dla API i frontendu |
 | `web_server` | `pandapowerNet` | aplikacja FastAPI i endpoint `/api/network` | wystawienie danych w przeglądarce |
 
 ## Przykład end-to-end
@@ -51,7 +51,7 @@ Stan po załadowaniu i policzeniu:
 Wyjście dla API:
 
 ```python
-from kse_grid.serializer import serialize_network
+from kse_grid.serialization.serializer import serialize_network
 
 payload = serialize_network(grid.net)
 print(payload["layoutModes"])       # ['graph', 'geo']
@@ -68,11 +68,17 @@ print(payload["stats"]["nBus"])     # 2746
 
 ## Układ katalogów
 
+Per-modułowe notatki (poniżej) opisują pierwotny, mniejszy zestaw plików.
+Aktualna struktura pakietu (`loading/`, `powerflow/`, `topology/`,
+`serialization/`, `converters/`) opisana jest w sekcji "Struktura projektu"
+głównego README.md. Notatki tutaj wciąż wyjaśniają **co dzieje się w kodzie**,
+nawet jeśli ścieżki importów uległy reorganizacji.
+
 - [`__init__`](__init__/README.md) - publiczne API pakietu
-- [`convert_kse_kmz`](convert_kse_kmz/README.md) - konwersja EPC + KMZ -> GeoJSON
-- [`convert_tamu_geo`](convert_tamu_geo/README.md) - konwersja EPC -> GeoJSON
+- [`convert_kse_kmz`](convert_kse_kmz/README.md) - konwersja EPC + KMZ -> GeoJSON (obecnie `kse_grid.converters.kse_kmz`)
+- [`convert_tamu_geo`](convert_tamu_geo/README.md) - konwersja EPC -> GeoJSON (obecnie `kse_grid.converters.tamu_geo`)
 - [`grid`](grid/README.md) - fasada wysokiego poziomu
-- [`matpower`](matpower/README.md) - import MATPOWER i geometrii
-- [`runner`](runner/README.md) - load flow i raport tekstowy
-- [`serializer`](serializer/README.md) - `pandapowerNet` -> JSON dla frontendu
+- [`matpower`](matpower/README.md) - import MATPOWER i geometrii (obecnie `kse_grid.loading.matpower`)
+- [`runner`](runner/README.md) - load flow i raport tekstowy (obecnie `kse_grid.powerflow.runner`)
+- [`serializer`](serializer/README.md) - `pandapowerNet` -> JSON dla frontendu (obecnie `kse_grid.serialization.serializer`)
 - [`web_server`](web_server/README.md) - FastAPI i statyczny frontend

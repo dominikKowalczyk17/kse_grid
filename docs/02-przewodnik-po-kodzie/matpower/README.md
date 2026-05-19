@@ -23,7 +23,7 @@ To jest warstwa importu. Bierze plik MATPOWER i zamienia go na `pandapowerNet`, 
 Wejście:
 
 ```python
-from kse_grid.matpower import load_matpower_case
+from kse_grid.loading.matpower import load_matpower_case
 
 net = load_matpower_case("data/case2746wop_TAMU_Updated.m")
 ```

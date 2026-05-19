@@ -20,7 +20,7 @@ To jest cienka warstwa HTTP. Nie liczy load flow i nie buduje payloadu ręcznie 
 ## Realny przykład z repo
 
 ```python
-from kse_grid.matpower import load_matpower_case
+from kse_grid.loading.matpower import load_matpower_case
 from kse_grid.web_server import create_app
 
 net = load_matpower_case("data/case3120sp.m")
