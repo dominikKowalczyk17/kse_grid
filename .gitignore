@@ -1,11 +1,13 @@
 __pycache__/
 *.pyc
 .venv/
-.idea/
+.idea/*
+!.idea/runConfigurations/
 .vscode/
 desktop.ini
 *.egg-info/
 learning/
 .obsidian/
 obsidian-vault/
+.claude/
 
