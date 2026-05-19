@@ -19,3 +19,11 @@ export function formatMw (value) {
     const numeric = Number(value);
     return Math.abs(numeric) >= 1000 ? `${(numeric / 1000).toFixed(2)} GW` : `${numeric.toFixed(1)} MW`;
 }
+
+export function polishPlural (count, one, few, many) {
+    if (count === 1) return one;
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return few;
+    return many;
+}

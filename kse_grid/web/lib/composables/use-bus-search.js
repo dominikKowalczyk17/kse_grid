@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue';
+import { isMapMode } from '/lib/view-mode.js';
 
 export function useBusSearch(props, { onPickBus }) {
     const search = ref('');
@@ -7,7 +8,7 @@ export function useBusSearch(props, { onPickBus }) {
     const suggestions = computed(() => {
         const query = search.value.trim().toLowerCase();
         if (!query) return [];
-        const isMap = props.viewMode === 'geo' || props.viewMode === 'atlas';
+        const isMap = isMapMode(props.viewMode);
         return props.buses
             .filter(bus =>
                 (bus.name.toLowerCase().includes(query) || String(bus.id).startsWith(query))

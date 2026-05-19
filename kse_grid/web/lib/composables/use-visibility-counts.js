@@ -1,4 +1,5 @@
 import { computed } from 'vue';
+import { isMapMode } from '/lib/view-mode.js';
 
 function loadingValue(value) {
     const num = Number(value);
@@ -51,12 +52,12 @@ export function useVisibilityCounts(props) {
             }
         }
 
-        const isMapMode = props.viewMode === 'geo' || props.viewMode === 'atlas';
+        const onMap = isMapMode(props.viewMode);
         const buses = typeSet.has('bus')
             ? props.network.buses.filter(bus => voltageSet.has(bus.vn_kv)
                 && visibleBusIds.has(bus.id)
                 && (connected === null || connected.has(bus.id))
-                && (!isMapMode || (bus.lat != null && bus.lon != null))).length
+                && (!onMap || (bus.lat != null && bus.lon != null))).length
             : 0;
         const lines = typeSet.has('line')
             ? props.network.lines.filter(line => lineVisible(line, voltageSet, minLoad, branchOk)).length
