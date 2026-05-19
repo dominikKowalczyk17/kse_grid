@@ -61,11 +61,16 @@ _LINE_FIELDS: list[tuple] = [
     ("x_ohm_per_km", "X'", "float", "Ω/km", None,
      "Reaktancja jednostkowa linii (Ω/km). Główny parametr decydujący "
      "o przepływie mocy biernej i kątach napięć."),
-    ("c_nf_per_km", "C'", "float", "nF/km", None,
-     "Pojemność jednostkowa do ziemi (nF/km). Wpływa na generację mocy biernej "
-     "przez linię (efekt Ferrantiego przy małym obciążeniu)."),
-    ("g_us_per_km", "G'", "float", "µS/km", None,
-     "Konduktancja jednostkowa upływu do ziemi (µS/km). Zwykle bliska 0 "
+    ("c_nf_per_km", "C' (źródło B')", "float", "nF/km", None,
+     "Pojemność jednostkowa do ziemi (nF/km). To pole jest źródłem susceptancji "
+     "linii w macierzy admitancji — pandapower nie trzyma B' osobno, lecz wylicza "
+     "B' = 2π·f·C'·10⁻³ [µS/km] (przy 50 Hz: B' ≈ 0.3142·C').\n"
+     "Z MATPOWER: kolumna `b` (per-unit, total) jest konwertowana na C' przez "
+     "importer. Wpływa na generację mocy biernej linii (efekt Ferrantiego "
+     "przy małym obciążeniu)."),
+    ("g_us_per_km", "G' (upływność)", "float", "µS/km", None,
+     "Konduktancja jednostkowa upływu do ziemi (µS/km). Z MATPOWER nie jest "
+     "wczytywana (matpower nie ma kolumny G dla branchu) — zwykle bliska 0 "
      "dla linii napowietrznych."),
     ("max_i_ka", "I max", "float", "kA", None,
      "Termiczny prąd dopuszczalny linii (kA). Z tego oraz Un wyliczane jest "
@@ -185,12 +190,109 @@ _GEN_FIELDS: list[tuple] = [
 ]
 
 
+_LOAD_FIELDS: list[tuple] = [
+    ("name", "Nazwa", "str", None, None,
+     "Etykieta obciążenia — pomocna do identyfikacji."),
+    ("p_mw", "P obc.", "float", "MW", None,
+     "Pobierana moc czynna (MW). MATPOWER `Pd` w wierszu szyny mapuje się tutaj."),
+    ("q_mvar", "Q obc.", "float", "Mvar", None,
+     "Pobierana moc bierna (Mvar). MATPOWER `Qd`."),
+    ("const_z_percent", "Udział stałej Z", "float", "%", None,
+     "Procent obciążenia modelowany jako stała impedancja (ZIP). Suma Z+I+P powinna = 100."),
+    ("const_i_percent", "Udział stałego I", "float", "%", None,
+     "Procent obciążenia modelowany jako stały prąd (ZIP)."),
+    ("sn_mva", "Sn", "float", "MVA", None,
+     "Moc znamionowa obciążenia (MVA) — używana do skalowania ZIP."),
+    ("scaling", "Współ. skalowania", "float", None, None,
+     "Mnożnik P i Q stosowany w obliczeniach (np. profil dobowy)."),
+    ("type", "Typ", "enum", None, ["", "wye", "delta"],
+     "Schemat połączenia: wye (gwiazda) lub delta (trójkąt)."),
+    ("controllable", "Sterowalne (OPF)", "bool", None, None,
+     "Czy OPF może modyfikować P/Q (load shedding / DSM)."),
+    ("in_service", "W eksploatacji", "bool", None, None,
+     "Gdy wyłączone, obciążenie nie jest uwzględniane w obliczeniach."),
+]
+
+_SGEN_FIELDS: list[tuple] = [
+    ("name", "Nazwa", "str", None, None,
+     "Etykieta generatora statycznego (PV/wiatr/farma)."),
+    ("p_mw", "P", "float", "MW", None,
+     "Wstrzykiwana moc czynna (MW). Konwencja: dodatnie = generacja."),
+    ("q_mvar", "Q", "float", "Mvar", None,
+     "Wstrzykiwana moc bierna (Mvar)."),
+    ("sn_mva", "Sn", "float", "MVA", None,
+     "Moc znamionowa (MVA)."),
+    ("scaling", "Współ. skalowania", "float", None, None,
+     "Mnożnik P i Q stosowany w obliczeniach."),
+    ("type", "Typ", "str", None, None,
+     "Dowolna etykieta typu (np. 'PV', 'WT'). Nie wpływa na load flow."),
+    ("current_source", "Źródło prądowe", "bool", None, None,
+     "Gdy True, model traktuje jak źródło prądowe (istotne dla zwarć)."),
+    ("max_p_mw", "P max", "float", "MW", None,
+     "Maksymalna moc czynna (OPF)."),
+    ("min_p_mw", "P min", "float", "MW", None,
+     "Minimalna moc czynna (OPF)."),
+    ("max_q_mvar", "Q max", "float", "Mvar", None,
+     "Maksymalna moc bierna (OPF)."),
+    ("min_q_mvar", "Q min", "float", "Mvar", None,
+     "Minimalna moc bierna (OPF)."),
+    ("controllable", "Sterowalne (OPF)", "bool", None, None,
+     "Czy OPF może zmieniać P/Q."),
+    ("in_service", "W eksploatacji", "bool", None, None,
+     "Gdy wyłączone, pomijany w obliczeniach."),
+]
+
+_EXT_GRID_FIELDS: list[tuple] = [
+    ("name", "Nazwa", "str", None, None,
+     "Etykieta zasilania zewnętrznego (slack)."),
+    ("vm_pu", "U zadane", "float", "p.u.", None,
+     "Nastawione napięcie szyny slack (p.u.). MATPOWER `Vg` dla wiersza slack."),
+    ("va_degree", "Kąt zadany", "float", "°", None,
+     "Kąt napięcia szyny slack (°). Zwykle 0 jako węzeł referencyjny."),
+    ("slack_weight", "Waga slack", "float", None, None,
+     "Udział w pokryciu strat — istotne tylko gdy jest wiele slacków."),
+    ("max_p_mw", "P max", "float", "MW", None,
+     "Maksymalna moc czynna oddawana do sieci (OPF)."),
+    ("min_p_mw", "P min", "float", "MW", None,
+     "Minimalna moc czynna (OPF, może być ujemna = pobór)."),
+    ("max_q_mvar", "Q max", "float", "Mvar", None,
+     "Maksymalna moc bierna (OPF)."),
+    ("min_q_mvar", "Q min", "float", "Mvar", None,
+     "Minimalna moc bierna (OPF)."),
+    ("controllable", "Sterowalne (OPF)", "bool", None, None,
+     "Czy OPF może modyfikować P/Q slacka."),
+    ("in_service", "W eksploatacji", "bool", None, None,
+     "Gdy wyłączone, slack nie jest aktywny — system traci punkt referencyjny."),
+]
+
+_SHUNT_FIELDS: list[tuple] = [
+    ("name", "Nazwa", "str", None, None,
+     "Etykieta elementu boczngo (bateria kondensatorów / dławik)."),
+    ("p_mw", "P (Gs)", "float", "MW", None,
+     "Czynne straty bocznika przy napięciu znamionowym. MATPOWER `Gs`."),
+    ("q_mvar", "Q (Bs)", "float", "Mvar", None,
+     "Generacja Q przy U=1 p.u. Dodatnie = kondensator, ujemne = dławik. MATPOWER `Bs`."),
+    ("vn_kv", "Un", "float", "kV", None,
+     "Napięcie znamionowe bocznika (kV) — baza do przeliczenia admitancji."),
+    ("step", "Bieżący stopień", "int", None, None,
+     "Aktualnie załączony stopień regulacji."),
+    ("max_step", "Liczba stopni", "int", None, None,
+     "Maksymalna liczba stopni regulacji."),
+    ("in_service", "W eksploatacji", "bool", None, None,
+     "Gdy wyłączone, bocznik nie wnosi admitancji do macierzy."),
+]
+
+
 _TABLES = {
     "bus": ("bus", _BUS_FIELDS),
     "line": ("line", _LINE_FIELDS),
     "trafo": ("trafo", _TRAFO_FIELDS),
     "switch": ("switch", _SWITCH_FIELDS),
     "gen": ("gen", _GEN_FIELDS),
+    "load": ("load", _LOAD_FIELDS),
+    "sgen": ("sgen", _SGEN_FIELDS),
+    "ext_grid": ("ext_grid", _EXT_GRID_FIELDS),
+    "shunt": ("shunt", _SHUNT_FIELDS),
 }
 
 

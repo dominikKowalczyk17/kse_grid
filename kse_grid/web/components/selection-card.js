@@ -1,21 +1,26 @@
 import { computed, reactive, ref, watch } from 'vue';
-import { IconCheck, IconClose, IconEdit } from '/icons.js';
+import { IconCheck, IconChevronLeft, IconClose, IconEdit } from '/icons.js';
 import { voltageStatus } from '/lib/formatters.js';
 
 export const SelectionCard = {
-    components: { IconCheck, IconClose, IconEdit },
+    components: { IconCheck, IconChevronLeft, IconClose, IconEdit },
     props: {
         selection: Object,
         switches: { type: Array, default: () => [] },
         gens: { type: Array, default: () => [] },
+        loads: { type: Array, default: () => [] },
+        sgens: { type: Array, default: () => [] },
+        extGrids: { type: Array, default: () => [] },
+        shunts: { type: Array, default: () => [] },
         hasResults: Boolean,
         topologyBusy: { type: Boolean, default: false },
         elementSchema: { type: Object, default: () => ({}) },
         elementParams: { type: Object, default: null },
         editError: { type: String, default: '' },
         editBusy: { type: Boolean, default: false },
+        canGoBack: { type: Boolean, default: false },
     },
-    emits: ['close', 'set-switch-state', 'set-switches-state', 'select-gen', 'request-edit-params', 'submit-edit', 'cancel-edit'],
+    emits: ['close', 'go-back', 'set-switch-state', 'set-switches-state', 'select-gen', 'select-bus-element', 'request-edit-params', 'submit-edit', 'cancel-edit'],
     setup (props, { emit }) {
         const editing = ref(false);
         const formState = reactive({ values: {} });
@@ -104,6 +109,17 @@ export const SelectionCard = {
             return (props.gens || []).filter(g => g.busId === busId);
         });
 
+        function _filterByBus(arr) {
+            if (props.selection?.kind !== 'bus') return [];
+            const busId = props.selection.payload?.id;
+            if (busId == null) return [];
+            return (arr || []).filter(x => x.busId === busId);
+        }
+        const busLoads = computed(() => _filterByBus(props.loads));
+        const busSgens = computed(() => _filterByBus(props.sgens));
+        const busExtGrids = computed(() => _filterByBus(props.extGrids));
+        const busShunts = computed(() => _filterByBus(props.shunts));
+
         const rows = computed(() => {
             if (!props.selection) return [];
             const selection = props.selection;
@@ -172,6 +188,43 @@ export const SelectionCard = {
                 }
                 return items;
             }
+            if (selection.kind === 'load') {
+                const ld = selection.payload;
+                const items = [];
+                if (ld.busId != null) items.push({ label: 'Szyna', value: `#${ld.busId}` });
+                items.push({ label: 'Status', value: ld.inService ? 'W ruchu' : 'Wyłączony', status: ld.inService ? 'good' : 'bad' });
+                if (ld.pMw != null) items.push({ label: 'P obc.', value: `${ld.pMw.toFixed(2)} MW` });
+                if (ld.qMvar != null) items.push({ label: 'Q obc.', value: `${ld.qMvar.toFixed(2)} Mvar` });
+                return items;
+            }
+            if (selection.kind === 'sgen') {
+                const sg = selection.payload;
+                const items = [];
+                if (sg.busId != null) items.push({ label: 'Szyna', value: `#${sg.busId}` });
+                items.push({ label: 'Status', value: sg.inService ? 'W ruchu' : 'Wyłączony', status: sg.inService ? 'good' : 'bad' });
+                if (sg.pMw != null) items.push({ label: 'P', value: `${sg.pMw.toFixed(2)} MW` });
+                if (sg.qMvar != null) items.push({ label: 'Q', value: `${sg.qMvar.toFixed(2)} Mvar` });
+                return items;
+            }
+            if (selection.kind === 'ext_grid') {
+                const eg = selection.payload;
+                const items = [];
+                if (eg.busId != null) items.push({ label: 'Szyna', value: `#${eg.busId}` });
+                items.push({ label: 'Status', value: eg.inService ? 'W ruchu' : 'Wyłączony', status: eg.inService ? 'good' : 'bad' });
+                if (eg.vmPu != null) items.push({ label: 'U zadane', value: `${eg.vmPu.toFixed(4)} p.u.` });
+                if (eg.vaDeg != null) items.push({ label: 'Kąt zadany', value: `${eg.vaDeg.toFixed(2)} °` });
+                return items;
+            }
+            if (selection.kind === 'shunt') {
+                const sh = selection.payload;
+                const items = [];
+                if (sh.busId != null) items.push({ label: 'Szyna', value: `#${sh.busId}` });
+                items.push({ label: 'Status', value: sh.inService ? 'W ruchu' : 'Wyłączony', status: sh.inService ? 'good' : 'bad' });
+                if (sh.pMw != null) items.push({ label: 'P (Gs)', value: `${sh.pMw.toFixed(2)} MW` });
+                if (sh.qMvar != null) items.push({ label: 'Q (Bs)', value: `${sh.qMvar.toFixed(2)} Mvar` });
+                if (sh.step != null) items.push({ label: 'Stopień', value: String(sh.step) });
+                return items;
+            }
             if (selection.kind === 'switch') {
                 const sw = selection.payload;
                 return [
@@ -192,19 +245,21 @@ export const SelectionCard = {
             if (!selection) return '';
             const id = selection.payload?.id;
             if (id == null) return '';
-            return selection.kind === 'bus' ? `Szyna #${id}`
-                : selection.kind === 'line' ? `Linia #${id}`
-                    : selection.kind === 'trafo' ? `Trafo #${id}`
-                        : selection.kind === 'switch' ? `Odłącznik #${id}`
-                            : selection.kind === 'gen' ? `Generator #${id}` : '';
+            const kindToLabel = {
+                bus: 'Szyna', line: 'Linia', trafo: 'Trafo', switch: 'Odłącznik',
+                gen: 'Generator', load: 'Obciążenie', sgen: 'SGen',
+                ext_grid: 'Slack', shunt: 'Bocznik',
+            };
+            const label = kindToLabel[selection.kind];
+            return label ? `${label} #${id}` : '';
         });
         const kindLabel = computed(() => {
-            const kind = props.selection?.kind;
-            return kind === 'bus' ? 'Szyna'
-                : kind === 'line' ? 'Linia'
-                    : kind === 'trafo' ? 'Transformator'
-                        : kind === 'switch' ? 'Odłącznik'
-                            : kind === 'gen' ? 'Generator' : '';
+            const kindToLabel = {
+                bus: 'Szyna', line: 'Linia', trafo: 'Transformator', switch: 'Odłącznik',
+                gen: 'Generator', load: 'Obciążenie', sgen: 'Generator statyczny',
+                ext_grid: 'Zasilanie zewnętrzne', shunt: 'Bocznik (Gs/Bs)',
+            };
+            return kindToLabel[props.selection?.kind] || '';
         });
 
         const switchActionLabel = computed(() => {
@@ -243,6 +298,10 @@ export const SelectionCard = {
             trafoConnected,
             trafoActionLabel,
             busGens,
+            busLoads,
+            busSgens,
+            busExtGrids,
+            busShunts,
             editing,
             schemaForKind,
             formState,
@@ -259,7 +318,10 @@ export const SelectionCard = {
     template: `
     <div v-if="selection" class="selection-card">
         <div class="selection-header">
-            <div>
+            <button v-if="canGoBack" class="card-icon-btn selection-back-btn" type="button" @click="$emit('go-back')" aria-label="Powrót do szyny">
+                <IconChevronLeft />
+            </button>
+            <div class="selection-header-text">
                 <div class="selection-kind">{{ kindLabel }}</div>
                 <div class="selection-title">{{ title }}</div>
                 <div v-if="subtitle" class="selection-subtitle">{{ subtitle }}</div>
@@ -281,6 +343,46 @@ export const SelectionCard = {
                     {{ gen.inService ? 'W ruchu' : 'Wyłączony' }}
                 </span>
                 <button type="button" class="btn btn-sm gen-edit-btn" @click="$emit('select-gen', gen.id)">
+                    Edytuj
+                </button>
+            </div>
+        </template>
+
+        <template v-if="!editing && selection.kind === 'bus' && busLoads.length">
+            <div class="selection-section-label">Obciążenia</div>
+            <div v-for="ld in busLoads" :key="ld.id" class="selection-gen-row">
+                <span class="gen-name">{{ ld.name }} — {{ (ld.pMw ?? 0).toFixed(1) }} MW</span>
+                <button type="button" class="btn btn-sm gen-edit-btn" @click="$emit('select-bus-element', { kind: 'load', id: ld.id })">
+                    Edytuj
+                </button>
+            </div>
+        </template>
+
+        <template v-if="!editing && selection.kind === 'bus' && busSgens.length">
+            <div class="selection-section-label">Generatory statyczne (SGen)</div>
+            <div v-for="sg in busSgens" :key="sg.id" class="selection-gen-row">
+                <span class="gen-name">{{ sg.name }} — {{ (sg.pMw ?? 0).toFixed(1) }} MW</span>
+                <button type="button" class="btn btn-sm gen-edit-btn" @click="$emit('select-bus-element', { kind: 'sgen', id: sg.id })">
+                    Edytuj
+                </button>
+            </div>
+        </template>
+
+        <template v-if="!editing && selection.kind === 'bus' && busExtGrids.length">
+            <div class="selection-section-label">Zasilanie zewnętrzne (slack)</div>
+            <div v-for="eg in busExtGrids" :key="eg.id" class="selection-gen-row">
+                <span class="gen-name">{{ eg.name }} — {{ (eg.vmPu ?? 1).toFixed(3) }} p.u.</span>
+                <button type="button" class="btn btn-sm gen-edit-btn" @click="$emit('select-bus-element', { kind: 'ext_grid', id: eg.id })">
+                    Edytuj
+                </button>
+            </div>
+        </template>
+
+        <template v-if="!editing && selection.kind === 'bus' && busShunts.length">
+            <div class="selection-section-label">Boczniki (Gs/Bs)</div>
+            <div v-for="sh in busShunts" :key="sh.id" class="selection-gen-row">
+                <span class="gen-name">{{ sh.name }} — Q={{ (sh.qMvar ?? 0).toFixed(1) }} Mvar</span>
+                <button type="button" class="btn btn-sm gen-edit-btn" @click="$emit('select-bus-element', { kind: 'shunt', id: sh.id })">
                     Edytuj
                 </button>
             </div>

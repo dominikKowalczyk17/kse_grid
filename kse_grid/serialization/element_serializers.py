@@ -200,6 +200,75 @@ def serialize_gens(net: pp.pandapowerNet) -> list[dict[str, Any]]:
     return out
 
 
+def serialize_loads(net: pp.pandapowerNet) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if not hasattr(net, "load") or net.load.empty:
+        return out
+    for load_idx, row in net.load.iterrows():
+        load_id = _to_int(load_idx)
+        out.append({
+            "id": load_id,
+            "busId": _to_int(row.bus),
+            "name": str(row.get("name") or f"Load {load_id}"),
+            "pMw": _safe_float(row.get("p_mw")),
+            "qMvar": _safe_float(row.get("q_mvar")),
+            "inService": bool(row.get("in_service", True)),
+        })
+    return out
+
+
+def serialize_sgens(net: pp.pandapowerNet) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if not hasattr(net, "sgen") or net.sgen.empty:
+        return out
+    for sgen_idx, row in net.sgen.iterrows():
+        sgen_id = _to_int(sgen_idx)
+        out.append({
+            "id": sgen_id,
+            "busId": _to_int(row.bus),
+            "name": str(row.get("name") or f"SGen {sgen_id}"),
+            "pMw": _safe_float(row.get("p_mw")),
+            "qMvar": _safe_float(row.get("q_mvar")),
+            "inService": bool(row.get("in_service", True)),
+        })
+    return out
+
+
+def serialize_ext_grids(net: pp.pandapowerNet) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if not hasattr(net, "ext_grid") or net.ext_grid.empty:
+        return out
+    for eg_idx, row in net.ext_grid.iterrows():
+        eg_id = _to_int(eg_idx)
+        out.append({
+            "id": eg_id,
+            "busId": _to_int(row.bus),
+            "name": str(row.get("name") or f"Slack {eg_id}"),
+            "vmPu": _safe_float(row.get("vm_pu")),
+            "vaDeg": _safe_float(row.get("va_degree")),
+            "inService": bool(row.get("in_service", True)),
+        })
+    return out
+
+
+def serialize_shunts(net: pp.pandapowerNet) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if not hasattr(net, "shunt") or net.shunt.empty:
+        return out
+    for sh_idx, row in net.shunt.iterrows():
+        sh_id = _to_int(sh_idx)
+        out.append({
+            "id": sh_id,
+            "busId": _to_int(row.bus),
+            "name": str(row.get("name") or f"Shunt {sh_id}"),
+            "pMw": _safe_float(row.get("p_mw")),
+            "qMvar": _safe_float(row.get("q_mvar")),
+            "step": _to_int(row.get("step") or 0),
+            "inService": bool(row.get("in_service", True)),
+        })
+    return out
+
+
 def _bus_load(net: pp.pandapowerNet, bus_id: int) -> tuple[float, float]:
     if net.load.empty:
         return 0.0, 0.0

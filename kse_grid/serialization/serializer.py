@@ -9,8 +9,12 @@ import pandapower as pp
 from kse_grid.serialization.diagnostics import compute_diagnostics as _compute_diagnostics
 from kse_grid.serialization.element_serializers import (
     serialize_buses as _serialize_buses,
+    serialize_ext_grids as _serialize_ext_grids,
     serialize_gens as _serialize_gens,
     serialize_lines as _serialize_lines,
+    serialize_loads as _serialize_loads,
+    serialize_sgens as _serialize_sgens,
+    serialize_shunts as _serialize_shunts,
     serialize_switches as _serialize_switches,
     serialize_trafos as _serialize_trafos,
 )
@@ -55,6 +59,10 @@ def serialize_network(
         "trafos": _serialize_trafos(net, has_trafo_results),
         "switches": _serialize_switches(net),
         "gens": _serialize_gens(net),
+        "loads": _serialize_loads(net),
+        "sgens": _serialize_sgens(net),
+        "extGrids": _serialize_ext_grids(net),
+        "shunts": _serialize_shunts(net),
         "topology": _compute_topology(net),
         "bounds": graph_bounds,
         "graphBounds": graph_bounds,
@@ -207,4 +215,20 @@ def _serialize_changed_element(
         for item in _serialize_gens(net):
             if item["id"] == element_id:
                 return {"kind": "gen", "id": element_id, "payload": item}
+    if kind == "load" and element_id in net.load.index:
+        for item in _serialize_loads(net):
+            if item["id"] == element_id:
+                return {"kind": "load", "id": element_id, "payload": item}
+    if kind == "sgen" and element_id in net.sgen.index:
+        for item in _serialize_sgens(net):
+            if item["id"] == element_id:
+                return {"kind": "sgen", "id": element_id, "payload": item}
+    if kind == "ext_grid" and element_id in net.ext_grid.index:
+        for item in _serialize_ext_grids(net):
+            if item["id"] == element_id:
+                return {"kind": "ext_grid", "id": element_id, "payload": item}
+    if kind == "shunt" and element_id in net.shunt.index:
+        for item in _serialize_shunts(net):
+            if item["id"] == element_id:
+                return {"kind": "shunt", "id": element_id, "payload": item}
     return None

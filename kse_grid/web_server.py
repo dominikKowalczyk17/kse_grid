@@ -38,7 +38,7 @@ class ElementUpdate(BaseModel):
     fields: dict[str, object] = Field(default_factory=dict)
 
 
-_ELEMENT_KINDS = {"bus", "line", "trafo", "switch", "gen"}
+_ELEMENT_KINDS = {"bus", "line", "trafo", "switch", "gen", "load", "sgen", "ext_grid", "shunt"}
 
 
 def create_app(net: pp.pandapowerNet) -> FastAPI:

@@ -358,6 +358,7 @@ export const GraphPanel = {
                     error,
                 }),
                 onSelect: sel => {
+                    selectionStack.value = [];
                     if (!sel) { selection.value = null; return; }
                     if (sel.kind === 'bus') {
                         const bus = props.network.buses.find(b => b.id === sel.id);
@@ -501,6 +502,7 @@ export const GraphPanel = {
         function selectBus (busId, focus) {
             const bus = props.network.buses.find(item => item.id === busId);
             if (!bus) return;
+            selectionStack.value = [];
             selection.value = { kind: 'bus', payload: bus };
 
             if (pixiCtrl.value) {
@@ -522,6 +524,7 @@ export const GraphPanel = {
         function selectLine (lineId, focus) {
             const line = props.network.lines.find(item => item.id === lineId);
             if (!line) return;
+            selectionStack.value = [];
             if (pixiCtrl.value) {
                 selection.value = { kind: 'line', payload: line };
                 pixiCtrl.value.setSelection({ kind: 'line', id: lineId });
@@ -543,6 +546,7 @@ export const GraphPanel = {
         function selectTrafo (trafoId, focus) {
             const trafo = props.network.trafos.find(item => item.id === trafoId);
             if (!trafo) return;
+            selectionStack.value = [];
             if (pixiCtrl.value) {
                 selection.value = { kind: 'trafo', payload: trafo };
                 pixiCtrl.value.setSelection({ kind: 'trafo', id: trafoId });
@@ -571,9 +575,44 @@ export const GraphPanel = {
             }
         }
 
+        const selectionStack = ref([]);
+
+        function _pushBeforeNested () {
+            if (selection.value?.kind === 'bus') {
+                selectionStack.value = [...selectionStack.value, selection.value];
+            }
+        }
+
         function selectGen (genId) {
             const gen = (props.network.gens || []).find(g => g.id === genId);
-            if (gen) selection.value = { kind: 'gen', payload: gen };
+            if (gen) {
+                _pushBeforeNested();
+                selection.value = { kind: 'gen', payload: gen };
+            }
+        }
+
+        function selectBusElement ({ kind, id }) {
+            const listByKind = {
+                load: props.network.loads,
+                sgen: props.network.sgens,
+                ext_grid: props.network.extGrids,
+                shunt: props.network.shunts,
+            };
+            const list = listByKind[kind];
+            if (!list) return;
+            const item = list.find(x => x.id === id);
+            if (item) {
+                _pushBeforeNested();
+                selection.value = { kind, payload: item };
+            }
+        }
+
+        function goBack () {
+            const stack = selectionStack.value;
+            if (!stack.length) return;
+            const prev = stack[stack.length - 1];
+            selectionStack.value = stack.slice(0, -1);
+            selection.value = prev;
         }
 
         function resetView () {
@@ -601,6 +640,7 @@ export const GraphPanel = {
 
         function clearSelection () {
             selection.value = null;
+            selectionStack.value = [];
             clearHighlight();
         }
 
@@ -689,7 +729,8 @@ export const GraphPanel = {
             }
         });
 
-        return { graphEl, selection, clearSelection, selectBus, selectLine, selectTrafo, selectElement, selectGen, resetView, handleLayoutChange, visibleCounts };
+        const canGoBack = computed(() => selectionStack.value.length > 0);
+        return { graphEl, selection, clearSelection, selectBus, selectLine, selectTrafo, selectElement, selectGen, selectBusElement, goBack, canGoBack, resetView, handleLayoutChange, visibleCounts };
     },
     template: `
     <div class="graph-panel">
@@ -698,16 +739,23 @@ export const GraphPanel = {
             :selection="selection"
             :switches="network.switches || []"
             :gens="network.gens || []"
+            :loads="network.loads || []"
+            :sgens="network.sgens || []"
+            :ext-grids="network.extGrids || []"
+            :shunts="network.shunts || []"
             :has-results="network.hasResults"
             :topology-busy="topologyBusy"
             :element-schema="elementSchema"
             :element-params="elementParams"
             :edit-error="editError"
             :edit-busy="editBusy"
+            :can-go-back="canGoBack"
             @close="clearSelection"
+            @go-back="goBack"
             @set-switch-state="$emit('set-switch-state', $event)"
             @set-switches-state="$emit('set-switches-state', $event)"
             @select-gen="selectGen($event)"
+            @select-bus-element="selectBusElement($event)"
             @request-edit-params="$emit('request-edit-params', $event)"
             @submit-edit="$emit('submit-edit', $event)"
             @cancel-edit="$emit('cancel-edit')" />
