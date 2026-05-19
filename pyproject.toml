@@ -11,3 +11,11 @@ dependencies = [
     "pandas-stubs~=2.3.3",
     "python-multipart>=0.0.28",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
