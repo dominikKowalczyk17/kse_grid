@@ -1,0 +1,65 @@
+/* =============================================================
+   Graph panel
+   ============================================================= */
+
+.graph-panel {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.graph-canvas {
+    position: absolute;
+    inset: 0;
+}
+
+.graph-canvas .nsewdrag,
+.graph-canvas .nsewdrag.drag {
+    cursor: grab !important;
+}
+
+.graph-canvas.is-dragging .nsewdrag,
+.graph-canvas .nsewdrag:active {
+    cursor: grabbing !important;
+}
+
+.graph-canvas.is-hovering-target .nsewdrag {
+    cursor: pointer !important;
+}
+
+/* HUD */
+.graph-hud {
+    position: absolute;
+    bottom: 0.6rem;
+    left: 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--graph-hud-color);
+    pointer-events: none;
+}
+
+.kbd-hint {
+    position: absolute;
+    bottom: 0.6rem;
+    right: 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    color: var(--muted-foreground);
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    pointer-events: none;
+}
+
+.kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    color: var(--foreground);
+}

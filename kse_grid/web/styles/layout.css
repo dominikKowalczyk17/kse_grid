@@ -1,0 +1,202 @@
+/* =============================================================
+   Layout shell
+   ============================================================= */
+
+.app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-body {
+    --sidebar-width: 320px;
+    --sidebar-toggle-size: 28px;
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    transition: grid-template-columns 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-body.sidebar-hidden {
+    grid-template-columns: 0 minmax(0, 1fr);
+}
+
+.sidebar-shell {
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.sidebar-toggle {
+    position: absolute;
+    top: 1rem;
+    left: calc(var(--sidebar-width));
+    width: var(--sidebar-toggle-size);
+    height: 56px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-left: 0;
+    border-radius: 0 999px 999px 0;
+    background: var(--panel-glass);
+    color: var(--muted-foreground);
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    z-index: 5;
+    transition:
+        left 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+        color 0.15s ease,
+        border-color 0.15s ease,
+        background 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.sidebar-toggle:hover {
+    color: var(--foreground);
+    border-color: var(--primary-30);
+    background: var(--card);
+    box-shadow: 0 8px 24px oklch(0 0 0 / 0.15);
+}
+
+.sidebar-toggle .icon {
+    width: 16px;
+    height: 16px;
+}
+
+.app-body.sidebar-hidden .sidebar-toggle {
+    left: 0;
+}
+
+/* =============================================================
+   Header
+   ============================================================= */
+
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    height: 3.5rem;
+    padding: 0 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-glass);
+    backdrop-filter: blur(8px);
+    flex-shrink: 0;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.brand-mark {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-15);
+    color: var(--primary);
+    box-shadow: inset 0 0 0 1px var(--primary-30);
+    border-radius: 0.4rem;
+}
+
+.brand-title {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.brand-title .accent {
+    color: var(--primary);
+}
+
+.brand-title .sep {
+    color: var(--muted-foreground);
+}
+
+.header-divider {
+    width: 1px;
+    height: 1rem;
+    background: var(--border);
+    margin: 0 0.25rem;
+}
+
+.case-name {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+.header-spacer {
+    flex: 1;
+}
+
+.header-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+.header-stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+}
+
+.header-stat .v {
+    color: var(--foreground);
+    font-variant-numeric: tabular-nums;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid var(--border);
+    background: var(--muted-40);
+}
+
+.status-pill .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--muted-foreground);
+}
+
+.status-pill.good {
+    color: var(--good);
+    border-color: oklch(0.55 0.18 145 / 0.5);
+}
+
+.status-pill.good .dot {
+    background: var(--good);
+    box-shadow: 0 0 8px var(--good);
+}
+
+.status-pill.warn {
+    color: var(--warn);
+    border-color: oklch(0.55 0.16 85 / 0.5);
+}
+
+.status-pill.warn .dot {
+    background: var(--warn);
+}
+
