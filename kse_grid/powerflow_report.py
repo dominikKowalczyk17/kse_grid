@@ -1,0 +1,91 @@
+"""Prezentacja wyników load flow w terminalu."""
+
+from __future__ import annotations
+
+import pandas as pd
+import pandapower as pp
+
+
+def print_load_flow_summary(net: pp.pandapowerNet) -> None:
+    sep = "=" * 65
+    print(sep)
+    print(f"  Model sieci – {getattr(net, 'name', 'pandapower')}")
+    print(sep)
+    _print_power_balance(net)
+    _print_voltage_deviations(net)
+    _print_top_loaded_lines(net)
+    _print_transformers(net)
+    _print_overload_summary(net)
+
+
+def voltage_violations(net: pp.pandapowerNet) -> pd.DataFrame:
+    """Zwraca DataFrame z szynami poza pasmem ±5% Un."""
+    res = net.res_bus[["vm_pu"]].copy()
+    res["name"] = net.bus["name"]
+    res["vn_kv"] = net.bus["vn_kv"]
+    return res[(res.vm_pu < 0.95) | (res.vm_pu > 1.05)]
+
+
+def _print_power_balance(net: pp.pandapowerNet) -> None:
+    p_gen = net.res_gen["p_mw"].sum() if len(net.res_gen) else 0.0
+    p_ext = net.res_ext_grid["p_mw"].sum() if len(net.res_ext_grid) else 0.0
+    p_load = net.res_load["p_mw"].sum() if len(net.res_load) else 0.0
+    p_loss = (
+        (net.res_line["pl_mw"].sum() if len(net.res_line) else 0.0) +
+        (net.res_trafo["pl_mw"].sum() if len(net.res_trafo) else 0.0)
+    )
+    print(f"\n📊 BILANS MOCY:")
+    print(f"   Generacja (PV):  {p_gen:>8.1f} MW")
+    print(f"   Import/Slack:    {p_ext:>8.1f} MW")
+    print(f"   Obciążenie:      {p_load:>8.1f} MW")
+    print(f"   Straty:          {p_loss:>8.1f} MW")
+
+
+def _print_voltage_deviations(net: pp.pandapowerNet) -> None:
+    bus_res = net.res_bus[["vm_pu", "va_degree"]].copy()
+    bus_res["nazwa"] = net.bus["name"]
+    bus_res["vn_kv"] = net.bus["vn_kv"]
+    bus_res["odchylenie"] = (bus_res["vm_pu"] - 1.0).abs()
+    print(f"\n⚡ NAPIĘCIA – największe odchylenia:")
+    print(f"   {'Stacja':<35} {'kV':>6}  {'Um [p.u.]':>9}  {'δ [°]':>8}")
+    print(f"   {'-'*35} {'-'*8}  {'-'*8}")
+    for _, row in bus_res.sort_values("odchylenie", ascending=False).head(10).iterrows():
+        flag = " ⚠️" if row.vm_pu < 0.95 or row.vm_pu > 1.05 else ""
+        print(f"   {row.nazwa:<35} {row.vn_kv:>6.0f}  {row.vm_pu:>8.4f}  {row.va_degree:>8.2f}{flag}")
+
+
+def _print_top_loaded_lines(net: pp.pandapowerNet) -> None:
+    line_res = net.res_line[["p_from_mw", "loading_percent"]].copy()
+    line_res["nazwa"] = net.line["name"]
+    line_res["vn_kv"] = net.bus.loc[net.line["from_bus"], "vn_kv"].to_numpy()
+    print(f"\n🔌 LINIE – TOP 10 obciążonych:")
+    print(f"   {'Linia':<45} {'kV':>6}  {'P [MW]':>8}  {'Obciąż. [%]':>11}")
+    print(f"   {'-'*45} {'-'*8}  {'-'*11}")
+    for _, row in line_res.sort_values("loading_percent", ascending=False).head(10).iterrows():
+        flag = " 🔴" if row.loading_percent > 80 else (" 🟡" if row.loading_percent > 60 else "")
+        print(f"   {row.nazwa:<45} {row.vn_kv:>6.0f}  {row.p_from_mw:>8.1f}  {row.loading_percent:>10.1f}%{flag}")
+
+
+def _print_transformers(net: pp.pandapowerNet) -> None:
+    trafo_res = net.res_trafo[["p_hv_mw", "loading_percent"]].copy()
+    trafo_res["nazwa"] = net.trafo["name"]
+    print(f"\n🔄 TRANSFORMATORY:")
+    print(f"   {'Trafo':<40} {'P_HV [MW]':>10}  {'Obciąż. [%]':>11}")
+    print(f"   {'-'*40} {'-'*10}  {'-'*11}")
+    for _, row in trafo_res.sort_values("loading_percent", ascending=False).head(10).iterrows():
+        flag = " 🔴" if row.loading_percent > 80 else ""
+        print(f"   {row.nazwa:<40} {row.p_hv_mw:>10.1f}  {row.loading_percent:>10.1f}%{flag}")
+
+
+def _print_overload_summary(net: pp.pandapowerNet) -> None:
+    overloaded_lines = net.res_line[net.res_line["loading_percent"] > 80]
+    overloaded_trafos = net.res_trafo[net.res_trafo["loading_percent"] > 80]
+    print(f"\n📋 PODSUMOWANIE:")
+    if len(overloaded_lines) == 0 and len(overloaded_trafos) == 0:
+        print("   ✅ Brak przeciążeń (loading < 80%)")
+    else:
+        if len(overloaded_lines) > 0:
+            print(f"   ⚠️  Przeciążone linie:  {len(overloaded_lines)}")
+        if len(overloaded_trafos) > 0:
+            print(f"   ⚠️  Przeciążone trafos: {len(overloaded_trafos)}")
+    print()

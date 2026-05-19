@@ -7,25 +7,18 @@ from typing import Any, Callable
 
 import pandas as pd
 import pandapower as pp
-import pandapower.auxiliary as pp_aux
 
 from kse_grid.element_editing import (
     apply_element_update,
     field_schema,
     read_element_params,
 )
+from kse_grid.powerflow_engine import load_powerflow_options, run_powerflow
 from kse_grid.serializer import (
     compute_graph_positions,
     serialize_network,
     serialize_topology_update,
 )
-
-
-_DEFAULT_POWERFLOW_OPTIONS = {
-    "algorithm": "nr",
-    "max_iteration": 100,
-    "tolerance_mva": 1e-6,
-}
 
 
 class SwitchingSession:
@@ -58,7 +51,7 @@ class SwitchingSession:
 
         # Jeśli wcześniejszy load flow używał niestandardowych parametrów, chcemy
         # je zachować przy kolejnych przeliczeniach po zmianach topologii.
-        self._powerflow_options = _extract_powerflow_options(net)
+        self._powerflow_options = load_powerflow_options(net)
 
         self._last_run_succeeded: bool | None = _has_results(self.working_net)
         self._last_run_message: str | None = None
@@ -177,46 +170,17 @@ class SwitchingSession:
         return self.build_update_payload(changed_element=changed_element)
 
     def _recalculate_in_place(self, net: pp.pandapowerNet) -> None:
-        # Stare wyniki po poprzednim stanie topologii byłyby mylące, więc przed
-        # nowym `runpp()` czyścimy wszystkie tabele `res_*`.
         _clear_results(net)
-
-        try:
-            pp.runpp(
-                net,
-                algorithm=self._powerflow_options["algorithm"],
-                calculate_voltage_angles=True,
-                max_iteration=self._powerflow_options["max_iteration"],
-                init="flat",
-                tolerance_mva=self._powerflow_options["tolerance_mva"],
-            )
-        except (pp_aux.LoadflowNotConverged, UserWarning) as exc:
-            net.converged = False
-            self._last_run_succeeded = False
-            self._last_run_message = str(exc)
-            return
-
-        net.converged = True
-        self._last_run_succeeded = True
-        self._last_run_message = None
-
-
-def _extract_powerflow_options(net: pp.pandapowerNet) -> dict[str, Any]:
-    """
-    Pobiera parametry load flow zapisane wcześniej na sieci.
-
-    Jeśli wcześniejszy kod nie zapisał takich ustawień, wracamy do domyślnych
-    parametrów aplikacji. Dzięki temu warstwa switchy nie musi zgadywać, jak
-    uruchamiać `runpp()` po zmianie topologii.
-    """
-    raw = getattr(net, "_powerflow_options", None)
-    if not isinstance(raw, dict):
-        return dict(_DEFAULT_POWERFLOW_OPTIONS)
-    return {
-        "algorithm": str(raw.get("algorithm", _DEFAULT_POWERFLOW_OPTIONS["algorithm"])),
-        "max_iteration": int(raw.get("max_iteration", _DEFAULT_POWERFLOW_OPTIONS["max_iteration"])),
-        "tolerance_mva": float(raw.get("tolerance_mva", _DEFAULT_POWERFLOW_OPTIONS["tolerance_mva"])),
-    }
+        opts = self._powerflow_options
+        result = run_powerflow(
+            net,
+            algorithm=str(opts["algorithm"]),
+            max_iteration=int(opts["max_iteration"]),
+            tolerance_mva=float(opts["tolerance_mva"]),
+        )
+        net.converged = result.converged
+        self._last_run_succeeded = result.converged
+        self._last_run_message = result.message if not result.converged else None
 
 
 def _has_results(net: pp.pandapowerNet) -> bool:
