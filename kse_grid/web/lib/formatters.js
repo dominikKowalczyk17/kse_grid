@@ -1,6 +1,4 @@
-export const HISTOGRAM_BIN_WIDTH = 0.01;
-export const HISTOGRAM_MIN = 0.85;
-export const HISTOGRAM_MAX = 1.15;
+import { VOLTAGE_OK_MIN, VOLTAGE_OK_MAX, VOLTAGE_WARN_MIN, VOLTAGE_WARN_MAX } from '/lib/thresholds.js';
 
 export function voltageColorVar (kv) {
     if (kv >= 380) return 'var(--grid-400)';
@@ -11,8 +9,8 @@ export function voltageColorVar (kv) {
 
 export function voltageStatus (vmPu) {
     if (vmPu == null) return '';
-    if (vmPu >= 0.95 && vmPu <= 1.05) return 'good';
-    if (vmPu >= 0.9 && vmPu <= 1.1) return 'warn';
+    if (vmPu >= VOLTAGE_OK_MIN && vmPu <= VOLTAGE_OK_MAX) return 'good';
+    if (vmPu >= VOLTAGE_WARN_MIN && vmPu <= VOLTAGE_WARN_MAX) return 'warn';
     return 'bad';
 }
 

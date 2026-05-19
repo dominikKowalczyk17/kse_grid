@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 import re
 import tempfile
-from numbers import Integral, Real
 from pathlib import Path
 
 import pandapower as pp
 from pandapower.converter.matpower import from_mpc
+
+from kse_grid.type_coercion import to_float as _to_float, to_int as _to_int
 
 
 def load_matpower_case(case_file: str | Path, f_hz: int = 50) -> pp.pandapowerNet:
@@ -513,19 +514,3 @@ def _match_geo_feature_to_bus(
     return None
 
 
-def _to_int(value: object) -> int:
-    if isinstance(value, Integral):
-        return int(value)
-    if isinstance(value, str):
-        return int(value)
-    raise TypeError(f"Expected integer-like value, got {type(value).__name__}")
-
-
-def _to_float(value: object) -> float:
-    if isinstance(value, bool):
-        return float(value)
-    if isinstance(value, Real):
-        return float(value)
-    if isinstance(value, str):
-        return float(value)
-    raise TypeError(f"Expected float-like value, got {type(value).__name__}")

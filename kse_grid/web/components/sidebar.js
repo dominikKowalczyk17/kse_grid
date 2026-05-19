@@ -1,14 +1,8 @@
 import { computed, ref, watch } from 'vue';
 import { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot } from '/icons.js';
 import { SwitchingPanel } from '/components/switching-panel.js';
-import {
-    formatMw,
-    HISTOGRAM_BIN_WIDTH,
-    HISTOGRAM_MAX,
-    HISTOGRAM_MIN,
-    voltageColorVar,
-    voltageStatus,
-} from '/lib/formatters.js';
+import { formatMw, voltageColorVar, voltageStatus } from '/lib/formatters.js';
+import { HISTOGRAM_BIN_WIDTH, HISTOGRAM_MAX, HISTOGRAM_MIN } from '/lib/thresholds.js';
 
 export const Sidebar = {
     components: { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot, SwitchingPanel },

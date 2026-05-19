@@ -4,20 +4,20 @@ from __future__ import annotations
 
 import json
 import math
-from numbers import Integral, Real
 from typing import Any
 
 import networkx as nx
 import pandapower as pp
 from pandapower.topology import create_nxgraph, unsupplied_buses
 
-
-_VOLTAGE_OK_MIN = 0.95
-_VOLTAGE_OK_MAX = 1.05
-_OVERLOAD_PCT = 150.0
-_LOAD_WARN_PCT = 100.0
-_LOAD_BAD_PCT = 150.0
-_CORE_VOLTAGE_KV = 220.0
+from kse_grid.thresholds import (
+    CORE_VOLTAGE_KV as _CORE_VOLTAGE_KV,
+    LOAD_BAD_PCT as _LOAD_BAD_PCT,
+    LOAD_WARN_PCT as _LOAD_WARN_PCT,
+    VOLTAGE_OK_MAX as _VOLTAGE_OK_MAX,
+    VOLTAGE_OK_MIN as _VOLTAGE_OK_MIN,
+)
+from kse_grid.type_coercion import safe_float as _safe_float, to_float as _to_float, to_int as _to_int
 
 
 def compute_graph_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, float]]:
@@ -198,21 +198,6 @@ def serialize_network(
         "graphBounds": graph_bounds,
         "geoView": geo_view,
     }
-
-
-def _to_int(value: object) -> int:
-    if isinstance(value, Integral):
-        return int(value)
-    if isinstance(value, str):
-        return int(value)
-    raise TypeError(f"Expected integer-like value, got {type(value).__name__}")
-
-
-def _to_float(value: object) -> float:
-    result = _safe_float(value)
-    if result is None:
-        raise TypeError(f"Expected float-like value, got {value!r}")
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -596,23 +581,6 @@ def _serialize_gens(net: pp.pandapowerNet) -> list[dict[str, Any]]:
     return out
 
 
-def _safe_float(value: Any) -> float | None:
-    if isinstance(value, bool):
-        f = float(value)
-    elif isinstance(value, Real):
-        f = float(value)
-    elif isinstance(value, str):
-        try:
-            f = float(value)
-        except ValueError:
-            return None
-    else:
-        return None
-    if math.isnan(f) or math.isinf(f):
-        return None
-    return f
-
-
 # ---------------------------------------------------------------------------
 # Statystyki
 # ---------------------------------------------------------------------------
@@ -813,8 +781,8 @@ def _compute_loading_diagnostics(net: pp.pandapowerNet) -> dict[str, Any]:
 
     if not net.res_line.empty:
         line_loading = net.res_line["loading_percent"].fillna(0.0)
-        overloaded += int((line_loading >= _OVERLOAD_PCT).sum())
-        heavy += int(((line_loading >= _LOAD_WARN_PCT) & (line_loading < _OVERLOAD_PCT)).sum())
+        overloaded += int((line_loading >= _LOAD_BAD_PCT).sum())
+        heavy += int(((line_loading >= _LOAD_WARN_PCT) & (line_loading < _LOAD_BAD_PCT)).sum())
         if not line_loading.empty:
             idx = _to_int(line_loading.idxmax())
             value = float(line_loading.loc[idx])
@@ -826,8 +794,8 @@ def _compute_loading_diagnostics(net: pp.pandapowerNet) -> dict[str, Any]:
 
     if not net.res_trafo.empty:
         trafo_loading = net.res_trafo["loading_percent"].fillna(0.0)
-        overloaded += int((trafo_loading >= _OVERLOAD_PCT).sum())
-        heavy += int(((trafo_loading >= _LOAD_WARN_PCT) & (trafo_loading < _OVERLOAD_PCT)).sum())
+        overloaded += int((trafo_loading >= _LOAD_BAD_PCT).sum())
+        heavy += int(((trafo_loading >= _LOAD_WARN_PCT) & (trafo_loading < _LOAD_BAD_PCT)).sum())
         if not trafo_loading.empty:
             idx = _to_int(trafo_loading.idxmax())
             value = float(trafo_loading.loc[idx])
@@ -873,9 +841,9 @@ def _count_voltage_violations(net: pp.pandapowerNet) -> int:
 def _count_overloads(net: pp.pandapowerNet) -> int:
     total = 0
     if not net.res_line.empty:
-        total += int((net.res_line["loading_percent"].fillna(0.0) > _OVERLOAD_PCT).sum())
+        total += int((net.res_line["loading_percent"].fillna(0.0) > _LOAD_BAD_PCT).sum())
     if not net.res_trafo.empty:
-        total += int((net.res_trafo["loading_percent"].fillna(0.0) > _OVERLOAD_PCT).sum())
+        total += int((net.res_trafo["loading_percent"].fillna(0.0) > _LOAD_BAD_PCT).sum())
     return total
 
 
