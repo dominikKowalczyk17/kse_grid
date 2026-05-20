@@ -39,7 +39,7 @@ mpc.branch = [
     4  5  0.002  0.02  0.05  1500  1500  1500     0  0  1;  % Odcinek 2 (ok. 100 km)
 
 
-    5  6  0.001  0.04     0   500   500   500  1.07  0  1;  % Zaczep podbity dla stabilizacji [7]
+    5  6  0.001  0.04     0   500   500   500  1.00  0  1;
 ];
 
 %% --- COST DATA (Opcjonalne dla runopf) ---

@@ -1,0 +1,11 @@
+{
+  "type": "FeatureCollection",
+  "name": "Zarnowiec",
+  "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+  "features": [
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [18.107273, 54.718464]}, "properties": {"bus": 206, "station": "Żarnowiec"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [18.708682, 54.338341]}, "properties": {"bus": 187, "station": "Gdańsk Błonia"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [20.347871, 53.828031]}, "properties": {"bus": 195, "station": "Olsztyn Mątki"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.622238, 53.107268]}, "properties": {"bus": 18, "station": "Ostrołęka"}}
+  ]
+}
