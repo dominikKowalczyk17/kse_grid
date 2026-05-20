@@ -1,0 +1,82 @@
+{
+  "type": "FeatureCollection",
+  "name": "Porabka_Belchatow",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.211745,
+          49.780375
+        ]
+      },
+      "properties": {
+        "bus": 401,
+        "station": "Porąbka-Żar"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.212772,
+          49.842428
+        ]
+      },
+      "properties": {
+        "bus": 402,
+        "station": "Bujaków"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.293988,
+          50.163212
+        ]
+      },
+      "properties": {
+        "bus": 403,
+        "station": "Byczyna"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.332399,
+          50.377021
+        ]
+      },
+      "properties": {
+        "bus": 404,
+        "station": "Tucznawa"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.328516,
+          51.31616
+        ]
+      },
+      "properties": {
+        "bus": 405,
+        "station": "Rogowiec"
+      }
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "type": "FeatureCollection",
+  "name": "Solina_Kozienice",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          22.45564,
+          49.39781
+        ]
+      },
+      "properties": {
+        "bus": 1,
+        "station": "Solina"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          22.45564,
+          49.39781
+        ]
+      },
+      "properties": {
+        "bus": 2,
+        "station": "Solina 110 kV"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.85287,
+          49.68855
+        ]
+      },
+      "properties": {
+        "bus": 3,
+        "station": "Krosno Iskrzynia 400 kV"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.87051,
+          50.19068
+        ]
+      },
+      "properties": {
+        "bus": 4,
+        "station": "Rzeszów Widełka 400 kV"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.45394,
+          51.66369
+        ]
+      },
+      "properties": {
+        "bus": 5,
+        "station": "Kozienice 400 kV"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.45394,
+          51.66369
+        ]
+      },
+      "properties": {
+        "bus": 6,
+        "station": "Kozienice 220 kV"
+      }
+    }
+  ]
+}

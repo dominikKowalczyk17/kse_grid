@@ -1,0 +1,110 @@
+{
+  "type": "FeatureCollection",
+  "name": "Porabka_Opole",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.211745,
+          49.780375
+        ]
+      },
+      "properties": {
+        "bus": 501,
+        "station": "Porąbka-Żar"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.212772,
+          49.842428
+        ]
+      },
+      "properties": {
+        "bus": 502,
+        "station": "Bujaków"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.293988,
+          50.163212
+        ]
+      },
+      "properties": {
+        "bus": 503,
+        "station": "Byczyna"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          18.852108,
+          50.231197
+        ]
+      },
+      "properties": {
+        "bus": 504,
+        "station": "Halemba"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          18.850299,
+          50.130522
+        ]
+      },
+      "properties": {
+        "bus": 505,
+        "station": "Kopanina"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          18.539818,
+          50.124995
+        ]
+      },
+      "properties": {
+        "bus": 506,
+        "station": "Wielopole"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.872544,
+          50.746963
+        ]
+      },
+      "properties": {
+        "bus": 507,
+        "station": "Dobrzeń"
+      }
+    }
+  ]
+}
