@@ -932,6 +932,18 @@ body {
     margin-bottom: 0.5rem;
 }
 
+.header-view-toggle {
+    display: inline-flex;
+    gap: 0.3rem;
+    margin-left: 0.75rem;
+}
+.header-view-toggle .chip {
+    flex: 0 0 auto;
+    height: 28px;
+    padding: 0 0.65rem;
+    font-size: 0.6875rem;
+}
+
 .chip {
     flex: 1;
     height: 26px;

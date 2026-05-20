@@ -169,6 +169,27 @@ export const App = {
 
             <div class="header-divider"></div>
 
+            <div class="header-view-toggle" role="group" aria-label="Tryb widoku">
+                <button type="button"
+                        class="chip"
+                        :class="{ active: viewMode === 'graph' }"
+                        @click="viewMode = 'graph'"
+                        title="Widok grafowy (layout schematyczny)">Graf</button>
+                <button type="button"
+                        class="chip"
+                        :class="{ active: viewMode === 'geo' }"
+                        :disabled="!network.geoAvailable"
+                        @click="viewMode = 'geo'"
+                        :title="network.geoAvailable ? 'Widok geograficzny (OpenStreetMap)' : 'Brak współrzędnych WGS84 w case\\'ie'">OSM</button>
+                <button type="button"
+                        class="chip"
+                        :class="{ active: viewMode === 'atlas' }"
+                        @click="viewMode = 'atlas'"
+                        title="Atlas KSE 2019 (referencyjny)">Atlas</button>
+            </div>
+
+            <div class="header-divider"></div>
+
             <div class="header-stats">
                 <span class="header-stat"><span class="v tabular">{{ stats.nBus }}</span> szyn</span>
                 <span class="header-stat"><span class="v tabular">{{ stats.nLine }}</span> linii</span>

@@ -1,5 +1,5 @@
-import { computed } from 'vue';
-import { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot } from '/icons.js';
+import { computed, ref } from 'vue';
+import { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot, IconChevronLeft, IconChevronRight, IconActivity, IconBolt } from '/icons.js';
 import { SwitchingPanel } from '/components/switching-panel.js';
 import { formatMw, voltageColorVar } from '/lib/formatters.js';
 import { useBusSearch } from '/lib/composables/use-bus-search.js';
@@ -7,7 +7,7 @@ import { useVoltageHistogram } from '/lib/composables/use-voltage-histogram.js';
 import { useBranchRanking } from '/lib/composables/use-branch-ranking.js';
 
 export const Sidebar = {
-    components: { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot, SwitchingPanel },
+    components: { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot, IconChevronLeft, IconChevronRight, IconActivity, IconBolt, SwitchingPanel },
     props: {
         stats: Object,
         totals: Object,
@@ -127,11 +127,6 @@ export const Sidebar = {
             focusBranchAt, navigateBranches,
         } = useBranchRanking(props, { focusElement });
 
-        function setViewMode (mode) {
-            if (mode === 'geo' && !props.geoAvailable) return;
-            emit('update:viewMode', mode);
-        }
-
         function toggleAtlasCategory (category) {
             const set = new Set(props.atlasCategories);
             if (set.has(category)) set.delete(category); else set.add(category);
@@ -167,10 +162,23 @@ export const Sidebar = {
             emit('update:minBusPower', num);
         }
 
+        const panel = ref('root');
+        const panelTitles = {
+            balance: 'Bilans mocy',
+            voltage: 'Profil napięciowy',
+            loading: 'Obciążenie gałęzi',
+            histogram: 'Rozkład U (p.u.)',
+            switching: 'Łączenia / wyspy',
+        };
+        const panelTitle = computed(() => panelTitles[panel.value] || '');
+        function openPanel (name) { panel.value = name; }
+        function backToRoot () { panel.value = 'root'; }
+
         return {
+            panel, panelTitle, openPanel, backToRoot,
             search, showSuggestions, suggestions,
             isCore, isAll, isMediumVoltage,
-            applyPreset, toggleVoltage, toggleType, pickSuggestion, blurLater, setViewMode,
+            applyPreset, toggleVoltage, toggleType, pickSuggestion, blurLater,
             toggleAtlasCategory,
             HISTOGRAM_BIN_WIDTH,
             voltageColorVar, totals, voltageDiag, loadingDiag,
@@ -186,116 +194,42 @@ export const Sidebar = {
     template: `
     <aside class="sidebar">
 
-        <SwitchingPanel
-            :topology="topology"
-            :busy="topologyBusy"
-            :request-error="topologyError" />
+        <template v-if="panel !== 'root'">
+            <button class="sidebar-back" type="button" @click="backToRoot">
+                <IconChevronLeft />
+                <span class="sidebar-back-label">Wstecz</span>
+                <span class="sidebar-back-title">{{ panelTitle }}</span>
+            </button>
+        </template>
 
+        <template v-if="panel === 'root'">
         <section class="section-card">
-            <h3 class="section-title">Bilans mocy</h3>
-            <div class="metric-grid">
-                <div class="metric">
-                    <div class="metric-label">Σ P obc.</div>
-                    <div class="metric-value tabular">{{ formatMw(totals.loadMw) }}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Σ P gen</div>
-                    <div class="metric-value tabular">{{ formatMw(totals.generationMw) }}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">ΔP strat</div>
-                    <div class="metric-value tabular">{{ formatMw(totals.lossesMw) }}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Udział strat</div>
-                    <div class="metric-value tabular">{{ lossPctLabel }}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Węzeł slack</div>
-                    <div class="metric-value tabular">{{ slackLabel }}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Jedn. gen.</div>
-                    <div class="metric-value tabular">{{ totals.genUnits ?? '—' }}</div>
-                </div>
+            <h3 class="section-title">Wyszukaj szynę</h3>
+            <div class="search-wrap">
+                <IconSearch />
+                <input
+                    v-model="search"
+                    @focus="showSuggestions = true"
+                    @blur="blurLater"
+                    class="search-input"
+                    placeholder="Nazwa lub ID szyny..."
+                    type="text" />
             </div>
-        </section>
-
-        <section class="section-card">
-            <h3 class="section-title">Profil napięciowy</h3>
-            <div class="diag-stack">
-                <button class="diag-row diag-row-button" type="button" :disabled="!canFocusBus(voltageDiag.minBusId)" @click="focusBus(voltageDiag.minBusId)">
-                    <span class="diag-main">
-                        <span class="diag-label">U min</span>
-                        <span class="diag-sub">{{ minBusSub }}</span>
-                    </span>
-                    <span class="diag-values">
-                        <span class="diag-value tabular" :class="voltageDiag.minPu != null ? (voltageDiag.minPu < 0.95 ? 'bad' : 'good') : ''">{{ voltageDiag.minPu != null ? voltageDiag.minPu.toFixed(3) + ' p.u.' : '—' }}</span>
-                    </span>
+            <div v-if="showSuggestions && suggestions.length" class="suggestions">
+                <button
+                    v-for="b in suggestions"
+                    :key="b.id"
+                    class="suggestion-item"
+                    @mousedown.prevent="pickSuggestion(b)">
+                    <span>{{ b.name }}</span>
+                    <span class="meta">#{{ b.id }} · {{ b.vn_kv.toFixed(0) }} kV</span>
                 </button>
-                <button class="diag-row diag-row-button" type="button" :disabled="!canFocusBus(voltageDiag.maxBusId)" @click="focusBus(voltageDiag.maxBusId)">
-                    <span class="diag-main">
-                        <span class="diag-label">U max</span>
-                        <span class="diag-sub">{{ maxBusSub }}</span>
-                    </span>
-                    <span class="diag-values">
-                        <span class="diag-value tabular" :class="voltageDiag.maxPu != null ? (voltageDiag.maxPu > 1.05 ? 'bad' : 'good') : ''">{{ voltageDiag.maxPu != null ? voltageDiag.maxPu.toFixed(3) + ' p.u.' : '—' }}</span>
-                    </span>
-                </button>
-                <div class="diag-row">
-                    <span class="diag-label">U &lt; 0.95 p.u.</span>
-                    <span class="diag-value tabular" :class="{ bad: (voltageDiag.lowCount ?? 0) > 0 }">{{ voltageDiag.lowCount ?? 0 }}</span>
-                </div>
-                <div class="diag-row">
-                    <span class="diag-label">U &gt; 1.05 p.u.</span>
-                    <span class="diag-value tabular" :class="{ bad: (voltageDiag.highCount ?? 0) > 0 }">{{ voltageDiag.highCount ?? 0 }}</span>
-                </div>
             </div>
-        </section>
-
-        <section class="section-card">
-            <h3 class="section-title">Obciążenie gałęzi</h3>
-            <div class="diag-stack">
-                <button class="diag-row diag-row-button"
-                        type="button"
-                        :disabled="!activeBranch || !canFocusElement(activeBranch)"
-                        @click="focusBranchAt(activeBranchCursor)">
-                    <span class="diag-main">
-                        <span class="diag-label">Maks. obciążenie</span>
-                        <span class="diag-sub">{{ activeBranch ? activeBranch.label + ' · ' + activeBranch.voltageLabel : maxElementSub }}</span>
-                    </span>
-                    <span class="diag-values">
-                        <span class="diag-value tabular" :class="(activeBranch?.loading ?? loadingDiag.maxPct) >= 150 ? 'bad' : ((activeBranch?.loading ?? loadingDiag.maxPct) >= 100 ? 'warn' : 'good')">{{ activeBranch ? activeBranch.loading.toFixed(1) + ' %' : (loadingDiag.maxPct != null ? loadingDiag.maxPct.toFixed(1) + ' %' : '—') }}</span>
-                    </span>
+            <div class="btn-search-row">
+                <button class="btn btn-block" @click="$emit('reset-view')">
+                    <IconRotate />
+                    Reset widoku
                 </button>
-                <div class="diag-row">
-                    <span class="diag-label">Przeciążone ≥ 150%</span>
-                    <span class="diag-value tabular" :class="{ bad: (loadingDiag.overloadedCount ?? 0) > 0 }">{{ loadingDiag.overloadedCount ?? 0 }}</span>
-                </div>
-                <div class="diag-row">
-                    <span class="diag-label">Ciężko obciążone 100–150%</span>
-                    <span class="diag-value tabular">{{ loadingDiag.heavyCount ?? 0 }}</span>
-                </div>
-                <div class="diag-row">
-                    <span class="diag-label">Szyny z obciążeniem</span>
-                    <span class="diag-value tabular">{{ loadingDiag.loadBusCount ?? 0 }}</span>
-                </div>
-                <div v-if="activeBranch" class="group-nav">
-                    <button class="chip"
-                            type="button"
-                            :disabled="activeBranchCursor <= 0"
-                            @click="navigateBranches(-1)">Poprzednia</button>
-                    <button class="chip"
-                            type="button"
-                            :disabled="!canFocusElement(activeBranch)"
-                            @click="focusBranchAt(activeBranchCursor)">
-                        {{ activeBranchCursor + 1 }}/{{ sortedBranches.length }}
-                    </button>
-                    <button class="chip"
-                            type="button"
-                            :disabled="activeBranchCursor >= sortedBranches.length - 1"
-                            @click="navigateBranches(1)">Następna</button>
-                </div>
             </div>
         </section>
 
@@ -329,62 +263,9 @@ export const Sidebar = {
             </div>
         </section>
 
-        <section class="section-card">
-            <h3 class="section-title">Wyszukaj szynę</h3>
-            <div class="search-wrap">
-                <IconSearch />
-                <input
-                    v-model="search"
-                    @focus="showSuggestions = true"
-                    @blur="blurLater"
-                    class="search-input"
-                    placeholder="Nazwa lub ID szyny..."
-                    type="text" />
-            </div>
-            <div v-if="showSuggestions && suggestions.length" class="suggestions">
-                <button
-                    v-for="b in suggestions"
-                    :key="b.id"
-                    class="suggestion-item"
-                    @mousedown.prevent="pickSuggestion(b)">
-                    <span>{{ b.name }}</span>
-                    <span class="meta">#{{ b.id }} · {{ b.vn_kv.toFixed(0) }} kV</span>
-                </button>
-            </div>
-            <div class="btn-search-row">
-                <button class="btn btn-block" @click="$emit('reset-view')">
-                    <IconRotate />
-                    Reset widoku
-                </button>
-            </div>
-        </section>
-
-        <section class="section-card">
-            <h3 class="section-title">Widok</h3>
+        <section v-if="viewMode === 'atlas'" class="section-card">
+            <h3 class="section-title">Kategorie atlasu</h3>
             <div class="chip-row">
-                <button class="chip" :class="{ active: viewMode === 'graph' }" @click="setViewMode('graph')">Graf</button>
-                <button
-                    class="chip"
-                    :class="{ active: viewMode === 'geo' }"
-                    :disabled="!geoAvailable"
-                    @click="setViewMode('geo')">
-                    OpenStreetMap
-                </button>
-                <button
-                    class="chip"
-                    :class="{ active: viewMode === 'atlas' }"
-                    @click="setViewMode('atlas')">
-                    Atlas KSE
-                </button>
-            </div>
-            <p class="helper">
-                {{ viewMode === 'atlas'
-                    ? 'Widok referencyjny KSE 2019: stacje i linie z OpenInfraMap (przesył NN czerwony, dystrybucja 110 kV niebieska, JW szara). Bez modelu pandapower.'
-                    : geoAvailable
-                        ? 'Tryb mapowy używa współrzędnych WGS84 z datasetu.'
-                        : 'Tryb mapowy włączy się automatycznie, gdy case dostarczy geometrię WGS84.' }}
-            </p>
-            <div v-if="viewMode === 'atlas'" class="chip-row" style="margin-top:8px;">
                 <button
                     class="chip"
                     :class="{ active: atlasCategories.includes('osp') }"
@@ -404,6 +285,9 @@ export const Sidebar = {
                     title="Linie blokowe / jednostki wytwórcze"
                 ><span class="v-dot" style="background:#ffdc78"></span>JW</button>
             </div>
+            <p class="helper">
+                Widok referencyjny KSE 2019: stacje i linie z OpenInfraMap (przesył NN czerwony, dystrybucja 110 kV niebieska, JW szara). Bez modelu pandapower.
+            </p>
         </section>
 
         <section class="section-card">
@@ -507,8 +391,171 @@ export const Sidebar = {
             </div>
         </section>
 
+        <section class="section-card sidebar-nav">
+            <h3 class="section-title">Diagnostyka i topologia</h3>
+            <button class="nav-row nav-row-balance" type="button" @click="openPanel('balance')">
+                <span class="nav-row-text">
+                    <span class="nav-row-title">Bilans mocy</span>
+                    <span class="nav-row-sub">Σ P obc/gen, straty, slack</span>
+                </span>
+                <IconChevronRight class="nav-row-chevron" />
+            </button>
+            <button class="nav-row nav-row-voltage" type="button" @click="openPanel('voltage')">
+                <span class="nav-row-text">
+                    <span class="nav-row-title">Profil napięciowy</span>
+                    <span class="nav-row-sub">U min/max, naruszenia ±5%</span>
+                </span>
+                <IconChevronRight class="nav-row-chevron" />
+            </button>
+            <button class="nav-row nav-row-loading" type="button" @click="openPanel('loading')">
+                <span class="nav-row-text">
+                    <span class="nav-row-title">Obciążenie gałęzi</span>
+                    <span class="nav-row-sub">Najgorętsze linie i trafo</span>
+                </span>
+                <IconChevronRight class="nav-row-chevron" />
+            </button>
+            <button class="nav-row nav-row-histogram" type="button" @click="openPanel('histogram')">
+                <span class="nav-row-text">
+                    <span class="nav-row-title">Rozkład U (p.u.)</span>
+                    <span class="nav-row-sub">Histogram napięć szyn</span>
+                </span>
+                <IconChevronRight class="nav-row-chevron" />
+            </button>
+            <button class="nav-row nav-row-switching" type="button" @click="openPanel('switching')">
+                <span class="nav-row-text">
+                    <span class="nav-row-title">Łączenia / wyspy</span>
+                    <span class="nav-row-sub">Stan łączników i topologii</span>
+                </span>
+                <IconChevronRight class="nav-row-chevron" />
+            </button>
+        </section>
+
         <section class="section-card">
-            <h3 class="section-title">Rozkład U (p.u.)</h3>
+            <h3 class="section-title">Obciążenie linii</h3>
+            <div class="legend-bar"></div>
+            <div class="legend-scale">
+                <span>0%</span><span>60%</span><span>100%</span><span>150%+</span>
+            </div>
+        </section>
+
+        <section class="section-card">
+            <h3 class="section-title">Napięcie szyn (Um)</h3>
+            <ul class="legend-list">
+                <li><span class="dot" style="background:#6A1B9A"></span>&lt; 0.90 p.u.</li>
+                <li><span class="dot" style="background:#1E88E5"></span>0.90 – 0.95</li>
+                <li><span class="dot" style="background:#43A047"></span>0.95 – 1.05 (OK)</li>
+                <li><span class="dot" style="background:#FB8C00"></span>1.05 – 1.10</li>
+                <li><span class="dot" style="background:#D32F2F"></span>&gt; 1.10 p.u.</li>
+            </ul>
+        </section>
+        </template>
+
+        <section v-if="panel === 'balance'" class="section-card">
+            <div class="metric-grid">
+                <div class="metric">
+                    <div class="metric-label">Σ P obc.</div>
+                    <div class="metric-value tabular">{{ formatMw(totals.loadMw) }}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Σ P gen</div>
+                    <div class="metric-value tabular">{{ formatMw(totals.generationMw) }}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">ΔP strat</div>
+                    <div class="metric-value tabular">{{ formatMw(totals.lossesMw) }}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Udział strat</div>
+                    <div class="metric-value tabular">{{ lossPctLabel }}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Węzeł slack</div>
+                    <div class="metric-value tabular">{{ slackLabel }}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Jedn. gen.</div>
+                    <div class="metric-value tabular">{{ totals.genUnits ?? '—' }}</div>
+                </div>
+            </div>
+        </section>
+
+        <section v-if="panel === 'voltage'" class="section-card">
+            <div class="diag-stack">
+                <button class="diag-row diag-row-button" type="button" :disabled="!canFocusBus(voltageDiag.minBusId)" @click="focusBus(voltageDiag.minBusId)">
+                    <span class="diag-main">
+                        <span class="diag-label">U min</span>
+                        <span class="diag-sub">{{ minBusSub }}</span>
+                    </span>
+                    <span class="diag-values">
+                        <span class="diag-value tabular" :class="voltageDiag.minPu != null ? (voltageDiag.minPu < 0.95 ? 'bad' : 'good') : ''">{{ voltageDiag.minPu != null ? voltageDiag.minPu.toFixed(3) + ' p.u.' : '—' }}</span>
+                    </span>
+                </button>
+                <button class="diag-row diag-row-button" type="button" :disabled="!canFocusBus(voltageDiag.maxBusId)" @click="focusBus(voltageDiag.maxBusId)">
+                    <span class="diag-main">
+                        <span class="diag-label">U max</span>
+                        <span class="diag-sub">{{ maxBusSub }}</span>
+                    </span>
+                    <span class="diag-values">
+                        <span class="diag-value tabular" :class="voltageDiag.maxPu != null ? (voltageDiag.maxPu > 1.05 ? 'bad' : 'good') : ''">{{ voltageDiag.maxPu != null ? voltageDiag.maxPu.toFixed(3) + ' p.u.' : '—' }}</span>
+                    </span>
+                </button>
+                <div class="diag-row">
+                    <span class="diag-label">U &lt; 0.95 p.u.</span>
+                    <span class="diag-value tabular" :class="{ bad: (voltageDiag.lowCount ?? 0) > 0 }">{{ voltageDiag.lowCount ?? 0 }}</span>
+                </div>
+                <div class="diag-row">
+                    <span class="diag-label">U &gt; 1.05 p.u.</span>
+                    <span class="diag-value tabular" :class="{ bad: (voltageDiag.highCount ?? 0) > 0 }">{{ voltageDiag.highCount ?? 0 }}</span>
+                </div>
+            </div>
+        </section>
+
+        <section v-if="panel === 'loading'" class="section-card">
+            <div class="diag-stack">
+                <button class="diag-row diag-row-button"
+                        type="button"
+                        :disabled="!activeBranch || !canFocusElement(activeBranch)"
+                        @click="focusBranchAt(activeBranchCursor)">
+                    <span class="diag-main">
+                        <span class="diag-label">Maks. obciążenie</span>
+                        <span class="diag-sub">{{ activeBranch ? activeBranch.label + ' · ' + activeBranch.voltageLabel : maxElementSub }}</span>
+                    </span>
+                    <span class="diag-values">
+                        <span class="diag-value tabular" :class="(activeBranch?.loading ?? loadingDiag.maxPct) >= 150 ? 'bad' : ((activeBranch?.loading ?? loadingDiag.maxPct) >= 100 ? 'warn' : 'good')">{{ activeBranch ? activeBranch.loading.toFixed(1) + ' %' : (loadingDiag.maxPct != null ? loadingDiag.maxPct.toFixed(1) + ' %' : '—') }}</span>
+                    </span>
+                </button>
+                <div class="diag-row">
+                    <span class="diag-label">Przeciążone ≥ 150%</span>
+                    <span class="diag-value tabular" :class="{ bad: (loadingDiag.overloadedCount ?? 0) > 0 }">{{ loadingDiag.overloadedCount ?? 0 }}</span>
+                </div>
+                <div class="diag-row">
+                    <span class="diag-label">Ciężko obciążone 100–150%</span>
+                    <span class="diag-value tabular">{{ loadingDiag.heavyCount ?? 0 }}</span>
+                </div>
+                <div class="diag-row">
+                    <span class="diag-label">Szyny z obciążeniem</span>
+                    <span class="diag-value tabular">{{ loadingDiag.loadBusCount ?? 0 }}</span>
+                </div>
+                <div v-if="activeBranch" class="group-nav">
+                    <button class="chip"
+                            type="button"
+                            :disabled="activeBranchCursor <= 0"
+                            @click="navigateBranches(-1)">Poprzednia</button>
+                    <button class="chip"
+                            type="button"
+                            :disabled="!canFocusElement(activeBranch)"
+                            @click="focusBranchAt(activeBranchCursor)">
+                        {{ activeBranchCursor + 1 }}/{{ sortedBranches.length }}
+                    </button>
+                    <button class="chip"
+                            type="button"
+                            :disabled="activeBranchCursor >= sortedBranches.length - 1"
+                            @click="navigateBranches(1)">Następna</button>
+                </div>
+            </div>
+        </section>
+
+        <section v-if="panel === 'histogram'" class="section-card">
             <div class="histogram-shell">
                 <div class="histogram-chart">
                     <div class="histogram-band histogram-band-good" :style="{ left: histogram.okBandLeft + '%', width: histogram.okBandWidth + '%' }"></div>
@@ -571,24 +618,11 @@ export const Sidebar = {
             </div>
         </section>
 
-        <section class="section-card">
-            <h3 class="section-title">Obciążenie linii</h3>
-            <div class="legend-bar"></div>
-            <div class="legend-scale">
-                <span>0%</span><span>60%</span><span>100%</span><span>150%+</span>
-            </div>
-        </section>
-
-        <section class="section-card">
-            <h3 class="section-title">Napięcie szyn (Um)</h3>
-            <ul class="legend-list">
-                <li><span class="dot" style="background:#6A1B9A"></span>&lt; 0.90 p.u.</li>
-                <li><span class="dot" style="background:#1E88E5"></span>0.90 – 0.95</li>
-                <li><span class="dot" style="background:#43A047"></span>0.95 – 1.05 (OK)</li>
-                <li><span class="dot" style="background:#FB8C00"></span>1.05 – 1.10</li>
-                <li><span class="dot" style="background:#D32F2F"></span>&gt; 1.10 p.u.</li>
-            </ul>
-        </section>
+        <SwitchingPanel
+            v-if="panel === 'switching'"
+            :topology="topology"
+            :busy="topologyBusy"
+            :request-error="topologyError" />
 
     </aside>
     `,
