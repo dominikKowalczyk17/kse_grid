@@ -1,0 +1,20 @@
+{
+  "type": "FeatureCollection",
+  "name": "Solina",
+  "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+  "features": [
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [22.45564, 49.39781]}, "properties": {"bus": 792, "station": "Solina"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.85287, 49.68855]}, "properties": {"bus": 665, "station": "Krosno Iskrzynia"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.85287, 49.68855]}, "properties": {"bus": 49,  "station": "Krosno Iskrzynia"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.85287, 49.68855]}, "properties": {"bus": 48,  "station": "Krosno Iskrzynia"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.87051, 50.19068]}, "properties": {"bus": 65,  "station": "Rzeszow Widelka"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.87051, 50.19068]}, "properties": {"bus": 64,  "station": "Rzeszow Widelka"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.33405, 50.44375]}, "properties": {"bus": 58,  "station": "Polaniec"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.45254, 50.93796]}, "properties": {"bus": 54,  "station": "Ostrowiec"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.45254, 50.93796]}, "properties": {"bus": 53,  "station": "Ostrowiec"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.45394, 51.66369]}, "properties": {"bus": 43,  "station": "Kozienice"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.45394, 51.66369]}, "properties": {"bus": 44,  "station": "Kozienice"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.45394, 51.66369]}, "properties": {"bus": 45,  "station": "Kozienice"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.45394, 51.66369]}, "properties": {"bus": 46,  "station": "Kozienice"}}
+  ]
+}
