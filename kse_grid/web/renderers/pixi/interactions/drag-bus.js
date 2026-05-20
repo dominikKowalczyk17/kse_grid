@@ -30,6 +30,8 @@ export function setupBusDrag ({
 
     function onSpriteDown (evt) {
         if (!isEditMode()) return;
+        // Geo positions come from the atlas — never move them by drag.
+        if (isGeo && isGeo()) return;
         const native = evt.nativeEvent || evt.data?.originalEvent;
         if (native) native.__pixiHandled = true;
         const sp = evt.currentTarget || evt.target;

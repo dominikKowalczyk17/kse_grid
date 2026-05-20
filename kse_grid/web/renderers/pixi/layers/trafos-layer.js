@@ -16,6 +16,13 @@ const COIL_RADIUS_PX = 8;
 const COIL_LINE_WIDTH = 1.6;
 const COIL_SEPARATION_PX = COIL_RADIUS_PX * 1.1; // half-overlap
 
+// When HV and LV buses share the same geographic location (common for two
+// voltage levels at one substation in geo mode), we synthesise a fixed screen
+// offset so the IEC symbol sits visibly next to the bus instead of on top.
+// Angle is derived per-trafo so multiple trafos at one node fan out.
+const TRAFO_OFFSET_PX_FROM_BUS = 22;
+const COINCIDENT_EPSILON = 1e-6;
+
 export class TrafosLayer {
     constructor ({ linesContainer, coilsContainer, viewport, network, busById, textures, palette, project }) {
         this.linesContainer = linesContainer;
@@ -64,7 +71,9 @@ export class TrafosLayer {
             coilB.anchor.set(0.5);
             this.coilsContainer.addChild(coilA, coilB);
 
-            const st = { trafo: tr, color: bin.color, dash: disconnected, coilA, coilB, from, to };
+            const coincident = Math.hypot(to.x - from.x, to.y - from.y) < COINCIDENT_EPSILON;
+            const offsetAngle = coincident ? syntheticOffsetAngle(tr.id) : 0;
+            const st = { trafo: tr, color: bin.color, dash: disconnected, coilA, coilB, from, to, coincident, offsetAngle };
             this._state.set(tr.id, st);
         }
         this._dirtyConnectors = true;
@@ -81,7 +90,11 @@ export class TrafosLayer {
             const lvBus = this.busById.get(tr.lvBus);
             const from = busPos(hv, this.viewMode, this.project);
             const to = busPos(lvBus, this.viewMode, this.project);
-            if (from && to) { st.from = from; st.to = to; }
+            if (from && to) {
+                st.from = from; st.to = to;
+                st.coincident = Math.hypot(to.x - from.x, to.y - from.y) < COINCIDENT_EPSILON;
+                if (st.coincident && !st.offsetAngle) st.offsetAngle = syntheticOffsetAngle(tr.id);
+            }
         }
         this._dirtyConnectors = true;
     }
@@ -95,16 +108,40 @@ export class TrafosLayer {
     }
 
     redraw () {
-        // connectors
+        const inv = 1 / this.viewport.scale;
+        // For coincident trafos: connector goes bus -> offset point, and both
+        // coils cluster *around* that offset point (oriented along the offset
+        // direction). For normal trafos: connector spans HV->LV, coils sit at
+        // the midpoint oriented along HV->LV.
+        const layouts = new Map();
+        for (const st of this._state.values()) {
+            if (st.coincident) {
+                const ux = Math.cos(st.offsetAngle);
+                const uy = Math.sin(st.offsetAngle);
+                const center = {
+                    x: st.from.x + ux * TRAFO_OFFSET_PX_FROM_BUS * inv,
+                    y: st.from.y + uy * TRAFO_OFFSET_PX_FROM_BUS * inv,
+                };
+                layouts.set(st, { connFrom: st.from, connTo: center, center, ux, uy });
+            } else {
+                const u = unitVector(st.from, st.to);
+                layouts.set(st, {
+                    connFrom: st.from,
+                    connTo: st.to,
+                    center: midpoint(st.from, st.to),
+                    ux: u.len === 0 ? 0 : u.x,
+                    uy: u.len === 0 ? 1 : u.y,
+                });
+            }
+        }
+
         if (this._dirtyConnectors) {
-            const inv = 1 / this.viewport.scale;
             const g = this._connectorG;
             g.clear();
             for (const st of this._state.values()) {
-                g.moveTo(st.from.x, st.from.y).lineTo(st.to.x, st.to.y);
+                const e = layouts.get(st);
+                g.moveTo(e.connFrom.x, e.connFrom.y).lineTo(e.connTo.x, e.connTo.y);
             }
-            // we draw all bins same-stroke for performance — colors are encoded by coils,
-            // and the connector is just a thin tinted hint.
             g.stroke({
                 color: 0x808890,
                 width: TRAFO_LINE_WIDTH * inv,
@@ -112,16 +149,11 @@ export class TrafosLayer {
             });
             this._dirtyConnectors = false;
         }
-        // coil positions
-        const inv = 1 / this.viewport.scale;
         const sep = COIL_SEPARATION_PX * inv;
         for (const st of this._state.values()) {
-            const mid = midpoint(st.from, st.to);
-            const u = unitVector(st.from, st.to);
-            const ux = u.len === 0 ? 0 : u.x;
-            const uy = u.len === 0 ? 1 : u.y;
-            st.coilA.position.set(mid.x - ux * sep, mid.y - uy * sep);
-            st.coilB.position.set(mid.x + ux * sep, mid.y + uy * sep);
+            const e = layouts.get(st);
+            st.coilA.position.set(e.center.x - e.ux * sep, e.center.y - e.uy * sep);
+            st.coilB.position.set(e.center.x + e.ux * sep, e.center.y + e.uy * sep);
         }
     }
 
@@ -133,9 +165,17 @@ export class TrafosLayer {
 
     pickAt (worldX, worldY, tolerancePx) {
         const tol = tolerancePx / this.viewport.scale;
+        const inv = 1 / this.viewport.scale;
         let best = null;
         for (const st of this._state.values()) {
-            const mid = midpoint(st.from, st.to);
+            let mid;
+            if (st.coincident) {
+                const dx = Math.cos(st.offsetAngle) * TRAFO_OFFSET_PX_FROM_BUS * inv;
+                const dy = Math.sin(st.offsetAngle) * TRAFO_OFFSET_PX_FROM_BUS * inv;
+                mid = { x: st.from.x + dx, y: st.from.y + dy };
+            } else {
+                mid = midpoint(st.from, st.to);
+            }
             const d = Math.hypot(worldX - mid.x, worldY - mid.y);
             if (d <= tol && (!best || d < best.distance)) best = { trafo: st.trafo, distance: d };
         }
@@ -159,4 +199,12 @@ function pickBin (bins, value) {
 
 function parseColor (hex) {
     return parseInt(hex.replace('#', ''), 16);
+}
+
+function syntheticOffsetAngle (trafoId) {
+    let h = 0;
+    const s = String(trafoId);
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    const frac = ((h % 360) + 360) % 360;
+    return (frac * Math.PI) / 180;
 }

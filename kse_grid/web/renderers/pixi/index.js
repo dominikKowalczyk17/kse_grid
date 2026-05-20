@@ -33,6 +33,9 @@ import { setupHover } from './interactions/hover.js';
 import { setupSelection } from './interactions/selection.js';
 import { setupBusDrag } from './interactions/drag-bus.js';
 import { setupBend } from './interactions/bend.js';
+import { projectBus } from './projection.js';
+import { TileLayer } from './layers/tile-layer.js';
+import { BorderLayer } from './layers/border-layer.js';
 
 export async function mountPixi (container, network, opts = {}) {
     const theme = opts.theme || 'dark';
@@ -56,7 +59,14 @@ export async function mountPixi (container, network, opts = {}) {
     const busIndex = BusIndex.build(network);
     const segmentIndex = new SegmentIndex();
 
-    const project = null; // graph view; geo overlay would supply one
+    // `project` is consulted only when viewMode === 'geo' (see geometry.busPos).
+    // In graph mode layers fall back to (b.x, -b.y) world coords.
+    const project = projectBus;
+
+    const tileLayer = new TileLayer({ container: layers.tiles, viewport, theme });
+    const borderLayer = new BorderLayer({ container: layers.border, viewport, theme });
+    layers.tiles.visible = viewMode === 'geo';
+    layers.border.visible = viewMode === 'geo';
 
     const linesLayer = new LinesLayer({
         container: layers.lines, viewport, network, busById, segmentIndex, project,
@@ -86,9 +96,17 @@ export async function mountPixi (container, network, opts = {}) {
     });
 
     function setViewMode (m) {
+        const wasGeo = currentViewMode === 'geo';
         currentViewMode = m;
         for (const layer of [linesLayer, trafosLayer, busesLayer, switchesLayer, arrowsLayer, selectionLayer, bendLayer]) {
             layer.setViewMode?.(m);
+        }
+        const isGeoNow = m === 'geo';
+        layers.tiles.visible = isGeoNow;
+        layers.border.visible = isGeoNow;
+        if (isGeoNow !== wasGeo) {
+            firstFitDone = false; // re-fit on mode switch
+            if (isGeoNow) tileLayer.scheduleRefresh();
         }
     }
     setViewMode(viewMode);
@@ -113,9 +131,10 @@ export async function mountPixi (container, network, opts = {}) {
 
     let firstFitDone = false;
     function fitToContent () {
-        const bbox = computeBBox(network);
+        const bbox = computeBBox(network, currentViewMode);
         if (bbox) viewport.fit(bbox, 32);
         applyZoomAll();
+        if (currentViewMode === 'geo') tileLayer.scheduleRefresh();
     }
 
     // Honour caller-supplied initial viewport (e.g. when remounting after a
@@ -157,7 +176,7 @@ export async function mountPixi (container, network, opts = {}) {
         onSelect: sel => {
             selectionLayer.setSelection(sel);
             onSelect(sel);
-            if (editMode && sel?.kind === 'line') {
+            if (editMode && sel?.kind === 'line' && currentViewMode !== 'geo') {
                 bendLayer.show(sel.id);
                 bend.refreshAttachments();
             } else {
@@ -200,6 +219,8 @@ export async function mountPixi (container, network, opts = {}) {
                 selectionLayer.setPalette(palette);
                 scene.setBackground(th);
                 hover.applyTheme(th);
+                tileLayer.setTheme(th);
+                borderLayer.setTheme(th);
             }
             if (vm && vm !== currentViewMode) setViewMode(vm);
             disc = disconnectedBranchIds(network.switches || []);
@@ -211,7 +232,7 @@ export async function mountPixi (container, network, opts = {}) {
         },
         setSelection (sel) {
             selectionLayer.setSelection(sel);
-            if (editMode && sel?.kind === 'line') {
+            if (editMode && sel?.kind === 'line' && currentViewMode !== 'geo') {
                 bendLayer.show(sel.id);
                 bend.refreshAttachments();
             } else {
@@ -233,6 +254,8 @@ export async function mountPixi (container, network, opts = {}) {
             selectionLayer.setPalette(palette);
             scene.setBackground(th);
             hover.applyTheme(th);
+            tileLayer.setTheme(th);
+            borderLayer.setTheme(th);
             rebuildAll();
         },
         focus ({ kind, id }) {
@@ -252,6 +275,8 @@ export async function mountPixi (container, network, opts = {}) {
             selection.destroy();
             drag.destroy();
             bend.destroy();
+            tileLayer.destroy();
+            borderLayer.destroy();
             linesLayer.destroy();
             trafosLayer.destroy();
             busesLayer.destroy();
@@ -264,13 +289,22 @@ export async function mountPixi (container, network, opts = {}) {
     };
 }
 
-function computeBBox (network) {
+function computeBBox (network, viewMode) {
+    const isGeo = viewMode === 'geo';
     let minX = +Infinity, minY = +Infinity, maxX = -Infinity, maxY = -Infinity, n = 0;
     for (const b of network.buses) {
-        if (b.x == null || b.y == null) continue;
-        if (b.x < minX) minX = b.x;
-        if (b.x > maxX) maxX = b.x;
-        const y = -b.y;
+        let x, y;
+        if (isGeo) {
+            if (b.lon == null || b.lat == null) continue;
+            const p = projectBus(b);
+            if (!p) continue;
+            x = p.x; y = p.y;
+        } else {
+            if (b.x == null || b.y == null) continue;
+            x = b.x; y = -b.y;
+        }
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
         n++;
@@ -283,7 +317,10 @@ function locate (kind, id, busById, network, viewMode) {
     const isGeo = viewMode === 'geo';
     function pos (b) {
         if (!b) return null;
-        if (isGeo) return b.lon == null ? null : { x: b.lon, y: -b.lat };
+        if (isGeo) {
+            if (b.lon == null || b.lat == null) return null;
+            return projectBus(b);
+        }
         return b.x == null ? null : { x: b.x, y: -b.y };
     }
     if (kind === 'bus') return pos(busById.get(id));

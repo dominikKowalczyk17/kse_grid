@@ -90,7 +90,7 @@ export const GraphPanel = {
         });
         const { visibleCounts } = useVisibilityCounts(props);
         const pixiCtrl = ref(null);
-        const usePixi = computed(() => props.viewMode === 'graph');
+        const usePixi = computed(() => props.viewMode === 'graph' || props.viewMode === 'geo');
 
         function pixiFilters () {
             return {
@@ -279,8 +279,13 @@ export const GraphPanel = {
             if (ready.value && !pixiCtrl.value) {
                 preservedViewport.value = captureViewport();
             }
-            // Pixi: capture camera before destroy so remount restores it.
-            const prevPixiView = pixiCtrl.value ? pixiCtrl.value.getView() : null;
+            // Pixi: capture camera before destroy so remount restores it — but
+            // only if the new view mode matches the captured one (graph and geo
+            // use different world coords, so cross-mode restore would land the
+            // camera at nonsense coordinates).
+            const prevPixiView = (pixiCtrl.value && pixiCtrl.value.viewMode === props.viewMode)
+                ? pixiCtrl.value.getView()
+                : null;
 
             ready.value = false;
             selection.value = null;
@@ -346,7 +351,7 @@ export const GraphPanel = {
             // Mount the Pixi renderer onto the same container; it manages its
             // own canvas. Selection events are routed through `setSelection`
             // so the SelectionCard sees the same shape as the Plotly path.
-            pixiCtrl.value = await mountPixi(graphEl.value, props.network, {
+            const ctrl = await mountPixi(graphEl.value, props.network, {
                 theme: props.theme,
                 viewMode: props.viewMode,
                 editMode: props.editMode,
@@ -375,6 +380,8 @@ export const GraphPanel = {
                     }
                 },
             });
+            pixiCtrl.value = ctrl;
+            if (typeof window !== 'undefined') window.__ctrl = ctrl;
         }
 
         async function rebuildPlot (info) {

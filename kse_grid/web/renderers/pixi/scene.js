@@ -9,6 +9,8 @@ import { Viewport } from './interactions/pan-zoom.js';
 import { TextureCache } from './textures.js';
 
 const LAYER_ORDER = [
+    'tiles',
+    'border',
     'lines',
     'trafoLines',
     'trafoCoils',

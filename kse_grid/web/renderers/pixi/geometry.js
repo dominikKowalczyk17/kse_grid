@@ -21,8 +21,8 @@ export function isGeo (viewMode) {
 
 export function busPos (bus, viewMode, project) {
     if (!bus) return null;
-    if (project) return project(bus);
     if (isGeo(viewMode)) {
+        if (project) return project(bus);
         if (bus.lon == null || bus.lat == null) return null;
         return { x: bus.lon, y: -bus.lat };
     }
