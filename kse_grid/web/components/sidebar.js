@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { IconSearch, IconRotate, IconCable, IconZap, IconCircleDot, IconChevronLeft, IconChevronRight, IconActivity, IconBolt } from '/icons.js';
 import { SwitchingPanel } from '/components/switching-panel.js';
 import { formatMw, voltageColorVar } from '/lib/formatters.js';
@@ -163,6 +163,8 @@ export const Sidebar = {
         }
 
         const panel = ref('root');
+        const sidebarEl = ref(null);
+        const savedScrollTop = ref(0);
         const panelTitles = {
             balance: 'Bilans mocy',
             voltage: 'Profil napięciowy',
@@ -171,10 +173,17 @@ export const Sidebar = {
             switching: 'Łączenia / wyspy',
         };
         const panelTitle = computed(() => panelTitles[panel.value] || '');
-        function openPanel (name) { panel.value = name; }
-        function backToRoot () { panel.value = 'root'; }
+        function openPanel (name) {
+            savedScrollTop.value = sidebarEl.value?.scrollTop ?? 0;
+            panel.value = name;
+        }
+        function backToRoot () {
+            panel.value = 'root';
+            nextTick(() => { if (sidebarEl.value) sidebarEl.value.scrollTop = savedScrollTop.value; });
+        }
 
         return {
+            sidebarEl,
             panel, panelTitle, openPanel, backToRoot,
             search, showSuggestions, suggestions,
             isCore, isAll, isMediumVoltage,
@@ -192,7 +201,7 @@ export const Sidebar = {
         };
     },
     template: `
-    <aside class="sidebar">
+    <aside class="sidebar" ref="sidebarEl">
 
         <template v-if="panel !== 'root'">
             <button class="sidebar-back" type="button" @click="backToRoot">
