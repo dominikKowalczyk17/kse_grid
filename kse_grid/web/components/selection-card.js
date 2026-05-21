@@ -181,7 +181,7 @@ export const SelectionCard = {
                 const trafoSwitches = props.switches.filter(sw => sw.parentKind === 'trafo' && sw.elementId === trafo.id);
                 for (const sw of trafoSwitches) {
                     items.push({
-                        label: `Odłącznik ${sw.sideLabel || sw.name}`,
+                        label: `Odłącznik ${sw.name}`,
                         value: sw.closed ? 'Zamknięty' : 'Otwarty',
                         status: sw.closed ? 'good' : 'bad',
                     });
@@ -233,7 +233,6 @@ export const SelectionCard = {
                     { label: 'Element', value: `${sw.elementName} (#${sw.elementId})` },
                     { label: 'Bus', value: `${sw.busName} (#${sw.busId})` },
                     { label: 'Drugi koniec', value: sw.remoteBusName ? `${sw.remoteBusName} (#${sw.remoteBusId})` : '—' },
-                    { label: 'Strona', value: sw.sideLabel || '—' },
                 ];
             }
             return [];
@@ -464,7 +463,7 @@ export const SelectionCard = {
                 type="button"
                 :disabled="topologyBusy"
                 @click="$emit('set-switch-state', { switchId: sw.id, closed: !sw.closed })">
-                {{ topologyBusy ? 'Aktualizuję…' : (sw.closed ? 'Otwórz ' : 'Zamknij ') + (sw.sideLabel || sw.name) }}
+                {{ topologyBusy ? 'Aktualizuję…' : (sw.closed ? 'Otwórz ' : 'Zamknij ') + sw.name }}
             </button>
         </div>
 

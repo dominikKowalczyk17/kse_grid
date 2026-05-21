@@ -128,27 +128,21 @@ def serialize_switches(net: pp.pandapowerNet) -> list[dict[str, Any]]:
         remote_bus_name: str | None = None
         element_name = str(row.get("name") or f"Switch {switch_id}")
         parent_kind = "switch"
-        side = ""
-        side_label = ""
 
         if switch_type == "l" and element_id in net.line.index:
-            remote_bus_id, remote_bus_name, element_name, parent_kind, side, side_label = _line_switch_details(
+            remote_bus_id, remote_bus_name, element_name, parent_kind = _line_switch_details(
                 net, bus_id, element_id
             )
         elif switch_type == "t" and element_id in net.trafo.index:
-            remote_bus_id, remote_bus_name, element_name, parent_kind, side, side_label = _trafo_switch_details(
+            remote_bus_id, remote_bus_name, element_name, parent_kind = _trafo_switch_details(
                 net, bus_id, element_id
             )
         elif switch_type == "b" and element_id in net.bus.index:
             remote_bus_id = element_id
             remote_bus_name = str(net.bus.at[remote_bus_id, "name"])
             parent_kind = "bus"
-            side = "bus"
-            side_label = "odłącznik szynowy"
 
-        display_name = str(row.get("name") or f"Odłącznik {switch_id}")
-        if side_label:
-            display_name = f"{element_name} [{side_label}]"
+        display_name = str(row.get("name") or element_name or f"Odłącznik {switch_id}")
 
         out.append({
             "id": switch_id,
@@ -161,8 +155,6 @@ def serialize_switches(net: pp.pandapowerNet) -> list[dict[str, Any]]:
             "elementName": element_name,
             "elementType": switch_type,
             "parentKind": parent_kind,
-            "side": side,
-            "sideLabel": side_label,
             "closed": bool(row.get("closed", False)),
             "voltage": voltage,
             "type": str(row.get("type") or ""),
@@ -300,35 +292,29 @@ def _geo_length(
 
 def _line_switch_details(
     net: pp.pandapowerNet, bus_id: int, element_id: int
-) -> tuple[int, str, str, str, str, str]:
+) -> tuple[int, str, str, str]:
     line = net.line.loc[element_id]
     from_bus = _to_int(line.from_bus)
     to_bus = _to_int(line.to_bus)
     remote_bus_id = to_bus if bus_id == from_bus else from_bus
-    side = "from" if bus_id == from_bus else "to"
     return (
         remote_bus_id,
         str(net.bus.at[remote_bus_id, "name"]),
         str(line["name"]),
         "line",
-        side,
-        "strona początkowa" if side == "from" else "strona końcowa",
     )
 
 
 def _trafo_switch_details(
     net: pp.pandapowerNet, bus_id: int, element_id: int
-) -> tuple[int, str, str, str, str, str]:
+) -> tuple[int, str, str, str]:
     trafo = net.trafo.loc[element_id]
     hv_bus = _to_int(trafo.hv_bus)
     lv_bus = _to_int(trafo.lv_bus)
     remote_bus_id = lv_bus if bus_id == hv_bus else hv_bus
-    side = "hv" if bus_id == hv_bus else "lv"
     return (
         remote_bus_id,
         str(net.bus.at[remote_bus_id, "name"]),
         str(trafo["name"]),
         "trafo",
-        side,
-        "strona WN" if side == "hv" else "strona NN",
     )

@@ -25,11 +25,11 @@ def import_matpower_case(case_path: Path, f_hz: int = 50) -> pp.pandapowerNet:
 
 
 def seed_operational_switches(net: pp.pandapowerNet) -> None:
-    """Dodaje operacyjne switche pandapower na końcach linii i transformatorów.
+    """Dodaje operacyjne switche pandapower dla linii i transformatorów.
 
     Matpower opisuje gałęzie przez flagę `branch status`; po imporcie tabela
     `net.switch` zostaje pusta. Ten helper uzupełnia brakujący poziom topologiczny,
-    tworząc po dwa switche (obu końcach) dla każdej linii i transformatora.
+    tworząc po jednym switchu (przy from_bus/hv_bus) dla każdej linii i transformatora.
     Funkcja jest idempotentna.
     """
     existing_switches = {
@@ -41,15 +41,13 @@ def seed_operational_switches(net: pp.pandapowerNet) -> None:
         line_id = _to_int(line_idx)
         closed = _initial_switch_state(row)
         line_name = str(row.get("name") or f"Line {line_id + 1}")
-        _create_switch(net, _to_int(row.from_bus), line_id, "l", closed, f"{line_name} [from]", existing_switches)
-        _create_switch(net, _to_int(row.to_bus), line_id, "l", closed, f"{line_name} [to]", existing_switches)
+        _create_switch(net, _to_int(row.from_bus), line_id, "l", closed, line_name, existing_switches)
 
     for trafo_idx, row in net.trafo.iterrows():
         trafo_id = _to_int(trafo_idx)
         closed = _initial_switch_state(row)
         trafo_name = str(row.get("name") or f"Trafo {trafo_id + 1}")
-        _create_switch(net, _to_int(row.hv_bus), trafo_id, "t", closed, f"{trafo_name} [hv]", existing_switches)
-        _create_switch(net, _to_int(row.lv_bus), trafo_id, "t", closed, f"{trafo_name} [lv]", existing_switches)
+        _create_switch(net, _to_int(row.hv_bus), trafo_id, "t", closed, trafo_name, existing_switches)
 
 
 def _promote_voltage_step_impedances_to_trafos(net: pp.pandapowerNet) -> None:

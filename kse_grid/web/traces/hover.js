@@ -52,6 +52,5 @@ export function switchHover(sw) {
         `Bus: ${sw.busName}`,
     ];
     if (sw.remoteBusName) lines.push(`Drugi koniec: ${sw.remoteBusName}`);
-    if (sw.sideLabel) lines.push(`Strona: ${sw.sideLabel}`);
     return lines.join('<br>');
 }
