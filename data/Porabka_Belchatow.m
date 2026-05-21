@@ -1,40 +1,44 @@
-function mpc = Porabka_Belchatow
+function mpc = Porabka_Belchatow_Urealniona
 %% MATPOWER Case Format : Version 2
 %% Blackstart: ESP Porąbka-Żar → E Bełchatów (Rogowiec)
-%% Trasa 220 kV: Porąbka-Żar – Bujaków – Byczyna – Tucznawa – Rogowiec
-%% Źródło: 4×136 = 544 MW | Odbiór: Pw = 30,4 MW (1×380 MW, potrzeby własne)
+%% Trasa 220 kV: Porąbka (SN) -> Trafo (110) -> Bujaków (220) -> Byczyna -> Tucznawa -> Rogowiec
 mpc.version = '2';
 mpc.baseMVA = 100;
 
-%% bus data
-%%  bus_i  type   Pd    Qd  Gs  Bs  area  Vm   Va  baseKV  zone  Vmax  Vmin
+%% --- BUS DATA ---
+% bus_i type Pd Qd Gs Bs area Vm Va baseKV zone Vmax Vmin
 mpc.bus = [
-    401  3     0   0  0  0  1  1.05  0  220  1  1.10  0.95;  % Porąbka-Żar (slack/ESP)
-    402  1     0   0  0  0  1  1.00  0  220  1  1.10  0.95;  % Bujaków
-    403  1     0   0  0  0  1  1.00  0  220  1  1.10  0.95;  % Byczyna
-    404  1     0   0  0  0  1  1.00  0  220  1  1.10  0.95;  % Tucznawa
-    405  1  30.4   0  0  0  1  1.00  0  220  1  1.10  0.95;  % Rogowiec/Bełchatów (Pw 1×380 MW)
+    1  3   0   0   0  0   1  1.05  0  15.75 1  1.1  0.95; % Szyna generatorowa ESP (SN) [1]
+    2  2   0   0   0  0   1  1.03  0  110   1  1.1  0.95; % Rozdzielnia 110 kV (Punkt regulacji) [2]
+    3  1   0   0   0  0   1  1.00  0  220   1  1.1  0.95; % Bujaków (Wyprowadzenie 220 kV)
+    4  1   0   0   0  0   1  1.00  0  220   1  1.1  0.95; % Byczyna (Tranzyt) [3]
+    5  1   0   0   0  0   1  1.00  0  220   1  1.1  0.95; % Tucznawa (Tranzyt)
+    6  1  30.4 15  0  0   1  1.00  0  220   1  1.1  0.95; % Rogowiec (Bełchatów - Pw bloku 380 MW) [4, 5]
 ];
 
-%% generator data
-%%  bus   Pg    Qg  Qmax  Qmin   Vg  mBase  status  Pmax  Pmin
+%% --- GENERATOR DATA ---
+% bus Pg Qg Qmax Qmin Vg mBase status Pmax Pmin
 mpc.gen = [
-    401  136  0  100  -80  1.05  136  1  136  10;  % Hydro 1
-    401  136  0  100  -80  1.05  136  1  136  10;  % Hydro 2
-    401  136  0  100  -80  1.05  136  1  136  10;  % Hydro 3
-    401  136  0  100  -80  1.05  136  1  136  10;  % Hydro 4
+    1  25  0  100  -80  1.05  136  1  136  10; % Hydro 1 (Moc Pg ustawiona pod rozruch) [6, 7]
+    1  25  0  100  -80  1.05  136  1  136  10; % Hydro 2
+    1  25  0  100  -80  1.05  136  1  136  10; % Hydro 3
+    1  25  0  100  -80  1.05  136  1  136  10; % Hydro 4
 ];
 
-%% branch data  (220 kV AFL-400, Zbase = 484 Ω)
-%%  fbus  tbus       r         x         b    rateA  rateB  rateC  ratio  angle  status
+%% --- BRANCH DATA ---
+% fbus tbus r x b rateA rateB rateC tap shift status
 mpc.branch = [
-    401  402  0.000356  0.004277  0.009151  550  550  550  0  0  1;  % 7 km
-    402  403  0.001867  0.0224  0.047926  550  550  550  0  0  1;  % 36 km
-    403  404  0.001236  0.014833  0.031736  550  550  550  0  0  1;  % 24 km
-    404  405  0.005394  0.064728  0.138488  550  550  550  0  0  1;  % 104 km
+    % TRANSFORMACJA I POWIĄZANIA PRZY ELEKTROWNI
+    1  2  0.001  0.05  0  600  600  600  1.00  0  1; % Trafo blokowe SN/110 kV [1, 8]
+    2  3  0.001  0.06  0  600  600  600  1.00  0  1; % Autotransformator 110/220 kV
+
+    % LINIE PRZESYŁOWE 220 kV (AFL-400) [Dane z Twojego szkicu]
+    3  4  0.0018  0.022  0.047  550  550  550  0  0  1; % Bujaków - Byczyna (36 km)
+    4  5  0.0012  0.014  0.031  550  550  550  0  0  1; % Byczyna - Tucznawa (24 km)
+    5  6  0.0053  0.064  0.138  550  550  550  0  0  1; % Tucznawa - Rogowiec (104 km)
 ];
 
-%% generator cost data
+%% --- GENERATOR COST DATA ---
 mpc.gencost = [
     2  0  0  3  0  0  0;
     2  0  0  3  0  0  0;

@@ -12,98 +12,52 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          19.211745,
-          49.780375
-        ]
+        "coordinates": [19.211745, 49.780375]
       },
       "properties": {
-        "bus": 501,
-        "station": "Porąbka-Żar"
+        "bus": 1,
+        "station": "Porąbka-Żar - Generator SN",
+        "voltage_kv": 15.75,
+        "description": "Szyna generatorowa w kawernie elektrowni"
       }
     },
     {
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          19.212772,
-          49.842428
-        ]
+        "coordinates": [19.212000, 49.781000]
       },
       "properties": {
-        "bus": 502,
-        "station": "Bujaków"
+        "bus": 2,
+        "station": "Porąbka-Żar - Rozdzielnia 110 kV",
+        "voltage_kv": 110,
+        "description": "Poziom regulacji napięcia (Trafo Blokowe)"
       }
     },
     {
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          19.293988,
-          50.163212
-        ]
+        "coordinates": [19.212772, 49.842428]
       },
       "properties": {
-        "bus": 503,
-        "station": "Byczyna"
+        "bus": 3,
+        "station": "Bujaków",
+        "voltage_kv": 220,
+        "description": "Główny węzeł wyprowadzenia mocy 220 kV"
       }
     },
     {
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          18.852108,
-          50.231197
-        ]
+        "coordinates": [17.872544, 50.746963]
       },
       "properties": {
-        "bus": 504,
-        "station": "Halemba"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          18.850299,
-          50.130522
-        ]
-      },
-      "properties": {
-        "bus": 505,
-        "station": "Kopanina"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          18.539818,
-          50.124995
-        ]
-      },
-      "properties": {
-        "bus": 506,
-        "station": "Wielopole"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          17.872544,
-          50.746963
-        ]
-      },
-      "properties": {
-        "bus": 507,
-        "station": "Dobrzeń"
+        "bus": 5,
+        "station": "Dobrzeń (Opole)",
+        "voltage_kv": 220,
+        "description": "Odbiór potrzeb własnych bloku cieplnego"
       }
     }
   ]

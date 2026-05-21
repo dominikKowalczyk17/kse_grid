@@ -4,5 +4,5 @@ import sys
 import kse_grid
 
 if __name__ == "__main__":
-    case_file = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / "data" / "Solina.m"
-    kse_grid.KSEGrid.from_matpower_case(case_file).run_powerflow().report().serve()
+    case_file = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / "data" / "Solina_Kozienice.m"
+    kse_grid.KSEGrid.from_matpower_case(case_file).run_powerflow().serve()
