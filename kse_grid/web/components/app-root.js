@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { ErrorModal } from '/components/error-modal.js';
+import { ResultsBar } from '/components/results-bar.js';
 import { Sidebar } from '/components/sidebar.js';
 import { GraphPanel } from '/components/graph-panel.js';
 import { IconChevronLeft, IconChevronRight, IconSun, IconMoon } from '/icons.js';
@@ -11,7 +12,7 @@ import { useUiState } from '/lib/composables/use-ui-state.js';
 import { polishPlural } from '/lib/formatters.js';
 
 export const App = {
-    components: { ErrorModal, Sidebar, GraphPanel, IconChevronLeft, IconChevronRight, IconSun, IconMoon },
+    components: { ErrorModal, ResultsBar, Sidebar, GraphPanel, IconChevronLeft, IconChevronRight, IconSun, IconMoon },
     setup() {
         const errorHandling = useErrorHandling();
         const uiState = useUiState();
@@ -308,6 +309,16 @@ export const App = {
                 @request-edit-params="onRequestEditParams"
                 @submit-edit="onSubmitEdit"
                 @cancel-edit="onCancelEdit" />
+            <ResultsBar
+                :has-results="network.hasResults"
+                :totals="network.totals"
+                :diagnostics="network.diagnostics"
+                :buses="network.buses"
+                :lines="network.lines"
+                :trafos="network.trafos"
+                @select-bus="onSelectBus"
+                @select-element="onSelectElement"
+            />
         </div>
     </div>
     <div v-else-if="error" class="overlay">

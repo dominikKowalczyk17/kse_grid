@@ -242,35 +242,6 @@ export const Sidebar = {
             </div>
         </section>
 
-        <section class="section-card">
-            <h3 class="section-title">Szybkie podsumowanie</h3>
-            <div class="metric-grid">
-                <div class="metric">
-                    <div class="metric-label">Szyny</div>
-                    <div class="metric-value tabular">{{ stats.nBus }}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Linie</div>
-                    <div class="metric-value tabular">{{ stats.nLine }}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Trafo</div>
-                    <div class="metric-value tabular">{{ stats.nTrafo }}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Generatory</div>
-                    <div class="metric-value tabular">{{ stats.nGen }}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Maks. obc.</div>
-                    <div class="metric-value tabular" :class="stats.loadClass">{{ stats.maxLoading }}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Naruszenia U</div>
-                    <div class="metric-value tabular" :class="stats.violClass">{{ stats.nViol }}</div>
-                </div>
-            </div>
-        </section>
 
         <section v-if="viewMode === 'atlas'" class="section-card">
             <h3 class="section-title">Kategorie atlasu</h3>

@@ -1,0 +1,307 @@
+/* =====================================================================
+   Results Bar — stały pasek KPI u dołu + modal z pełnym raportem
+   ===================================================================== */
+
+.results-bar {
+    grid-column: 2;
+    grid-row: 2;
+    border-top: 1px solid var(--border);
+    background: var(--panel-glass);
+    backdrop-filter: blur(8px);
+    min-width: 0;
+}
+
+/* ── Pasek KPI (zawsze widoczny) ─────────────────────────────────── */
+
+.results-bar__strip {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    width: 100%;
+    height: 44px;
+    padding: 0 1.25rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    text-align: left;
+}
+
+.results-bar__strip:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.results-bar__strip:not(:disabled):hover {
+    background: var(--accent-soft);
+}
+
+.results-bar__placeholder {
+    color: var(--muted-foreground);
+    font-style: italic;
+}
+
+.results-bar__kpi {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+
+.rb-label {
+    color: var(--muted-foreground);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.rb-value {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8rem;
+}
+
+.rb-value.rb-warn {
+    color: var(--warn);
+}
+
+.rb-sep {
+    color: var(--border);
+    user-select: none;
+}
+
+.rb-spacer {
+    flex: 1;
+}
+
+.rb-hint {
+    font-size: 0.72rem;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+}
+
+/* ── Modal — nakładka ────────────────────────────────────────────── */
+
+.report-backdrop {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: oklch(0 0 0 / 0.55);
+    backdrop-filter: blur(4px);
+    z-index: 110;
+}
+
+.report-modal {
+    width: min(1140px, calc(100vw - 2.5rem));
+    height: min(720px, calc(100vh - 5rem));
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow:
+        0 1px 0 var(--selection-card-inset) inset,
+        0 32px 80px oklch(0 0 0 / 0.4);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: var(--foreground);
+}
+
+/* ── Nagłówek modalu ─────────────────────────────────────────────── */
+
+.report-modal__header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.9rem 1.25rem 0.85rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.report-modal__title {
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+    flex: 1;
+}
+
+.report-modal__close {
+    background: none;
+    border: none;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0.2rem 0.35rem;
+    border-radius: 3px;
+}
+
+.report-modal__close:hover {
+    background: var(--accent-soft);
+    color: var(--foreground);
+}
+
+/* ── Ciało modalu — 3 kolumny ────────────────────────────────────── */
+
+.report-modal__body {
+    display: grid;
+    grid-template-columns: 260px 1fr 1fr;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.report-col {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 1.1rem;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.report-col + .report-col {
+    border-left: 1px solid var(--border);
+}
+
+.report-col__title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted-foreground);
+    margin-bottom: 0.75rem;
+    flex-shrink: 0;
+}
+
+/* ── Bilans mocy ─────────────────────────────────────────────────── */
+
+.report-balance {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.rb-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.3rem 0;
+    font-size: 0.82rem;
+}
+
+.rb-row--sep {
+    border-top: 1px solid var(--border);
+    margin-top: 0.25rem;
+    padding-top: 0.55rem;
+}
+
+.rb-row__label {
+    color: var(--muted-foreground);
+}
+
+.rb-row__val {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+}
+
+.rb-row__val.muted {
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+}
+
+/* ── Listy rankingowe (napięcia / obciążenia) ────────────────────── */
+
+.report-table {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.report-thead {
+    display: grid;
+    grid-template-columns: 1.8rem 1fr auto;
+    gap: 0.4rem;
+    padding: 0.2rem 0.4rem 0.4rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    flex-shrink: 0;
+}
+
+.report-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.report-row {
+    display: grid;
+    grid-template-columns: 1.8rem 1fr auto;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.28rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    background: none;
+    border: none;
+    color: inherit;
+    text-align: left;
+    width: 100%;
+    transition: background 0.1s;
+}
+
+.report-row:hover {
+    background: var(--accent-soft);
+}
+
+.report-row__badge {
+    font-size: 0.64rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    text-align: center;
+    font-family: var(--font-mono);
+}
+
+.report-row__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.report-row__meta {
+    font-size: 0.7rem;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+}
+
+.report-row__val {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.report-row--viol .report-row__val {
+    color: var(--warn);
+}
+
+.report-row--warn .report-row__val {
+    color: var(--warn);
+}
+
+.report-row--bad .report-row__val {
+    color: var(--bad);
+}
