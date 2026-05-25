@@ -90,6 +90,7 @@ export const GraphPanel = {
         });
         const { visibleCounts } = useVisibilityCounts(props);
         const pixiCtrl = ref(null);
+        let latestBuildId = 0;
         const usePixi = computed(() => props.viewMode === 'graph' || props.viewMode === 'geo');
 
         function pixiFilters () {
@@ -273,6 +274,7 @@ export const GraphPanel = {
         }
 
         async function buildPlot () {
+            const thisBuildId = ++latestBuildId;
             // Każdy redraw — po filtrach, zmianie payloadu, motywie czy przełącznikach —
             // powinien zachować aktualny viewport, jeśli użytkownik sam nie poprosił
             // o reset. Dlatego snapshot kamery/range robimy centralnie tutaj.
@@ -300,12 +302,20 @@ export const GraphPanel = {
             if (graphEl.value) Plotly.purge(graphEl.value);
 
             if (usePixi.value) {
-                await buildPixi(prevPixiView);
+                const ctrl = await buildPixi(prevPixiView);
+                if (thisBuildId !== latestBuildId) {
+                    ctrl.destroy();
+                    return;
+                }
+                pixiCtrl.value = ctrl;
                 ready.value = true;
                 return;
             }
 
-            if (props.viewMode === 'atlas') await ensureAtlasLoaded();
+            if (props.viewMode === 'atlas') {
+                await ensureAtlasLoaded();
+                if (thisBuildId !== latestBuildId) return;
+            }
 
             const built = props.viewMode === 'atlas'
                 ? buildAtlasTraces()
@@ -338,7 +348,12 @@ export const GraphPanel = {
                 focusHalf.value = { x: dx * FOCUS_ZOOM_RATIO, y: dy * FOCUS_ZOOM_RATIO };
             }
 
+            if (thisBuildId !== latestBuildId) return;
             await Plotly.newPlot(graphEl.value, traces, layout, PLOT_CONFIG);
+            if (thisBuildId !== latestBuildId) {
+                if (!ready.value) Plotly.purge(graphEl.value);
+                return;
+            }
             graphEl.value.on('plotly_click', onPlotClick);
             graphEl.value.on('plotly_hover', () => graphEl.value.classList.add('is-hovering-target'));
             graphEl.value.on('plotly_unhover', () => graphEl.value.classList.remove('is-hovering-target'));
@@ -380,8 +395,7 @@ export const GraphPanel = {
                     }
                 },
             });
-            pixiCtrl.value = ctrl;
-            if (typeof window !== 'undefined') window.__ctrl = ctrl;
+            return ctrl;
         }
 
         async function rebuildPlot (info) {
