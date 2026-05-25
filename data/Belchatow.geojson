@@ -1,0 +1,16 @@
+{
+  "type": "FeatureCollection",
+  "name": "Belchatow",
+  "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+  "features": [
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [19.202119, 49.807112]}, "properties": {"bus": 1, "station": "PŻ (15,75 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [19.211576, 49.780418]}, "properties": {"bus": 2, "station": "PŻ - wyjście mocy (220 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [19.213015, 49.842482]}, "properties": {"bus": 3, "station": "Bujaków (220 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [19.292062, 50.163333]}, "properties": {"bus": 4, "station": "Byczyna (220 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [19.296160, 50.163123]}, "properties": {"bus": 5, "station": "Byczyna (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [19.332399, 50.377021]}, "properties": {"bus": 6, "station": "Tucznawa (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [19.325291, 51.316998]}, "properties": {"bus": 7, "station": "Rogowiec (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [19.326158, 51.268558]}, "properties": {"bus": 8, "station": "Bełchatów - wejście mocy (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [19.326213, 51.268064]}, "properties": {"bus": 9, "station": "Bełchatów - potrzeby własne (22 kV)"}}
+  ]
+}

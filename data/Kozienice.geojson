@@ -1,0 +1,16 @@
+{
+  "type": "FeatureCollection",
+  "name": "Kozienice",
+  "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+  "features": [
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [22.454041, 49.395884]}, "properties": {"bus": 1, "station": "Solina (15,75 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [22.455596, 49.397930]}, "properties": {"bus": 2, "station": "Solina - wyjście mocy (110 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.851508, 49.687792]}, "properties": {"bus": 3, "station": "Krosno Iskrzynia (110 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.852976, 49.688782]}, "properties": {"bus": 4, "station": "Krosno Iskrzynia (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.870528, 50.190732]}, "properties": {"bus": 5, "station": "Rzeszów Widełka (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.334080, 50.443808]}, "properties": {"bus": 6, "station": "Połaniec (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.452559, 50.938133]}, "properties": {"bus": 7, "station": "Ostrowiec (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.454379, 51.664396]}, "properties": {"bus": 8, "station": "Kozienice - wejście mocy (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.464791, 51.664534]}, "properties": {"bus": 9, "station": "Kozienice - potrzeby własne (22 kV)"}}
+  ]
+}

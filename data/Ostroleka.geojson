@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "name": "Ostroleka",
+  "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+  "features": [
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [18.082885, 54.722540]}, "properties": {"bus": 1, "station": "Żarnowiec (15,75 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [18.107273, 54.718464]}, "properties": {"bus": 2, "station": "Żarnowiec - wyjście mocy (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [18.708682, 54.338341]}, "properties": {"bus": 3, "station": "Gdańsk Błonia (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [20.347871, 53.828031]}, "properties": {"bus": 4, "station": "Olsztyn Mątki (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.622238, 53.107268]}, "properties": {"bus": 5, "station": "Ostrołęka - wejście mocy (400 kV)"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [21.613003, 53.104182]}, "properties": {"bus": 6, "station": "Ostrołęka - potrzeby własne (15 kV)"}}
+  ]
+}
