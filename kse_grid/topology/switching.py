@@ -15,12 +15,17 @@ from kse_grid.topology.element_editing import (
     read_element_params,
     validate_creation_fields,
 )
+from kse_grid.loading.matpower_importer import seed_operational_switches
 from kse_grid.powerflow.engine import load_powerflow_options, run_powerflow
+from kse_grid.serialization.graph_layout import recompute_graph_positions
 from kse_grid.serialization.serializer import (
     compute_graph_positions,
     serialize_network,
     serialize_topology_update,
 )
+
+
+_BRANCH_KINDS: frozenset[str] = frozenset({"line", "trafo"})
 
 
 class SwitchingSession:
@@ -99,7 +104,8 @@ class SwitchingSession:
     def create_element(self, kind: str, fields: dict[str, Any]) -> dict[str, Any]:
         """Tworzy nowy element w sieci roboczej i odkłada przeliczenie load flow.
 
-        Zwraca słownik z kluczem `newElementId` (int) i `topologyUpdate` (slim payload).
+        Zwraca słownik z kluczem `newElementId` (int) i `topologyUpdate` (slim payload
+        wzbogacony o zaktualizowane pozycje grafowe).
         Rzuca ValueError przy brakujących wymaganych polach lub nieprawidłowych wartościach.
         """
         validate_creation_fields(kind, fields)
@@ -107,8 +113,12 @@ class SwitchingSession:
 
         def mutator(net: pp.pandapowerNet) -> None:
             new_id.append(create_element_in_net(net, kind, fields))
+            if kind in _BRANCH_KINDS:
+                seed_operational_switches(net)
 
         topology_update = self._stage_change(mutator, pending_message=f"Dodano nowy element {kind}.")
+        self._graph_positions = recompute_graph_positions(self.working_net)
+        topology_update["positions"] = {str(k): list(v) for k, v in self._graph_positions.items()}
         return {"newElementId": new_id[0], "topologyUpdate": topology_update}
 
     @staticmethod

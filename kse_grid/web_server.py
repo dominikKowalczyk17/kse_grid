@@ -39,7 +39,7 @@ class ElementUpdate(BaseModel):
 
 
 _ELEMENT_KINDS = {"bus", "line", "trafo", "switch", "gen", "load", "sgen", "ext_grid", "shunt"}
-_CREATABLE_KINDS = {"bus", "load", "sgen", "ext_grid", "shunt"}
+_CREATABLE_KINDS = {"bus", "load", "sgen", "ext_grid", "shunt", "line", "trafo", "gen"}
 
 
 def create_app(net: pp.pandapowerNet) -> FastAPI:

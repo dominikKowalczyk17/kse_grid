@@ -26,6 +26,9 @@ def compute_graph_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, flo
     return _spring_layout_with_offsets(graph)
 
 
+recompute_graph_positions = compute_graph_positions
+
+
 def compute_bounds(positions: dict[int, tuple[float, float]]) -> dict[str, list[float]]:
     if not positions:
         return {"x": [-1.0, 1.0], "y": [-1.0, 1.0]}

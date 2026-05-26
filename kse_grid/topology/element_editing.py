@@ -337,6 +337,55 @@ _CREATION_SCHEMA: dict[str, dict[str, Any]] = {
         ],
         "defaults": {"name": "", "p_mw": 0.0, "in_service": True},
     },
+    "line": {
+        "required": [
+            ("from_bus", "int"), ("to_bus", "int"), ("length_km", "float"),
+            ("r_ohm_per_km", "float"), ("x_ohm_per_km", "float"),
+            ("c_nf_per_km", "float"), ("max_i_ka", "float"),
+        ],
+        "optional": [
+            ("name", "str", None),
+            ("g_us_per_km", "float", None),
+            ("parallel", "int", None),
+            ("in_service", "bool", None),
+        ],
+        "defaults": {"name": "", "g_us_per_km": 0.0, "parallel": 1, "in_service": True},
+    },
+    "trafo": {
+        "required": [
+            ("hv_bus", "int"), ("lv_bus", "int"), ("sn_mva", "float"),
+            ("vn_hv_kv", "float"), ("vn_lv_kv", "float"),
+            ("vk_percent", "float"), ("vkr_percent", "float"),
+            ("pfe_kw", "float"), ("i0_percent", "float"),
+        ],
+        "optional": [
+            ("name", "str", None),
+            ("tap_neutral", "int", None),
+            ("tap_min", "int", None),
+            ("tap_max", "int", None),
+            ("tap_step_percent", "float", None),
+            ("tap_pos", "int", None),
+            ("parallel", "int", None),
+            ("in_service", "bool", None),
+        ],
+        "defaults": {
+            "name": "", "tap_neutral": 0, "tap_min": -2, "tap_max": 2,
+            "tap_step_percent": 1.25, "tap_pos": 0, "parallel": 1, "in_service": True,
+        },
+    },
+    "gen": {
+        "required": [("bus", "int"), ("p_mw", "float")],
+        "optional": [
+            ("name", "str", None),
+            ("vm_pu", "float", None),
+            ("max_q_mvar", "float", None),
+            ("min_q_mvar", "float", None),
+            ("max_p_mw", "float", None),
+            ("min_p_mw", "float", None),
+            ("in_service", "bool", None),
+        ],
+        "defaults": {"name": "", "vm_pu": 1.0, "in_service": True},
+    },
 }
 
 _CREATORS: dict[str, Any] = {
@@ -345,6 +394,9 @@ _CREATORS: dict[str, Any] = {
     "sgen": pp.create_sgen,
     "ext_grid": pp.create_ext_grid,
     "shunt": pp.create_shunt,
+    "line": pp.create_line_from_parameters,
+    "trafo": pp.create_transformer_from_parameters,
+    "gen": pp.create_gen,
 }
 
 _AUTO_NAME_PREFIX: dict[str, str] = {
@@ -353,6 +405,9 @@ _AUTO_NAME_PREFIX: dict[str, str] = {
     "sgen": "SGen",
     "ext_grid": "Grid",
     "shunt": "Shunt",
+    "line": "Line",
+    "trafo": "Trafo",
+    "gen": "Gen",
 }
 
 
@@ -541,6 +596,14 @@ def create_element_in_net(net: pp.pandapowerNet, kind: str, fields: dict[str, An
 
     if "bus" in kwargs and not net.bus.empty and int(kwargs["bus"]) not in net.bus.index:
         raise ValueError(f"Szyna o id={kwargs['bus']} nie istnieje.")
+
+    if kind == "gen" and "bus" in kwargs:
+        bus_id = int(kwargs["bus"])
+        if not net.ext_grid.empty and bus_id in net.ext_grid["bus"].values:
+            raise ValueError(
+                f"Szyna #{bus_id} jest już węzłem slack (ext_grid) — "
+                "dodanie generatora PV spowodowałoby konflikt węzłów referencyjnych."
+            )
 
     idx = int(_CREATORS[kind](net, **kwargs))
 
