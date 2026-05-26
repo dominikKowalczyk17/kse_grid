@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import pandas as pd
 import pandapower as pp
+import pandas as pd
 
 
 def print_load_flow_summary(net: pp.pandapowerNet) -> None:
@@ -34,7 +34,7 @@ def _print_power_balance(net: pp.pandapowerNet) -> None:
         (net.res_line["pl_mw"].sum() if len(net.res_line) else 0.0) +
         (net.res_trafo["pl_mw"].sum() if len(net.res_trafo) else 0.0)
     )
-    print(f"\n📊 BILANS MOCY:")
+    print("\n📊 BILANS MOCY:")
     print(f"   Generacja (PV):  {p_gen:>8.1f} MW")
     print(f"   Import/Slack:    {p_ext:>8.1f} MW")
     print(f"   Obciążenie:      {p_load:>8.1f} MW")
@@ -46,7 +46,7 @@ def _print_voltage_deviations(net: pp.pandapowerNet) -> None:
     bus_res["nazwa"] = net.bus["name"]
     bus_res["vn_kv"] = net.bus["vn_kv"]
     bus_res["odchylenie"] = (bus_res["vm_pu"] - 1.0).abs()
-    print(f"\n⚡ NAPIĘCIA – największe odchylenia:")
+    print("\n⚡ NAPIĘCIA – największe odchylenia:")
     print(f"   {'Stacja':<35} {'kV':>6}  {'Um [p.u.]':>9}  {'δ [°]':>8}")
     print(f"   {'-'*35} {'-'*8}  {'-'*8}")
     for _, row in bus_res.sort_values("odchylenie", ascending=False).head(10).iterrows():
@@ -58,7 +58,7 @@ def _print_top_loaded_lines(net: pp.pandapowerNet) -> None:
     line_res = net.res_line[["p_from_mw", "loading_percent"]].copy()
     line_res["nazwa"] = net.line["name"]
     line_res["vn_kv"] = net.bus.loc[net.line["from_bus"], "vn_kv"].to_numpy()
-    print(f"\n🔌 LINIE – TOP 10 obciążonych:")
+    print("\n🔌 LINIE – TOP 10 obciążonych:")
     print(f"   {'Linia':<45} {'kV':>6}  {'P [MW]':>8}  {'Obciąż. [%]':>11}")
     print(f"   {'-'*45} {'-'*8}  {'-'*11}")
     for _, row in line_res.sort_values("loading_percent", ascending=False).head(10).iterrows():
@@ -69,7 +69,7 @@ def _print_top_loaded_lines(net: pp.pandapowerNet) -> None:
 def _print_transformers(net: pp.pandapowerNet) -> None:
     trafo_res = net.res_trafo[["p_hv_mw", "loading_percent"]].copy()
     trafo_res["nazwa"] = net.trafo["name"]
-    print(f"\n🔄 TRANSFORMATORY:")
+    print("\n🔄 TRANSFORMATORY:")
     print(f"   {'Trafo':<40} {'P_HV [MW]':>10}  {'Obciąż. [%]':>11}")
     print(f"   {'-'*40} {'-'*10}  {'-'*11}")
     for _, row in trafo_res.sort_values("loading_percent", ascending=False).head(10).iterrows():
@@ -80,7 +80,7 @@ def _print_transformers(net: pp.pandapowerNet) -> None:
 def _print_overload_summary(net: pp.pandapowerNet) -> None:
     overloaded_lines = net.res_line[net.res_line["loading_percent"] > 80]
     overloaded_trafos = net.res_trafo[net.res_trafo["loading_percent"] > 80]
-    print(f"\n📋 PODSUMOWANIE:")
+    print("\n📋 PODSUMOWANIE:")
     if len(overloaded_lines) == 0 and len(overloaded_trafos) == 0:
         print("   ✅ Brak przeciążeń (loading < 80%)")
     else:

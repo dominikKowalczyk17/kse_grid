@@ -12,12 +12,12 @@ import pandapower as pp
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from kse_grid.loading.json_loader import detect_format, load_pandapower_json
-from kse_grid.loading.matpower import load_matpower_case, load_geo_sidecar
+from kse_grid.loading.matpower import load_geo_sidecar, load_matpower_case
 from kse_grid.powerflow.runner import PowerFlowRunner
 from kse_grid.topology.matpower_params import (
     MATPOWER_SCHEMA,
@@ -26,7 +26,6 @@ from kse_grid.topology.matpower_params import (
     convert_gen,
 )
 from kse_grid.topology.switching import SwitchingSession
-
 
 _WEB_DIR = Path(__file__).parent / "web"
 _DATA_DIR = Path(__file__).parent.parent / "data"
@@ -298,10 +297,9 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
 
     @app.get("/api/network/export/matpower")
     def export_matpower() -> JSONResponse:
+
         from fastapi.responses import Response
         from pandapower.converter.matpower import to_mpc
-        import scipy.io as sio
-        import io as _io
         net = current_session().working_net
         mpc = to_mpc(net).get("mpc", {})
         import numpy as np

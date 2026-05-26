@@ -18,8 +18,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 
 KML_NS = {"kml": "http://www.opengis.net/kml/2.2"}

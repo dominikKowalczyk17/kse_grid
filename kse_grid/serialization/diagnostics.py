@@ -7,7 +7,8 @@ from typing import Any
 import pandapower as pp
 
 from kse_grid.thresholds import LOAD_BAD_PCT, LOAD_WARN_PCT, VOLTAGE_OK_MAX, VOLTAGE_OK_MIN
-from kse_grid.type_coercion import to_float as _to_float, to_int as _to_int
+from kse_grid.type_coercion import to_float as _to_float
+from kse_grid.type_coercion import to_int as _to_int
 
 _EMPTY_VOLTAGE = {
     "minPu": None,

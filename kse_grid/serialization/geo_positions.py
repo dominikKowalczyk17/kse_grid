@@ -8,7 +8,8 @@ from typing import Any
 
 import pandapower as pp
 
-from kse_grid.type_coercion import safe_float as _safe_float, to_int as _to_int
+from kse_grid.type_coercion import safe_float as _safe_float
+from kse_grid.type_coercion import to_int as _to_int
 
 
 def extract_geo_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, float]]:

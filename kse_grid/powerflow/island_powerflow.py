@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import networkx as nx
-import pandas as pd
 import pandapower as pp
 import pandapower.auxiliary as pp_aux
+import pandas as pd
 from pandapower.topology import create_nxgraph
 
 from kse_grid.type_coercion import to_int as _to_int

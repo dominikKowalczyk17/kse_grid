@@ -5,16 +5,9 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Callable
 
-import pandas as pd
 import pandapower as pp
+import pandas as pd
 
-from kse_grid.topology.element_editing import (
-    apply_element_update,
-    create_element_in_net,
-    field_schema,
-    read_element_params,
-    validate_creation_fields,
-)
 from kse_grid.loading.matpower_importer import seed_operational_switches
 from kse_grid.powerflow.engine import load_powerflow_options
 from kse_grid.powerflow.island_powerflow import run_island_powerflow
@@ -24,7 +17,13 @@ from kse_grid.serialization.serializer import (
     serialize_network,
     serialize_topology_update,
 )
-
+from kse_grid.topology.element_editing import (
+    apply_element_update,
+    create_element_in_net,
+    field_schema,
+    read_element_params,
+    validate_creation_fields,
+)
 
 _BRANCH_KINDS: frozenset[str] = frozenset({"line", "trafo"})
 
@@ -223,7 +222,10 @@ class SwitchingSession:
         elif not energized:
             net.converged = False
             self._last_run_succeeded = False
-            self._last_run_message = "Wszystkie wyspy są niezasilone — brak źródła odniesienia."
+            self._last_run_message = (
+                "Brak źródła napięcia w sieci — dodaj ext_grid do jednej z szyn, "
+                "a następnie przelicz rozpływ mocy."
+            )
         elif failed:
             net.converged = False
             self._last_run_succeeded = False

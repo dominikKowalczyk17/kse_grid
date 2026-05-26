@@ -6,7 +6,7 @@ import re
 
 import pandapower as pp
 
-from kse_grid.type_coercion import to_float as _to_float, to_int as _to_int
+from kse_grid.type_coercion import to_int as _to_int
 
 _DEFAULT_LINE_NAME_RE = re.compile(r"^(?:Line|Linia)\s+\d+:\s")
 _DEFAULT_TRAFO_NAME_RE = re.compile(r"^Trafo\s+\d+:\s")

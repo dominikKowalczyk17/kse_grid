@@ -9,9 +9,9 @@ Użycie
     grid.serve()                      # dashboard FastAPI + Vue w przeglądarce
 """
 
+from kse_grid.grid import KSEGrid
 from kse_grid.loading.matpower import load_matpower_case, seed_operational_switches
 from kse_grid.powerflow.runner import PowerFlowRunner
-from kse_grid.grid import KSEGrid
 from kse_grid.topology.switching import SwitchingSession
 
 __all__ = [

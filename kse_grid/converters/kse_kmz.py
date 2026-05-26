@@ -30,7 +30,6 @@ from xml.etree import ElementTree as ET
 
 from kse_grid.converters.tamu_geo import _iter_sections, _parse_buses, _parse_substations
 
-
 KML_NS = {"kml": "http://www.opengis.net/kml/2.2"}
 
 NOISE_TOKENS = {

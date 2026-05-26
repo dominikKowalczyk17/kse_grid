@@ -18,7 +18,6 @@ import shlex
 from pathlib import Path
 from typing import Iterator
 
-
 SECTION_RE = re.compile(r"^([a-zA-Z_]+(?:\s+[a-zA-Z_]+)*)\s+data\s+\[\s*\d+\s*\]")
 
 
