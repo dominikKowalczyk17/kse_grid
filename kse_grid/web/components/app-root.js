@@ -3,16 +3,18 @@ import { ErrorModal } from '/components/error-modal.js';
 import { ResultsBar } from '/components/results-bar.js';
 import { Sidebar } from '/components/sidebar.js';
 import { GraphPanel } from '/components/graph-panel.js';
+import { GridBuilder } from '/components/grid-builder.js';
 import { IconChevronLeft, IconChevronRight, IconSun, IconMoon } from '/icons.js';
 import { useErrorHandling } from '/lib/composables/use-error-handling.js';
 import { useNetworkState } from '/lib/composables/use-network-state.js';
 import { useTopologyOps } from '/lib/composables/use-topology-ops.js';
 import { useElementEdit } from '/lib/composables/use-element-edit.js';
+import { useGridBuilder } from '/lib/composables/use-grid-builder.js';
 import { useUiState } from '/lib/composables/use-ui-state.js';
 import { polishPlural } from '/lib/formatters.js';
 
 export const App = {
-    components: { ErrorModal, ResultsBar, Sidebar, GraphPanel, IconChevronLeft, IconChevronRight, IconSun, IconMoon },
+    components: { ErrorModal, ResultsBar, Sidebar, GraphPanel, GridBuilder, IconChevronLeft, IconChevronRight, IconSun, IconMoon },
     setup() {
         const errorHandling = useErrorHandling();
         const uiState = useUiState();
@@ -48,6 +50,12 @@ export const App = {
 
         const elementEdit = useElementEdit({
             applyTopologyUpdate,
+            presentError: errorHandling.presentError,
+        });
+
+        const gridBuilder = useGridBuilder({
+            network: networkState.network,
+            applyNetwork: networkState.applyNetwork,
             presentError: errorHandling.presentError,
         });
 
@@ -97,6 +105,7 @@ export const App = {
 
         networkState.loadNetwork();
         elementEdit.loadElementSchema();
+        gridBuilder.loadCreateSchema();
 
         onMounted(() => {
             window.addEventListener('error', onWindowError);
@@ -159,6 +168,22 @@ export const App = {
             pendingHeaderLabel,
             dismissErrorModal: errorHandling.dismissErrorModal,
             handleRuntimeError,
+            gbTABS: gridBuilder.TABS,
+            gbActiveTab: gridBuilder.activeTab,
+            gbFormatMode: gridBuilder.formatMode,
+            gbActiveSchema: gridBuilder.activeSchema,
+            gbActiveRows: gridBuilder.activeRows,
+            gbFormFields: gridBuilder.formFields,
+            gbFormBusy: gridBuilder.formBusy,
+            gbFormError: gridBuilder.formError,
+            gbNewNetBusy: gridBuilder.newNetBusy,
+            gbOnTabChange: gridBuilder.onTabChange,
+            gbOnFormatChange: gridBuilder.onFormatChange,
+            gbOnCreateElement: gridBuilder.onCreateElement,
+            gbOnDeleteElement: gridBuilder.onDeleteElement,
+            gbOnExportNetwork: gridBuilder.onExportNetwork,
+            gbOnNewNetwork: gridBuilder.onNewNetwork,
+            gbOnUpdateFormFields: (f) => { gridBuilder.formFields.value = f; },
         };
     },
     template: `
@@ -170,73 +195,85 @@ export const App = {
 
             <div class="header-divider"></div>
 
-            <div class="header-view-toggle" role="group" aria-label="Tryb widoku">
-                <button type="button"
-                        class="chip"
-                        :class="{ active: viewMode === 'graph' }"
-                        @click="viewMode = 'graph'"
-                        title="Widok grafowy (layout schematyczny)">Graf</button>
-                <button type="button"
-                        class="chip"
-                        :class="{ active: viewMode === 'geo' }"
-                        :disabled="!network.geoAvailable"
-                        @click="viewMode = 'geo'"
-                        :title="network.geoAvailable ? 'Widok geograficzny (OpenStreetMap)' : 'Brak współrzędnych WGS84 w case\\'ie'">OSM</button>
-                <button type="button"
-                        class="chip"
-                        :class="{ active: viewMode === 'atlas' }"
-                        @click="viewMode = 'atlas'"
-                        title="Atlas KSE 2019 (referencyjny)">Atlas</button>
-            </div>
+            <template v-if="!network.isEmpty">
+                <div class="header-view-toggle" role="group" aria-label="Tryb widoku">
+                    <button type="button"
+                            class="chip"
+                            :class="{ active: viewMode === 'graph' }"
+                            @click="viewMode = 'graph'"
+                            title="Widok grafowy (layout schematyczny)">Graf</button>
+                    <button type="button"
+                            class="chip"
+                            :class="{ active: viewMode === 'geo' }"
+                            :disabled="!network.geoAvailable"
+                            @click="viewMode = 'geo'"
+                            :title="network.geoAvailable ? 'Widok geograficzny (OpenStreetMap)' : 'Brak współrzędnych WGS84 w case\\'ie'">OSM</button>
+                    <button type="button"
+                            class="chip"
+                            :class="{ active: viewMode === 'atlas' }"
+                            @click="viewMode = 'atlas'"
+                            title="Atlas KSE 2019 (referencyjny)">Atlas</button>
+                </div>
 
-            <div class="header-divider"></div>
+                <div class="header-divider"></div>
 
-            <div class="header-stats">
-                <span class="header-stat"><span class="v tabular">{{ stats.nBus }}</span> szyn</span>
-                <span class="header-stat"><span class="v tabular">{{ stats.nLine }}</span> linii</span>
-                <span class="header-stat"><span class="v tabular">{{ stats.nTrafo }}</span> trafo</span>
-                <span v-if="pendingRecalc" class="status-pill warn">
-                    <span class="dot"></span>
-                    {{ pendingHeaderLabel }}
-                </span>
-            </div>
+                <div class="header-stats">
+                    <span class="header-stat"><span class="v tabular">{{ stats.nBus }}</span> szyn</span>
+                    <span class="header-stat"><span class="v tabular">{{ stats.nLine }}</span> linii</span>
+                    <span class="header-stat"><span class="v tabular">{{ stats.nTrafo }}</span> trafo</span>
+                    <span v-if="pendingRecalc" class="status-pill warn">
+                        <span class="dot"></span>
+                        {{ pendingHeaderLabel }}
+                    </span>
+                </div>
+            </template>
 
             <div class="header-spacer"></div>
 
             <button class="btn"
                     type="button"
                     :disabled="uploadBusy"
-                    :title="uploadError || 'Załaduj plik MATPOWER (.m) z dysku'"
+                    :title="uploadError || 'Załaduj plik sieciowy (.m lub .json) z dysku'"
                     @click="triggerUpload">
-                {{ uploadBusy ? 'Wgrywam…' : 'Wczytaj plik .m' }}
+                {{ uploadBusy ? 'Wgrywam…' : 'Wczytaj plik' }}
             </button>
             <input ref="uploadInputRef"
                    type="file"
-                   accept=".m,text/plain"
+                   accept=".m,.json"
                    style="display:none"
                    @change="onUploadFile" />
 
-            <button class="btn"
-                    type="button"
-                    :class="{ 'btn-active': editMode }"
-                    :title="editMode ? 'Tryb edycji włączony — drag busa, łamanie linii' : 'Włącz tryb edycji (drag busa, łamanie linii)'"
-                    @click="editMode = !editMode">
-                {{ editMode ? 'Edycja: WŁ' : 'Edycja: WYŁ' }}
-            </button>
+            <template v-if="!network.isEmpty">
+                <button class="btn"
+                        type="button"
+                        :class="{ 'btn-active': editMode }"
+                        :title="editMode ? 'Tryb edycji włączony — drag busa, łamanie linii' : 'Włącz tryb edycji (drag busa, łamanie linii)'"
+                        @click="editMode = !editMode">
+                    {{ editMode ? 'Edycja: WŁ' : 'Edycja: WYŁ' }}
+                </button>
+
+                <button class="btn"
+                        v-if="pendingRecalc"
+                        type="button"
+                        :disabled="topologyBusy"
+                        @click="onRecalculatePowerflow">
+                    {{ topologyBusy ? 'Przeliczam…' : 'Przelicz rozpływ' }}
+                </button>
+
+                <button class="btn"
+                        type="button"
+                        :disabled="topologyBusy"
+                        @click="onResetTopology">
+                    {{ topologyBusy ? 'Przeliczam…' : 'Reset stanu sieci' }}
+                </button>
+            </template>
 
             <button class="btn"
-                    v-if="pendingRecalc"
                     type="button"
-                    :disabled="topologyBusy"
-                    @click="onRecalculatePowerflow">
-                {{ topologyBusy ? 'Przeliczam…' : 'Przelicz rozpływ' }}
-            </button>
-
-            <button class="btn"
-                    type="button"
-                    :disabled="topologyBusy"
-                    @click="onResetTopology">
-                {{ topologyBusy ? 'Przeliczam…' : 'Reset stanu sieci' }}
+                    :disabled="gbNewNetBusy"
+                    title="Utwórz nową pustą sieć"
+                    @click="gbOnNewNetwork">
+                {{ gbNewNetBusy ? 'Resetuję…' : 'Nowa sieć' }}
             </button>
 
             <button class="btn btn-icon theme-toggle"
@@ -248,7 +285,30 @@ export const App = {
                 <IconMoon v-else />
             </button>
         </header>
-        <div class="app-body" :class="{ 'sidebar-hidden': sidebarHidden }">
+
+        <div v-if="network.isEmpty" class="grid-builder-page">
+            <GridBuilder
+                :network="network"
+                :TABS="gbTABS"
+                :active-tab="gbActiveTab"
+                :format-mode="gbFormatMode"
+                :active-schema="gbActiveSchema"
+                :active-rows="gbActiveRows"
+                :form-fields="gbFormFields"
+                :form-busy="gbFormBusy"
+                :form-error="gbFormError"
+                :new-net-busy="gbNewNetBusy"
+                @tab-change="gbOnTabChange"
+                @format-change="gbOnFormatChange"
+                @create-element="gbOnCreateElement"
+                @delete-element="gbOnDeleteElement"
+                @export-network="gbOnExportNetwork"
+                @new-network="gbOnNewNetwork"
+                @update:form-fields="gbOnUpdateFormFields"
+            />
+        </div>
+
+        <div v-else class="app-body" :class="{ 'sidebar-hidden': sidebarHidden }">
             <div class="sidebar-shell">
                 <Sidebar
                     class="sidebar-panel"

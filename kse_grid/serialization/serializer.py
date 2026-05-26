@@ -45,6 +45,7 @@ def serialize_network(
 
     return {
         "name": getattr(net, "name", None) or "Sieć elektroenergetyczna",
+        "isEmpty": net.bus.empty,
         "hasResults": has_bus_results,
         "voltageLevels": voltage_levels,
         "defaultVoltageFilter": default_voltage_filter,

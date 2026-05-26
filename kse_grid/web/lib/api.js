@@ -153,3 +153,32 @@ export async function updateElement(kind, elementId, fields) {
         title: `Błąd zapisu parametrów ${kind} #${elementId}`,
     });
 }
+
+export async function fetchCreateSchema() {
+    return requestJson('/api/elements/create-schema', {}, { title: 'Błąd pobierania schematu tworzenia' });
+}
+
+export async function createElement(kind, fields, format = 'pandapower') {
+    return requestJson(`/api/elements/${kind}?format=${format}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields }),
+    }, { title: `Błąd tworzenia elementu ${kind}` });
+}
+
+export async function deleteElement(kind, elementId) {
+    return requestJson(`/api/elements/${kind}/${elementId}`, {
+        method: 'DELETE',
+    }, { title: `Błąd usuwania ${kind} #${elementId}` });
+}
+
+export async function newNetwork() {
+    return requestJson('/api/network/new', { method: 'POST' }, { title: 'Błąd tworzenia nowej sieci' });
+}
+
+export function exportNetwork(format) {
+    const url = format === 'matpower'
+        ? '/api/network/export/matpower'
+        : '/api/network/export/json';
+    window.location.href = url;
+}
