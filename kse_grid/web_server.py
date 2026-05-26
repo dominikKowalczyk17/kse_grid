@@ -167,9 +167,9 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
 
     @app.get("/api/elements/create-schema")
     def get_create_schema() -> JSONResponse:
-        from kse_grid.topology.element_editing import field_schema
+        from kse_grid.topology.element_editing import creation_field_schema
         return JSONResponse({
-            "pandapower": field_schema(),
+            "pandapower": creation_field_schema(),
             "matpower": MATPOWER_SCHEMA,
         })
 
