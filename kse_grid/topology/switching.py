@@ -215,6 +215,41 @@ class SwitchingSession:
         self._last_run_message = result.message if not result.converged else None
 
 
+    def delete_element(self, kind: str, element_id: int) -> dict[str, Any]:
+        """Usuwa element z sieci roboczej i odkłada przeliczenie load flow.
+
+        Rzuca KeyError gdy element nie istnieje.
+        """
+        _check_element_exists(self.working_net, kind, element_id)
+
+        def mutator(net: pp.pandapowerNet) -> None:
+            _delete_from_net(net, kind, element_id)
+
+        topology_update = self._stage_change(
+            mutator, pending_message=f"Usunięto {kind} #{element_id}."
+        )
+        self._graph_positions = recompute_graph_positions(self.working_net)
+        topology_update["positions"] = {str(k): list(v) for k, v in self._graph_positions.items()}
+        return {"deletedElement": {"kind": kind, "id": element_id}, "topologyUpdate": topology_update}
+
+
+def _check_element_exists(net: pp.pandapowerNet, kind: str, element_id: int) -> None:
+    table = getattr(net, kind, None)
+    if table is None or element_id not in table.index:
+        raise KeyError(f"Nie istnieje {kind} #{element_id}.")
+
+
+def _delete_from_net(net: pp.pandapowerNet, kind: str, element_id: int) -> None:
+    if kind == "bus":
+        pp.drop_buses(net, buses=[element_id])
+        return
+    if kind in {"line", "trafo"}:
+        et = "l" if kind == "line" else "t"
+        mask = (net.switch["element"].astype(int) == element_id) & (net.switch["et"] == et)
+        net.switch.drop(net.switch.index[mask], inplace=True)
+    getattr(net, kind).drop(element_id, inplace=True)
+
+
 def _has_results(net: pp.pandapowerNet) -> bool:
     return hasattr(net, "res_bus") and not net.res_bus.empty
 

@@ -95,6 +95,16 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
     def recalculate_powerflow() -> JSONResponse:
         return JSONResponse(current_session().recalculate())
 
+    @app.delete("/api/elements/{kind}/{element_id}")
+    def delete_element(kind: str, element_id: int) -> JSONResponse:
+        if kind not in _ELEMENT_KINDS:
+            raise HTTPException(status_code=404, detail=f"Nieznany typ elementu: {kind}.")
+        try:
+            result = current_session().delete_element(kind, element_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return JSONResponse(result)
+
     @app.post("/api/elements/{kind}", status_code=201)
     def create_element(kind: str, update: ElementUpdate) -> JSONResponse:
         if kind not in _CREATABLE_KINDS:
