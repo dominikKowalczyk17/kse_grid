@@ -1,9 +1,10 @@
 """Tests for JSON and MATPOWER export endpoints."""
 from __future__ import annotations
-import json
+
 import pandapower as pp
 import pytest
 from fastapi.testclient import TestClient
+
 from kse_grid.web_server import create_app
 
 

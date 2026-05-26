@@ -5,7 +5,6 @@ Written before implementation per issue #3 TDD requirement.
 
 from __future__ import annotations
 
-import pandapower as pp
 import pytest
 from fastapi.testclient import TestClient
 

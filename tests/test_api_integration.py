@@ -1,9 +1,12 @@
 """Integration test: full create → power flow → serialize cycle via HTTP API."""
 from __future__ import annotations
+
 import pandapower as pp
 import pytest
 from fastapi.testclient import TestClient
+
 from kse_grid.web_server import create_app
+
 
 @pytest.fixture
 def client():

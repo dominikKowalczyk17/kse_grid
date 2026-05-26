@@ -1,7 +1,8 @@
 """Verify vendor assets are present and index.html has no CDN URLs."""
 from __future__ import annotations
-from pathlib import Path
+
 import re
+from pathlib import Path
 
 VENDOR = Path(__file__).parent.parent / "kse_grid" / "web" / "vendor"
 INDEX = Path(__file__).parent.parent / "kse_grid" / "web" / "index.html"

@@ -9,10 +9,8 @@ import io
 import json
 
 import pandapower as pp
-import pytest
 from fastapi.testclient import TestClient
 
-import kse_grid
 from kse_grid.web_server import create_app
 
 

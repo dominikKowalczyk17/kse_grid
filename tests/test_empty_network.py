@@ -5,10 +5,7 @@ Written before implementation per issue #2 TDD requirement.
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pandapower as pp
-import pytest
 from fastapi.testclient import TestClient
 
 import kse_grid
