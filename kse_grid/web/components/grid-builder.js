@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { IconClose } from '/icons.js';
 
 const COLUMNS = {
@@ -84,6 +84,7 @@ export const GridBuilder = {
         const activeHint = computed(() => TAB_HINTS[props.activeTab] || null);
         const helpField = ref(null);
         const fieldErrors = ref({});
+        const formEl = ref(null);
 
         const busOptions = computed(() => {
             const buses = props.network?.buses || [];
@@ -127,6 +128,11 @@ export const GridBuilder = {
             emit('create-element');
         }
 
+        function clearForm() {
+            emit('update:formFields', {});
+            fieldErrors.value = {};
+        }
+
         function deleteRow(elementId) {
             emit('delete-element', props.activeTab, elementId);
         }
@@ -141,10 +147,13 @@ export const GridBuilder = {
 
         watch(() => props.activeTab, () => { fieldErrors.value = {}; });
         watch(() => props.formatMode, () => { fieldErrors.value = {}; });
+        watch(() => props.formSuccessMsg, (msg) => {
+            if (msg) nextTick(() => formEl.value?.querySelector('input, select')?.focus());
+        });
 
         return {
-            columns, activeHint, helpField, fieldErrors, busOptions,
-            isBusField, setField, validateField, submitForm, deleteRow, openHelp, closeHelp, colVal,
+            columns, activeHint, helpField, fieldErrors, busOptions, formEl,
+            isBusField, setField, validateField, submitForm, clearForm, deleteRow, openHelp, closeHelp, colVal,
         };
     },
     template: `
@@ -259,7 +268,7 @@ export const GridBuilder = {
             </div>
         </transition>
 
-        <form class="gb-form" @submit.prevent="submitForm" v-if="activeSchema.length > 0">
+        <form class="gb-form" ref="formEl" @submit.prevent="submitForm" @keydown.escape="clearForm" v-if="activeSchema.length > 0">
             <div class="gb-field-grid">
                 <div
                     v-for="field in activeSchema"
