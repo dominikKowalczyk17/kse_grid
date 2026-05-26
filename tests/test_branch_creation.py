@@ -74,3 +74,40 @@ def test_gen_on_slack_bus_rejected():
     client.post("/api/elements/ext_grid", json={"fields": {"bus": bus_id}})
     resp = client.post("/api/elements/gen", json={"fields": {"bus": bus_id, "p_mw": 50.0}})
     assert resp.status_code == 400
+
+
+def test_line_self_loop_rejected(two_bus_client):
+    client, b0, _ = two_bus_client
+    resp = client.post("/api/elements/line", json={"fields": {
+        "from_bus": b0, "to_bus": b0, "length_km": 10,
+        "r_ohm_per_km": 0.1, "x_ohm_per_km": 0.4,
+        "c_nf_per_km": 10, "max_i_ka": 0.5,
+    }})
+    assert resp.status_code == 400
+    assert "from_bus == to_bus" in resp.json()["detail"]
+
+
+def test_trafo_self_loop_rejected():
+    grid = kse_grid.KSEGrid.new_empty()
+    client = TestClient(create_app(grid.net))
+    bus_id = client.post("/api/elements/bus", json={"fields": {"vn_kv": 110}}).json()["newElementId"]
+    resp = client.post("/api/elements/trafo", json={"fields": {
+        "hv_bus": bus_id, "lv_bus": bus_id, "sn_mva": 100,
+        "vn_hv_kv": 110, "vn_lv_kv": 110,
+        "vk_percent": 10, "vkr_percent": 0.3,
+        "pfe_kw": 30, "i0_percent": 0.1,
+    }})
+    assert resp.status_code == 400
+    assert "hv_bus == lv_bus" in resp.json()["detail"]
+
+
+def test_line_nonexistent_bus_rejected():
+    grid = kse_grid.KSEGrid.new_empty()
+    client = TestClient(create_app(grid.net))
+    b0 = client.post("/api/elements/bus", json={"fields": {"vn_kv": 110}}).json()["newElementId"]
+    resp = client.post("/api/elements/line", json={"fields": {
+        "from_bus": b0, "to_bus": 9999, "length_km": 10,
+        "r_ohm_per_km": 0.1, "x_ohm_per_km": 0.4,
+        "c_nf_per_km": 10, "max_i_ka": 0.5,
+    }})
+    assert resp.status_code == 400

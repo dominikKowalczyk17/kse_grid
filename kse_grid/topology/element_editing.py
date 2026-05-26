@@ -596,6 +596,18 @@ def create_element_in_net(net: pp.pandapowerNet, kind: str, fields: dict[str, An
     if "bus" in kwargs and not net.bus.empty and int(kwargs["bus"]) not in net.bus.index:
         raise ValueError(f"Szyna o id={kwargs['bus']} nie istnieje.")
 
+    for bus_field in ("from_bus", "to_bus", "hv_bus", "lv_bus"):
+        if bus_field in kwargs and not net.bus.empty and int(kwargs[bus_field]) not in net.bus.index:
+            raise ValueError(f"Szyna o id={kwargs[bus_field]} ({bus_field}) nie istnieje.")
+
+    if kind == "line" and "from_bus" in kwargs and "to_bus" in kwargs:
+        if int(kwargs["from_bus"]) == int(kwargs["to_bus"]):
+            raise ValueError("Linia nie może łączyć szyny z samą sobą (from_bus == to_bus).")
+
+    if kind == "trafo" and "hv_bus" in kwargs and "lv_bus" in kwargs:
+        if int(kwargs["hv_bus"]) == int(kwargs["lv_bus"]):
+            raise ValueError("Transformator nie może łączyć szyny z samą sobą (hv_bus == lv_bus).")
+
     if kind == "gen" and "bus" in kwargs:
         bus_id = int(kwargs["bus"])
         if not net.ext_grid.empty and bus_id in net.ext_grid["bus"].values:
@@ -604,7 +616,12 @@ def create_element_in_net(net: pp.pandapowerNet, kind: str, fields: dict[str, An
                 "dodanie generatora PV spowodowałoby konflikt węzłów referencyjnych."
             )
 
-    idx = int(_CREATORS[kind](net, **kwargs))
+    try:
+        idx = int(_CREATORS[kind](net, **kwargs))
+    except (ValueError, KeyError) as exc:
+        raise ValueError(f"Błąd pandapower przy tworzeniu {kind}: {exc}") from exc
+    except Exception as exc:
+        raise ValueError(f"Nieoczekiwany błąd przy tworzeniu {kind}: {exc}") from exc
 
     table = getattr(net, kind)
     if "name" in table.columns and not str(table.at[idx, "name"]).strip():

@@ -13,6 +13,13 @@ from pandapower.topology import create_nxgraph
 
 from kse_grid.type_coercion import to_int as _to_int
 
+_PF_EXCEPTIONS: tuple[type[Exception], ...] = (pp_aux.LoadflowNotConverged,)
+try:
+    from pandapower.auxiliary import OPFNotConverged as _OPFNotConverged  # type: ignore[attr-defined]
+    _PF_EXCEPTIONS = (*_PF_EXCEPTIONS, _OPFNotConverged)
+except ImportError:
+    pass
+
 
 @dataclass
 class IslandPFResult:
@@ -86,7 +93,7 @@ def run_island_powerflow(
                 status="converged",
                 converged=True,
             ))
-        except pp_aux.LoadflowNotConverged as exc:
+        except _PF_EXCEPTIONS as exc:
             results.append(IslandPFResult(
                 id=island_idx,
                 bus_ids=bus_ids,
@@ -94,6 +101,15 @@ def run_island_powerflow(
                 status="not_converged",
                 converged=False,
                 message=str(exc),
+            ))
+        except Exception as exc:  # noqa: BLE001 — degenerate network (singular matrix etc.)
+            results.append(IslandPFResult(
+                id=island_idx,
+                bus_ids=bus_ids,
+                slack_bus_ids=island_slacks,
+                status="not_converged",
+                converged=False,
+                message=f"Błąd obliczeniowy: {exc}",
             ))
 
     return results

@@ -9,10 +9,9 @@ from __future__ import annotations
 import pandapower as pp
 import pytest
 
-from kse_grid.powerflow.island_powerflow import run_island_powerflow, _active_slack_bus_ids
+from kse_grid.powerflow.island_powerflow import run_island_powerflow
 from kse_grid.serialization.topology_analysis import compute_topology
 from kse_grid.topology.switching import _clear_results
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -177,3 +176,27 @@ class TestTopologyAnalysisWithPFResults:
         topology = compute_topology(net)
         unsupplied_island = next(i for i in topology["islands"] if i["pfStatus"] == "unsupplied")
         assert unsupplied_island["pfMessage"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Exception handling
+# ---------------------------------------------------------------------------
+
+class TestPFExceptionHandling:
+    def test_degenerate_network_no_raise(self):
+        """A network with zero-impedance line should not propagate an exception."""
+        net = pp.create_empty_network()
+        a = pp.create_bus(net, vn_kv=110.0, name="A")
+        b = pp.create_bus(net, vn_kv=110.0, name="B")
+        pp.create_ext_grid(net, bus=a, vm_pu=1.0)
+        pp.create_line_from_parameters(
+            net, from_bus=a, to_bus=b, length_km=1.0,
+            r_ohm_per_km=0.0, x_ohm_per_km=0.0, c_nf_per_km=0.0, max_i_ka=1.0,
+        )
+        pp.create_load(net, bus=b, p_mw=1.0, q_mvar=0.0)
+        try:
+            results = run_island_powerflow(net)
+            # Either converged or gracefully reported as not_converged — no exception
+            assert all(r.status in ("converged", "not_converged", "unsupplied") for r in results)
+        except Exception as exc:
+            pytest.fail(f"run_island_powerflow raised unexpectedly: {exc}")
