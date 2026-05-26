@@ -442,6 +442,80 @@ def field_schema() -> dict[str, list[dict[str, Any]]]:
 
 
 # ---------------------------------------------------------------------------
+# Schemat formularza tworzenia elementów
+# ---------------------------------------------------------------------------
+
+_CREATION_FIELD_META: dict[str, tuple] = {
+    "vn_kv":           ("Un",             "kV",     "Napięcie znamionowe szyny.",                     [15.0, 30.0, 110.0, 220.0, 400.0]),
+    "from_bus":        ("Szyna źródłowa", None,     "Szyna, od której odchodzi linia.",               None),
+    "to_bus":          ("Szyna docelowa", None,     "Szyna, do której dochodzi linia.",               None),
+    "hv_bus":          ("Szyna WN",       None,     "Szyna strony wysokiego napięcia.",               None),
+    "lv_bus":          ("Szyna nN",       None,     "Szyna strony niskiego napięcia.",                None),
+    "bus":             ("Szyna",          None,     "Szyna przyłączenia elementu.",                   None),
+    "p_mw":            ("P",              "MW",     "Moc czynna.",                                    None),
+    "q_mvar":          ("Q",              "Mvar",   "Moc bierna.",                                    None),
+    "length_km":       ("Długość",        "km",     "Długość odcinka linii.",                         None),
+    "r_ohm_per_km":    ("R",              "Ω/km",   "Rezystancja jednostkowa.",                       None),
+    "x_ohm_per_km":    ("X",              "Ω/km",   "Reaktancja jednostkowa.",                        None),
+    "c_nf_per_km":     ("C",              "nF/km",  "Pojemność jednostkowa.",                         None),
+    "max_i_ka":        ("Imax",           "kA",     "Maksymalny prąd długotrwały.",                   None),
+    "sn_mva":          ("Sn",             "MVA",    "Moc znamionowa transformatora.",                 None),
+    "vn_hv_kv":        ("Un WN",          "kV",     "Napięcie znamionowe strony WN.",                None),
+    "vn_lv_kv":        ("Un nN",          "kV",     "Napięcie znamionowe strony nN.",                None),
+    "vk_percent":      ("uk",             "%",      "Napięcie zwarcia transformatora.",               None),
+    "vkr_percent":     ("ukr",            "%",      "Rezystancyjna składowa napięcia zwarcia.",       None),
+    "pfe_kw":          ("Pfe",            "kW",     "Straty w żelazie (bieg jałowy).",               None),
+    "i0_percent":      ("i0",             "%",      "Prąd biegu jałowego.",                           None),
+    "vm_pu":           ("Um",             "p.u.",   "Zadane napięcie (moduł).",                      None),
+    "va_degree":       ("δ",              "°",      "Kąt napięcia węzła referencyjnego.",            None),
+    "name":            ("Nazwa",          None,     "Etykieta tekstowa elementu.",                    None),
+    "type":            ("Typ szyny",      None,     "Rodzaj węzła (b=szyna, n=węzeł, m=pomocniczy).", ["b", "n", "m"]),
+    "in_service":      ("W eksploatacji", None,     "Czy element jest aktywny.",                      None),
+    "g_us_per_km":     ("G",              "μS/km",  "Konduktancja jednostkowa.",                      None),
+    "parallel":        ("Równoległe",     None,     "Liczba równoległych torów.",                     None),
+    "scaling":         ("Scaling",        None,     "Współczynnik skalowania mocy.",                  None),
+    "max_q_mvar":      ("Qmax",           "Mvar",   "Maksymalna moc bierna generatora.",              None),
+    "min_q_mvar":      ("Qmin",           "Mvar",   "Minimalna moc bierna generatora.",               None),
+    "max_p_mw":        ("Pmax",           "MW",     "Maksymalna moc czynna generatora.",              None),
+    "min_p_mw":        ("Pmin",           "MW",     "Minimalna moc czynna generatora.",               None),
+    "tap_neutral":     ("Zacisk nom.",    None,     "Zacisk regulatora przy pozycji nominalnej.",     None),
+    "tap_min":         ("Zacisk min.",    None,     "Minimalna pozycja regulatora.",                  None),
+    "tap_max":         ("Zacisk max.",    None,     "Maksymalna pozycja regulatora.",                 None),
+    "tap_step_percent":("Krok reg.",      "%",      "Krok zmiany napięcia regulatora.",               None),
+    "tap_pos":         ("Pozycja reg.",   None,     "Aktualna pozycja regulatora.",                   None),
+}
+
+
+def creation_field_schema() -> dict[str, list[dict[str, Any]]]:
+    """Zwraca schemat pól formularza tworzenia elementów (pandapower)."""
+    result: dict[str, list[dict[str, Any]]] = {}
+    for kind, schema in _CREATION_SCHEMA.items():
+        required_names = {name for name, _ in schema["required"]}
+        all_fields: list[tuple[str, str, list | None]] = [
+            (name, ftype, None) for name, ftype in schema["required"]
+        ] + [
+            (name, ftype, options) for name, ftype, options in schema["optional"]
+        ]
+        fields: list[dict[str, Any]] = []
+        for name, ftype, schema_options in all_fields:
+            meta = _CREATION_FIELD_META.get(name, (name, None, None, None))
+            label, unit, description, meta_options = meta
+            options = schema_options if schema_options is not None else meta_options
+            resolved_type = "enum" if options else ftype
+            fields.append({
+                "name": name,
+                "label": label,
+                "type": resolved_type,
+                "unit": unit,
+                "options": options,
+                "description": description,
+                "required": name in required_names,
+            })
+        result[kind] = fields
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Odczyt / zapis
 # ---------------------------------------------------------------------------
 
