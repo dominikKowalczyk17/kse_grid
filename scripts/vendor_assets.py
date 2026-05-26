@@ -16,6 +16,7 @@ ASSETS: list[tuple[str, str]] = [
     ("vue.esm-browser.prod.js",        "https://unpkg.com/vue@3.5.13/dist/vue.esm-browser.prod.js"),
     ("pixi.min.mjs",                   "https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.mjs"),
     ("rbush.mjs",                      "https://cdn.jsdelivr.net/npm/rbush@4.0.1/+esm"),
+    ("quickselect.mjs",                "https://cdn.jsdelivr.net/npm/quickselect@3.0.0/+esm"),
 ]
 
 # Google Fonts CSS (Inter + JetBrains Mono) — fetched with a browser User-Agent
@@ -76,6 +77,15 @@ def main() -> None:
     print("  fetch fonts.css ← Google Fonts")
     css, _ = vendor_fonts()
     (VENDOR / "fonts.css").write_text(css, encoding="utf-8")
+
+    # rbush.mjs bundles a hardcoded jsDelivr URL for quickselect — rewrite to local path
+    rbush = VENDOR / "rbush.mjs"
+    patched = rbush.read_text().replace(
+        'from"/npm/quickselect@3.0.0/+esm"',
+        'from"/vendor/quickselect.mjs"',
+    )
+    rbush.write_text(patched)
+    print("  patch rbush.mjs → local quickselect.mjs")
 
     print("Done. All assets in", VENDOR)
 
