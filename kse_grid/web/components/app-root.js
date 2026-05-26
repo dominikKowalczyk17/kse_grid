@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { ErrorModal } from '/components/error-modal.js';
+import { LandingPage } from '/components/landing-page.js';
 import { ResultsBar } from '/components/results-bar.js';
 import { Sidebar } from '/components/sidebar.js';
 import { GraphPanel } from '/components/graph-panel.js';
@@ -14,7 +15,7 @@ import { useUiState } from '/lib/composables/use-ui-state.js';
 import { polishPlural } from '/lib/formatters.js';
 
 export const App = {
-    components: { ErrorModal, ResultsBar, Sidebar, GraphPanel, GridBuilder, IconChevronLeft, IconChevronRight, IconSun, IconMoon },
+    components: { ErrorModal, LandingPage, ResultsBar, Sidebar, GraphPanel, GridBuilder, IconChevronLeft, IconChevronRight, IconSun, IconMoon },
     setup() {
         const errorHandling = useErrorHandling();
         const uiState = useUiState();
@@ -122,6 +123,8 @@ export const App = {
         return {
             network: networkState.network,
             error: networkState.error,
+            atLanding: networkState.atLanding,
+            leaveLanding: networkState.leaveLanding,
             activeError: errorHandling.activeError,
             uploadBusy: networkState.uploadBusy,
             uploadError: networkState.uploadError,
@@ -187,7 +190,14 @@ export const App = {
         };
     },
     template: `
-    <div class="app-shell" v-if="network">
+    <LandingPage
+        v-if="network && atLanding"
+        :theme="theme"
+        @upload="triggerUpload"
+        @new-grid="leaveLanding"
+        @toggle-theme="toggleTheme"
+    />
+    <div class="app-shell" v-else-if="network && !atLanding">
         <header class="app-header">
             <div class="brand">
                 <span class="case-name brand-title">{{ network.name }}</span>
@@ -237,12 +247,6 @@ export const App = {
                     @click="triggerUpload">
                 {{ uploadBusy ? 'Wgrywam…' : 'Wczytaj plik' }}
             </button>
-            <input ref="uploadInputRef"
-                   type="file"
-                   accept=".m,.json"
-                   style="display:none"
-                   @change="onUploadFile" />
-
             <template v-if="!network.isEmpty">
                 <button class="btn"
                         type="button"
@@ -381,6 +385,12 @@ export const App = {
             />
         </div>
     </div>
+    <input v-if="network"
+           ref="uploadInputRef"
+           type="file"
+           accept=".m,.json"
+           style="display:none"
+           @change="onUploadFile" />
     <div v-else-if="error" class="overlay">
         <span class="err">Błąd ładowania danych: {{ error }}</span>
     </div>

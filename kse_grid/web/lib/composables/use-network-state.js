@@ -4,6 +4,7 @@ import { fetchNetwork, uploadNetwork } from '/lib/api.js';
 export function useNetworkState({ presentError, onApply }) {
     const network = ref(null);
     const error = ref(null);
+    const atLanding = ref(true);
     const uploadBusy = ref(false);
     const uploadError = ref('');
     const uploadProgress = ref(0);
@@ -73,6 +74,7 @@ export function useNetworkState({ presentError, onApply }) {
                     uploadProgress.value = 100;
                 }
             });
+            atLanding.value = false;
             applyNetwork(payload, { firstLoad: true });
         } catch (requestError) {
             uploadError.value = presentError(requestError, 'Błąd uploadu pliku').message;
@@ -85,10 +87,14 @@ export function useNetworkState({ presentError, onApply }) {
         }
     }
 
+    function leaveLanding() {
+        atLanding.value = false;
+    }
+
     return {
-        network, error,
+        network, error, atLanding,
         uploadBusy, uploadError, uploadProgress, uploadPhase, uploadFileName, uploadInputRef,
-        applyNetwork, applyTopologyUpdate, loadNetwork, triggerUpload, onUploadFile,
+        applyNetwork, applyTopologyUpdate, loadNetwork, triggerUpload, onUploadFile, leaveLanding,
     };
 }
 
