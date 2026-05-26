@@ -1,3 +1,4 @@
+import { ref } from 'vue';
 import { IconClose } from '/icons.js';
 
 export const ErrorModal = {
@@ -6,6 +7,11 @@ export const ErrorModal = {
         error: { type: Object, default: null },
     },
     emits: ['close'],
+    setup() {
+        const traceExpanded = ref(false);
+        function toggleTrace() { traceExpanded.value = !traceExpanded.value; }
+        return { traceExpanded, toggleTrace };
+    },
     template: `
     <transition name="upload-fade">
         <div v-if="error" class="error-backdrop" role="dialog" aria-modal="true" aria-label="Błąd aplikacji" @click.self="$emit('close')">
@@ -20,8 +26,23 @@ export const ErrorModal = {
                         <IconClose />
                     </button>
                 </div>
+
                 <div class="error-modal-summary">{{ error.message }}</div>
-                <pre v-if="error.detail" class="error-modal-detail">{{ error.detail }}</pre>
+                <div v-if="error.detail" class="error-modal-http-meta">{{ error.detail }}</div>
+
+                <div v-if="error.traceback" class="error-traceback-section">
+                    <button
+                        type="button"
+                        class="error-traceback-toggle"
+                        :aria-expanded="traceExpanded"
+                        @click="toggleTrace"
+                    >
+                        <span class="error-traceback-arrow">{{ traceExpanded ? '▼' : '▶' }}</span>
+                        Szczegóły techniczne
+                    </button>
+                    <pre v-if="traceExpanded" class="error-modal-detail">{{ error.traceback }}</pre>
+                </div>
+
                 <div class="error-modal-actions">
                     <button class="btn btn-primary" type="button" @click="$emit('close')">Zamknij</button>
                 </div>

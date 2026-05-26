@@ -23,6 +23,7 @@ async function parseJson(response, requestMeta = {}) {
         method: requestMeta.method || null,
         url: requestMeta.url || response.url,
         detail,
+        traceback: json?.traceback || '',
         body: text,
     });
 }
@@ -42,7 +43,7 @@ async function requestJson(url, options = {}, meta = {}) {
             title: meta.title || 'Błąd sieci',
             method: options.method || 'GET',
             url,
-            detail: error?.stack || String(error),
+            traceback: error?.stack || String(error),
             cause: error,
         });
     }
@@ -126,6 +127,7 @@ export function uploadNetwork(file, onProgress) {
                 method: 'POST',
                 url: '/api/network/upload',
                 detail,
+                traceback: json?.traceback || '',
                 body: text,
             }));
         });

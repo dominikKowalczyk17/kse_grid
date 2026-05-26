@@ -6,7 +6,7 @@ export function useErrorHandling() {
 
     function presentError(rawError, title, info = '') {
         const formatted = formatError(rawError, title);
-        if (info) formatted.detail = [info, formatted.detail].filter(Boolean).join('\n\n');
+        if (info) formatted.traceback = [info, formatted.traceback].filter(Boolean).join('\n\n');
         activeError.value = formatted;
         return formatted;
     }

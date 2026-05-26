@@ -7,6 +7,7 @@ export class AppError extends Error {
         this.method = options.method || null;
         this.url = options.url || null;
         this.detail = options.detail || '';
+        this.traceback = options.traceback || '';
         this.body = options.body || '';
         this.info = options.info || '';
         this.timestamp = options.timestamp || new Date().toISOString();
@@ -33,25 +34,30 @@ export function formatError(error, fallbackTitle = 'Błąd aplikacji') {
 
     const title = err.title || fallbackTitle;
     const message = err.message || stringifyUnknown(err);
-    const detailParts = [];
 
-    if (err.status != null || err.method || err.url) {
-        const requestMeta = [
-            err.status != null ? `HTTP ${err.status}` : null,
-            err.method || null,
-            err.url || null,
-        ].filter(Boolean).join(' · ');
-        if (requestMeta) detailParts.push(requestMeta);
+    // One-line HTTP context shown beneath the message
+    const contextParts = [
+        err.status != null ? `HTTP ${err.status}` : null,
+        err.method || null,
+        err.url || null,
+    ].filter(Boolean);
+    const detail = contextParts.join(' · ');
+
+    // Full technical content for the expandable section
+    // Priority: explicit traceback from server, then JS stack
+    const tracebackParts = [];
+    if (err.info) tracebackParts.push(String(err.info));
+    if (err.traceback) {
+        tracebackParts.push(err.traceback);
+    } else if (err.stack) {
+        tracebackParts.push(err.stack);
     }
-    if (err.info) detailParts.push(String(err.info));
-    if (err.detail && err.detail !== message) detailParts.push(String(err.detail));
-    if (err.body && err.body !== err.detail && err.body !== message) detailParts.push(String(err.body));
-    if (err.stack) detailParts.push(err.stack);
 
     return {
         title,
         message,
-        detail: detailParts.filter(Boolean).join('\n\n').trim(),
+        detail,
+        traceback: tracebackParts.filter(Boolean).join('\n\n').trim(),
         timestamp: err.timestamp || new Date().toISOString(),
     };
 }

@@ -118,23 +118,29 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
         request: Request,
         exc: RequestValidationError,
     ) -> JSONResponse:
-        detail = (
-            f"Request validation failed for {request.method} {request.url.path}\n"
+        tb = (
+            f"Validation error for {request.method} {request.url.path}\n\n"
             f"{exc}\n\n"
             f"{exc.errors()}"
         )
-        return JSONResponse(status_code=422, content={"detail": detail})
+        return JSONResponse(status_code=422, content={
+            "detail": "Nieprawidłowe dane wejściowe żądania.",
+            "traceback": tb,
+        })
 
     @app.exception_handler(Exception)
     async def handle_unexpected_exception(
         request: Request,
         exc: Exception,
     ) -> JSONResponse:
-        detail = (
-            f"Unhandled server exception during {request.method} {request.url.path}\n\n"
+        tb = (
+            f"Unhandled exception during {request.method} {request.url.path}\n\n"
             + "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
         )
-        return JSONResponse(status_code=500, content={"detail": detail})
+        return JSONResponse(status_code=500, content={
+            "detail": "Nieoczekiwany błąd serwera. Operacja nie została wykonana.",
+            "traceback": tb,
+        })
 
     @app.get("/api/network")
     def get_network() -> JSONResponse:
