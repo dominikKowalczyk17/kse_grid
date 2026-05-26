@@ -283,6 +283,79 @@ _SHUNT_FIELDS: list[tuple] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Schemat tworzenia elementów
+# ---------------------------------------------------------------------------
+
+# Struktura: {kind: {required: [(name, type)], optional: [(name, type, options)], defaults: {name: value}}}
+_CREATION_SCHEMA: dict[str, dict[str, Any]] = {
+    "bus": {
+        "required": [("vn_kv", "float")],
+        "optional": [
+            ("name", "str", None),
+            ("type", "enum", ["b", "n", "m"]),
+            ("in_service", "bool", None),
+        ],
+        "defaults": {"name": "", "type": "b", "in_service": True},
+    },
+    "load": {
+        "required": [("bus", "int"), ("p_mw", "float")],
+        "optional": [
+            ("name", "str", None),
+            ("q_mvar", "float", None),
+            ("scaling", "float", None),
+            ("in_service", "bool", None),
+        ],
+        "defaults": {"name": "", "q_mvar": 0.0, "scaling": 1.0, "in_service": True},
+    },
+    "sgen": {
+        "required": [("bus", "int"), ("p_mw", "float")],
+        "optional": [
+            ("name", "str", None),
+            ("q_mvar", "float", None),
+            ("scaling", "float", None),
+            ("in_service", "bool", None),
+        ],
+        "defaults": {"name": "", "q_mvar": 0.0, "scaling": 1.0, "in_service": True},
+    },
+    "ext_grid": {
+        "required": [("bus", "int")],
+        "optional": [
+            ("name", "str", None),
+            ("vm_pu", "float", None),
+            ("va_degree", "float", None),
+            ("in_service", "bool", None),
+        ],
+        "defaults": {"name": "", "vm_pu": 1.0, "va_degree": 0.0, "in_service": True},
+    },
+    "shunt": {
+        "required": [("bus", "int"), ("q_mvar", "float"), ("vn_kv", "float")],
+        "optional": [
+            ("name", "str", None),
+            ("p_mw", "float", None),
+            ("in_service", "bool", None),
+        ],
+        "defaults": {"name": "", "p_mw": 0.0, "in_service": True},
+    },
+}
+
+_CREATORS: dict[str, Any] = {
+    "bus": pp.create_bus,
+    "load": pp.create_load,
+    "sgen": pp.create_sgen,
+    "ext_grid": pp.create_ext_grid,
+    "shunt": pp.create_shunt,
+}
+
+_AUTO_NAME_PREFIX: dict[str, str] = {
+    "bus": "Bus",
+    "load": "Load",
+    "sgen": "SGen",
+    "ext_grid": "Grid",
+    "shunt": "Shunt",
+}
+
+
 _TABLES = {
     "bus": ("bus", _BUS_FIELDS),
     "line": ("line", _LINE_FIELDS),
@@ -430,3 +503,50 @@ def _coerce(name: str, value: Any, ftype: str, options: list | None) -> Any:
         return text
 
     return str(value)
+
+
+# ---------------------------------------------------------------------------
+# Tworzenie elementów
+# ---------------------------------------------------------------------------
+
+def validate_creation_fields(kind: str, fields: dict[str, Any]) -> None:
+    """Rzuca ValueError jeśli brakuje wymaganych pól dla danego rodzaju elementu."""
+    if kind not in _CREATION_SCHEMA:
+        raise ValueError(f"Tworzenie elementu {kind!r} nie jest obsługiwane.")
+    schema = _CREATION_SCHEMA[kind]
+    missing = [name for name, _ in schema["required"] if name not in fields or fields[name] is None]
+    if missing:
+        raise ValueError(f"Brakujące wymagane pola: {', '.join(missing)}.")
+
+
+def create_element_in_net(net: pp.pandapowerNet, kind: str, fields: dict[str, Any]) -> int:
+    """Tworzy element w sieci i zwraca jego index.
+
+    Rzuca ValueError przy brakujących polach, nieznanych wartościach lub złej referencji szyny.
+    """
+    validate_creation_fields(kind, fields)
+    schema = _CREATION_SCHEMA[kind]
+
+    req_names = {name for name, _ in schema["required"]}
+    kwargs: dict[str, Any] = dict(schema["defaults"])
+
+    for name, ftype in schema["required"]:
+        kwargs[name] = _coerce(name, fields[name], ftype, None)
+
+    opt_index = {name: (ftype, options) for name, ftype, options in schema["optional"]}
+    for name, value in fields.items():
+        if name in opt_index and name not in req_names:
+            ftype, options = opt_index[name]
+            kwargs[name] = _coerce(name, value, ftype, options)
+
+    if "bus" in kwargs and not net.bus.empty and int(kwargs["bus"]) not in net.bus.index:
+        raise ValueError(f"Szyna o id={kwargs['bus']} nie istnieje.")
+
+    idx = int(_CREATORS[kind](net, **kwargs))
+
+    table = getattr(net, kind)
+    if "name" in table.columns and not str(table.at[idx, "name"]).strip():
+        prefix = _AUTO_NAME_PREFIX.get(kind, kind.capitalize())
+        table.at[idx, "name"] = f"{prefix} {idx + 1}"
+
+    return idx

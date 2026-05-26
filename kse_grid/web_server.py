@@ -39,6 +39,7 @@ class ElementUpdate(BaseModel):
 
 
 _ELEMENT_KINDS = {"bus", "line", "trafo", "switch", "gen", "load", "sgen", "ext_grid", "shunt"}
+_CREATABLE_KINDS = {"bus", "load", "sgen", "ext_grid", "shunt"}
 
 
 def create_app(net: pp.pandapowerNet) -> FastAPI:
@@ -93,6 +94,19 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
     @app.post("/api/powerflow/recalculate")
     def recalculate_powerflow() -> JSONResponse:
         return JSONResponse(current_session().recalculate())
+
+    @app.post("/api/elements/{kind}", status_code=201)
+    def create_element(kind: str, update: ElementUpdate) -> JSONResponse:
+        if kind not in _CREATABLE_KINDS:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Tworzenie elementu {kind!r} nie jest obsługiwane przez ten endpoint.",
+            )
+        try:
+            result = current_session().create_element(kind, update.fields)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return JSONResponse(result, status_code=201)
 
     @app.get("/api/elements/schema")
     def get_element_schema() -> JSONResponse:

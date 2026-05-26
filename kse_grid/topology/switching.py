@@ -10,8 +10,10 @@ import pandapower as pp
 
 from kse_grid.topology.element_editing import (
     apply_element_update,
+    create_element_in_net,
     field_schema,
     read_element_params,
+    validate_creation_fields,
 )
 from kse_grid.powerflow.engine import load_powerflow_options, run_powerflow
 from kse_grid.serialization.serializer import (
@@ -93,6 +95,21 @@ class SwitchingSession:
         )
         update["changedElementParams"] = read_element_params(self.working_net, kind, element_id)
         return update
+
+    def create_element(self, kind: str, fields: dict[str, Any]) -> dict[str, Any]:
+        """Tworzy nowy element w sieci roboczej i odkłada przeliczenie load flow.
+
+        Zwraca słownik z kluczem `newElementId` (int) i `topologyUpdate` (slim payload).
+        Rzuca ValueError przy brakujących wymaganych polach lub nieprawidłowych wartościach.
+        """
+        validate_creation_fields(kind, fields)
+        new_id: list[int] = []
+
+        def mutator(net: pp.pandapowerNet) -> None:
+            new_id.append(create_element_in_net(net, kind, fields))
+
+        topology_update = self._stage_change(mutator, pending_message=f"Dodano nowy element {kind}.")
+        return {"newElementId": new_id[0], "topologyUpdate": topology_update}
 
     @staticmethod
     def field_schema() -> dict[str, list[dict[str, Any]]]:
