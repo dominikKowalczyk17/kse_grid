@@ -124,7 +124,10 @@ export const App = {
             network: networkState.network,
             error: networkState.error,
             atLanding: networkState.atLanding,
+            gridBuilderMode: networkState.gridBuilderMode,
             leaveLanding: networkState.leaveLanding,
+            enterGridBuilder: networkState.enterGridBuilder,
+            leaveGridBuilder: networkState.leaveGridBuilder,
             activeError: errorHandling.activeError,
             uploadBusy: networkState.uploadBusy,
             uploadError: networkState.uploadError,
@@ -179,6 +182,7 @@ export const App = {
             gbFormFields: gridBuilder.formFields,
             gbFormBusy: gridBuilder.formBusy,
             gbFormError: gridBuilder.formError,
+            gbFormSuccessMsg: gridBuilder.formSuccessMsg,
             gbNewNetBusy: gridBuilder.newNetBusy,
             gbOnTabChange: gridBuilder.onTabChange,
             gbOnFormatChange: gridBuilder.onFormatChange,
@@ -205,7 +209,7 @@ export const App = {
 
             <div class="header-divider"></div>
 
-            <template v-if="!network.isEmpty">
+            <template v-if="!network.isEmpty && !gridBuilderMode">
                 <div class="header-view-toggle" role="group" aria-label="Tryb widoku">
                     <button type="button"
                             class="chip"
@@ -242,12 +246,19 @@ export const App = {
 
             <button class="btn"
                     type="button"
+                    v-if="!network.isEmpty && !gridBuilderMode"
+                    title="Wróć do Grid Buildera, aby dodawać lub usuwać elementy"
+                    @click="enterGridBuilder">
+                Edytuj sieć
+            </button>
+            <button class="btn"
+                    type="button"
                     :disabled="uploadBusy"
                     :title="uploadError || 'Załaduj plik sieciowy (.m lub .json) z dysku'"
                     @click="triggerUpload">
                 {{ uploadBusy ? 'Wgrywam…' : 'Wczytaj plik' }}
             </button>
-            <template v-if="!network.isEmpty">
+            <template v-if="!network.isEmpty && !gridBuilderMode">
                 <button class="btn"
                         type="button"
                         :class="{ 'btn-active': editMode }"
@@ -290,7 +301,7 @@ export const App = {
             </button>
         </header>
 
-        <div v-if="network.isEmpty" class="grid-builder-page">
+        <div v-if="network.isEmpty || gridBuilderMode" class="grid-builder-page">
             <GridBuilder
                 :network="network"
                 :TABS="gbTABS"
@@ -301,6 +312,8 @@ export const App = {
                 :form-fields="gbFormFields"
                 :form-busy="gbFormBusy"
                 :form-error="gbFormError"
+                :form-success-msg="gbFormSuccessMsg"
+                :has-buses="!network.isEmpty"
                 :new-net-busy="gbNewNetBusy"
                 @tab-change="gbOnTabChange"
                 @format-change="gbOnFormatChange"
@@ -309,6 +322,7 @@ export const App = {
                 @export-network="gbOnExportNetwork"
                 @new-network="gbOnNewNetwork"
                 @update:form-fields="gbOnUpdateFormFields"
+                @show-graph="leaveGridBuilder"
             />
         </div>
 

@@ -5,6 +5,7 @@ export function useNetworkState({ presentError, onApply }) {
     const network = ref(null);
     const error = ref(null);
     const atLanding = ref(true);
+    const gridBuilderMode = ref(false);
     const uploadBusy = ref(false);
     const uploadError = ref('');
     const uploadProgress = ref(0);
@@ -75,6 +76,7 @@ export function useNetworkState({ presentError, onApply }) {
                 }
             });
             atLanding.value = false;
+            gridBuilderMode.value = false;
             applyNetwork(payload, { firstLoad: true });
         } catch (requestError) {
             uploadError.value = presentError(requestError, 'Błąd uploadu pliku').message;
@@ -89,12 +91,22 @@ export function useNetworkState({ presentError, onApply }) {
 
     function leaveLanding() {
         atLanding.value = false;
+        gridBuilderMode.value = true;
+    }
+
+    function enterGridBuilder() {
+        gridBuilderMode.value = true;
+    }
+
+    function leaveGridBuilder() {
+        gridBuilderMode.value = false;
     }
 
     return {
-        network, error, atLanding,
+        network, error, atLanding, gridBuilderMode,
         uploadBusy, uploadError, uploadProgress, uploadPhase, uploadFileName, uploadInputRef,
-        applyNetwork, applyTopologyUpdate, loadNetwork, triggerUpload, onUploadFile, leaveLanding,
+        applyNetwork, applyTopologyUpdate, loadNetwork, triggerUpload, onUploadFile,
+        leaveLanding, enterGridBuilder, leaveGridBuilder,
     };
 }
 
