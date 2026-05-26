@@ -26,6 +26,8 @@ export function useGridBuilder({ network, applyNetwork, presentError }) {
     const formFields = ref({});
     const formBusy = ref(false);
     const formError = ref('');
+    const formSuccessMsg = ref('');
+    let _successTimer = null;
     const deletingIds = ref(new Set());
     const newNetBusy = ref(false);
 
@@ -63,12 +65,24 @@ export function useGridBuilder({ network, applyNetwork, presentError }) {
         formError.value = '';
     }
 
+    function _showSuccess(msg) {
+        formSuccessMsg.value = msg;
+        clearTimeout(_successTimer);
+        _successTimer = setTimeout(() => { formSuccessMsg.value = ''; }, 3000);
+    }
+
     async function onCreateElement() {
         formBusy.value = true;
         formError.value = '';
+        formSuccessMsg.value = '';
         try {
-            await createElement(activeTab.value, formFields.value, formatMode.value);
+            const result = await createElement(activeTab.value, formFields.value, formatMode.value);
             applyNetwork(await fetchNetwork());
+            const tab = TABS.find(t => t.key === activeTab.value);
+            const rows = network.value?.[tab?.netKey] || [];
+            const created = rows.find(r => r.id === result?.newElementId);
+            const label = created?.name ? `"${created.name}"` : `#${result?.newElementId ?? '?'}`;
+            _showSuccess(`${activeTab.value} ${label} dodany`);
             resetForm();
         } catch (err) {
             formError.value = presentError(err, `Błąd dodawania ${activeTab.value}`).message;
@@ -130,6 +144,7 @@ export function useGridBuilder({ network, applyNetwork, presentError }) {
         formFields,
         formBusy,
         formError,
+        formSuccessMsg,
         newNetBusy,
         activeSchema,
         activeRows,

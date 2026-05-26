@@ -1,7 +1,6 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { IconClose } from '/icons.js';
 
-// Column definitions per element kind (display name → data key)
 const COLUMNS = {
     bus:      [['ID', 'id'], ['Nazwa', 'name'], ['Un [kV]', 'vnKv']],
     line:     [['ID', 'id'], ['Nazwa', 'name'], ['Od', 'fromBus'], ['Do', 'toBus']],
@@ -16,33 +15,41 @@ const TAB_HINTS = {
         title: 'Szyna (Bus)',
         body: 'Podstawowy węzeł sieci — punkt połączenia elementów. Każda szyna ma napięcie znamionowe (Un), które wyznacza poziom napięcia danego fragmentu sieci. Od szyn należy zaczynać budowę każdej sieci.',
         note: 'Dodaj co najmniej 1 szynę przed dodaniem linii, transformatorów, odbiorników lub generatorów.',
+        emptyHint: 'Zacznij tutaj — dodaj pierwszą szynę korzystając z formularza poniżej.',
     },
     line: {
         title: 'Linia',
         body: 'Odcinek linii elektrycznej łączący dwie szyny. Opisują ją parametry jednostkowe: rezystancja R (straty czynne), reaktancja X (przepływ mocy biernej) i pojemność C (efekt Ferrantiego) — mnożone przez długość.',
         note: 'Wymagane są co najmniej 2 szyny. Podaj ich ID w polach „Od" (from_bus) i „Do" (to_bus).',
+        emptyHint: 'Brak linii. Dodaj co najmniej 2 szyny, a następnie połącz je linią.',
     },
     trafo: {
         title: 'Transformator',
         body: 'Transformator dwuuzwojeniowy łączący szynę WN (wyższe napięcie) z szyną nN (niższe napięcie). Umożliwia przesył mocy między różnymi poziomami napięcia i zapewnia izolację galwaniczną.',
         note: 'Podaj ID szyny WN i szyny nN. Napięcia znamionowe szyn powinny być zgodne z parametrami vn_hv_kv i vn_lv_kv transformatora.',
+        emptyHint: 'Brak transformatorów. Dodaj szyny na różnych poziomach napięcia, a następnie połącz je transformatorem.',
     },
     load: {
         title: 'Odbiornik (Load)',
         body: 'Pobór mocy czynnej P [MW] i biernej Q [Mvar] przyłączony do szyny. Reprezentuje konsumentów: zakłady przemysłowe, sieci dystrybucyjne, linie odbiorcze. W load flow traktowany jako stałe PQ.',
         note: 'Podaj ID szyny, do której przyłączony jest odbiornik.',
+        emptyHint: 'Brak odbiorników. Podaj ID szyny, do której chcesz przyłączyć odbiór.',
     },
     gen: {
         title: 'Generator (węzeł PV)',
         body: 'Źródło mocy czynnej z regulacją napięcia (węzeł PV). Utrzymuje zadane napięcie na szynie i dostarcza określoną moc czynną. Moc bierna jest wyznaczana automatycznie w trakcie load flow.',
         note: 'W sieci wymagany jest przynajmniej jeden węzeł bilansu (sieć zewnętrzna). Podaj ID szyny generatora.',
+        emptyHint: 'Brak generatorów. Podaj ID szyny oraz zadaną moc czynną.',
     },
     ext_grid: {
         title: 'Sieć zewnętrzna (Slack)',
         body: 'Idealny węzeł bilansujący (slack) — utrzymuje zadane napięcie i kąt, przejmując nadwyżkę lub niedobór mocy. Jest to węzeł odniesienia dla obliczeń kątów fazowych i bilansu mocy.',
         note: 'Każda sieć musi mieć dokładnie jeden węzeł bilansu. Podaj ID szyny referencyjnej (zazwyczaj szyna z transformatorem sieciowym).',
+        emptyHint: 'Brak węzła bilansu. Sieć wymaga co najmniej jednego węzła slack (ext_grid) do obliczenia rozpływu mocy.',
     },
 };
+
+const _BUS_FIELD_NAMES = new Set(['bus', 'from_bus', 'to_bus', 'hv_bus', 'lv_bus']);
 
 function _colVal(row, key) {
     const v = row[key];
@@ -52,33 +59,71 @@ function _colVal(row, key) {
 export const GridBuilder = {
     components: { IconClose },
     props: {
-        network:      { type: Object,   required: true },
-        TABS:         { type: Array,    required: true },
-        activeTab:    { type: String,   required: true },
-        formatMode:   { type: String,   required: true },
-        activeSchema: { type: Array,    required: true },
-        activeRows:   { type: Array,    required: true },
-        formFields:   { type: Object,   required: true },
-        formBusy:     { type: Boolean,  default: false },
-        formError:    { type: String,   default: '' },
-        newNetBusy:   { type: Boolean,  default: false },
+        network:        { type: Object,  required: true },
+        TABS:           { type: Array,   required: true },
+        activeTab:      { type: String,  required: true },
+        formatMode:     { type: String,  required: true },
+        activeSchema:   { type: Array,   required: true },
+        activeRows:     { type: Array,   required: true },
+        formFields:     { type: Object,  required: true },
+        formBusy:       { type: Boolean, default: false },
+        formError:      { type: String,  default: '' },
+        formSuccessMsg: { type: String,  default: '' },
+        hasBuses:       { type: Boolean, default: false },
+        newNetBusy:     { type: Boolean, default: false },
     },
     emits: [
         'tab-change', 'format-change',
         'create-element', 'delete-element',
         'export-network', 'new-network',
+        'show-graph',
         'update:formFields',
     ],
     setup(props, { emit }) {
         const columns = computed(() => COLUMNS[props.activeTab] || [['ID', 'id']]);
         const activeHint = computed(() => TAB_HINTS[props.activeTab] || null);
         const helpField = ref(null);
+        const fieldErrors = ref({});
+
+        const busOptions = computed(() => {
+            const buses = props.network?.buses || [];
+            return buses.map(b => ({ id: b.id, label: b.name ? `${b.id} — ${b.name}` : String(b.id) }));
+        });
+
+        function isBusField(field) {
+            return _BUS_FIELD_NAMES.has(field.name);
+        }
 
         function setField(name, value) {
             emit('update:formFields', { ...props.formFields, [name]: value });
+            if (fieldErrors.value[name]) {
+                const errs = { ...fieldErrors.value };
+                delete errs[name];
+                fieldErrors.value = errs;
+            }
+        }
+
+        function validateField(field) {
+            if (!field.required) return;
+            const val = props.formFields[field.name];
+            if (val === undefined || val === null || val === '') {
+                fieldErrors.value = { ...fieldErrors.value, [field.name]: 'Pole wymagane' };
+            }
         }
 
         function submitForm() {
+            const schema = props.activeSchema;
+            const errs = {};
+            for (const field of schema) {
+                if (field.required) {
+                    const val = props.formFields[field.name];
+                    if (val === undefined || val === null || val === '') {
+                        errs[field.name] = 'Pole wymagane';
+                    }
+                }
+            }
+            fieldErrors.value = errs;
+            if (Object.keys(errs).length > 0) return;
             emit('create-element');
         }
 
@@ -94,13 +139,26 @@ export const GridBuilder = {
             helpField.value = null;
         }
 
-        return { columns, activeHint, helpField, setField, submitForm, deleteRow, openHelp, closeHelp, _colVal };
+        watch(() => props.activeTab, () => { fieldErrors.value = {}; });
+        watch(() => props.formatMode, () => { fieldErrors.value = {}; });
+
+        return {
+            columns, activeHint, helpField, fieldErrors, busOptions,
+            isBusField, setField, validateField, submitForm, deleteRow, openHelp, closeHelp, _colVal,
+        };
     },
     template: `
 <div class="grid-builder">
     <div class="gb-header">
         <h2 class="gb-title">Grid Builder</h2>
         <div class="gb-header-actions">
+            <button class="btn btn-primary"
+                    type="button"
+                    :disabled="!hasBuses"
+                    :title="hasBuses ? 'Przelicz rozpływ mocy i przejdź do widoku grafu' : 'Dodaj co najmniej jedną szynę przed przejściem do grafu'"
+                    @click="$emit('show-graph')">
+                Oblicz i pokaż graf
+            </button>
             <div class="gb-export-group">
                 <button class="btn btn-sm" type="button" @click="$emit('export-network', 'json')" title="Pobierz jako pandapower JSON">
                     ↓ JSON
@@ -171,7 +229,8 @@ export const GridBuilder = {
             </tbody>
         </table>
         <div v-else class="gb-empty-hint">
-            Brak elementów w tej kategorii.
+            <span class="gb-empty-icon">⊘</span>
+            <span>{{ activeHint?.emptyHint || 'Brak elementów w tej kategorii.' }}</span>
         </div>
     </div>
 
@@ -193,6 +252,12 @@ export const GridBuilder = {
                 </button>
             </div>
         </div>
+
+        <transition name="gb-toast-fade">
+            <div v-if="formSuccessMsg" class="gb-success-toast" role="status" aria-live="polite">
+                ✓ {{ formSuccessMsg }}
+            </div>
+        </transition>
 
         <form class="gb-form" @submit.prevent="submitForm" v-if="activeSchema.length > 0">
             <div class="gb-field-grid">
@@ -217,17 +282,32 @@ export const GridBuilder = {
                         :id="'gb-' + field.name"
                         class="gb-input"
                         :value="formFields[field.name] ?? ''"
-                        @change="setField(field.name, typeof field.options[0] === 'number' ? Number($event.target.value) : $event.target.value)">
+                        @change="setField(field.name, typeof field.options[0] === 'number' ? Number($event.target.value) : $event.target.value)"
+                        @keydown.enter.prevent="submitForm">
                         <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt === '' ? '—' : opt }}</option>
+                    </select>
+                    <select v-else-if="isBusField(field) && busOptions.length"
+                        :id="'gb-' + field.name"
+                        class="gb-input"
+                        :class="{ 'gb-input-error': fieldErrors[field.name] }"
+                        :value="formFields[field.name] ?? ''"
+                        @change="setField(field.name, $event.target.value === '' ? '' : Number($event.target.value))"
+                        @blur="validateField(field)"
+                        @keydown.enter.prevent="submitForm">
+                        <option value="">— wybierz szynę —</option>
+                        <option v-for="opt in busOptions" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
                     </select>
                     <input v-else
                         :id="'gb-' + field.name"
                         class="gb-input"
+                        :class="{ 'gb-input-error': fieldErrors[field.name] }"
                         type="text"
                         placeholder=""
                         :value="formFields[field.name] ?? ''"
                         @input="setField(field.name, $event.target.value)"
+                        @blur="validateField(field)"
                     />
+                    <span v-if="fieldErrors[field.name]" class="gb-field-error">{{ fieldErrors[field.name] }}</span>
                 </div>
             </div>
             <div v-if="formError" class="gb-form-error">{{ formError }}</div>

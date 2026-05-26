@@ -178,13 +178,6 @@
     text-align: right;
 }
 
-.gb-empty-hint {
-    padding: 1.5rem;
-    text-align: center;
-    color: var(--muted-foreground);
-    font-size: 0.875rem;
-}
-
 /* Add form */
 .gb-form-section {
     margin-top: 1.5rem;
@@ -300,6 +293,66 @@
 
 .btn-danger:hover:not(:disabled) {
     filter: brightness(1.12);
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: oklch(0.99 0 0);
+    border-color: transparent;
+    font-weight: 500;
+}
+
+.btn-primary:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+.btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* Inline field validation error */
+.gb-input-error {
+    border-color: var(--bad) !important;
+}
+
+.gb-field-error {
+    font-size: 0.7rem;
+    color: var(--bad);
+    line-height: 1.3;
+}
+
+/* Success toast */
+.gb-success-toast {
+    margin: 0.5rem 1rem;
+    padding: 0.5rem 0.75rem;
+    background: color-mix(in oklch, var(--good) 15%, var(--card));
+    border: 1px solid color-mix(in oklch, var(--good) 40%, transparent);
+    border-radius: var(--radius-sm);
+    color: var(--good);
+    font-size: 0.8125rem;
+}
+
+.gb-toast-fade-enter-active,
+.gb-toast-fade-leave-active { transition: opacity 0.3s; }
+.gb-toast-fade-enter-from,
+.gb-toast-fade-leave-to { opacity: 0; }
+
+/* Enhanced empty state */
+.gb-empty-hint {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.gb-empty-icon {
+    font-size: 1.5rem;
+    opacity: 0.4;
 }
 
 /* Full-page grid builder layout when network is empty */
