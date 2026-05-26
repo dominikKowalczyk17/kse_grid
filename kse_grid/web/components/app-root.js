@@ -65,6 +65,11 @@ export const App = {
             elementEdit.onCancelEdit();
         }
 
+        async function onShowGraphFromBuilder() {
+            await topologyOps.onRecalculatePowerflow();
+            networkState.leaveGridBuilder();
+        }
+
         function handleRuntimeError(payload) {
             const formatted = errorHandling.handleRuntimeError(payload);
             if (formatted && !networkState.network.value) {
@@ -128,6 +133,7 @@ export const App = {
             leaveLanding: networkState.leaveLanding,
             enterGridBuilder: networkState.enterGridBuilder,
             leaveGridBuilder: networkState.leaveGridBuilder,
+            onShowGraphFromBuilder,
             activeError: errorHandling.activeError,
             uploadBusy: networkState.uploadBusy,
             uploadError: networkState.uploadError,
@@ -322,7 +328,7 @@ export const App = {
                 @export-network="gbOnExportNetwork"
                 @new-network="gbOnNewNetwork"
                 @update:form-fields="gbOnUpdateFormFields"
-                @show-graph="leaveGridBuilder"
+                @show-graph="onShowGraphFromBuilder"
             />
         </div>
 

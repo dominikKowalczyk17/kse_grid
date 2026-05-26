@@ -739,7 +739,7 @@ export const GraphPanel = {
                     // Pixi scene's ResizeObserver handles internal resizing.
                     return;
                 }
-                Plotly.Plots.resize(graphEl.value);
+                if (graphEl.value) Plotly.Plots.resize(graphEl.value);
             });
         });
 
