@@ -161,7 +161,7 @@ def convert_gen(fields: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 BUS_SCHEMA: list[dict[str, Any]] = [
     {"name": "baseKV", "unit": "kV", "required": True,
      "description": "Nominal bus voltage (kV); sets vn_kv."},
-    {"name": "type", "unit": None, "required": True,
+    {"name": "type", "unit": None, "required": True, "type": "enum", "options": [1, 2, 3],
      "description": "Bus type: 1=PQ load bus, 2=PV gen bus, 3=slack."},
     {"name": "Pd", "unit": "MW", "required": False,
      "description": "Active power demand; creates a load when nonzero."},

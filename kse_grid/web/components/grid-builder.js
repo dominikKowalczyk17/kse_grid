@@ -213,7 +213,14 @@ export const GridBuilder = {
                                 :aria-label="'Pomoc: ' + (field.label || field.name)"
                                 @click="openHelp(field)">?</button>
                     </label>
-                    <input
+                    <select v-if="field.type === 'enum' && field.options && field.options.length"
+                        :id="'gb-' + field.name"
+                        class="gb-input"
+                        :value="formFields[field.name] ?? ''"
+                        @change="setField(field.name, typeof field.options[0] === 'number' ? Number($event.target.value) : $event.target.value)">
+                        <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt === '' ? '—' : opt }}</option>
+                    </select>
+                    <input v-else
                         :id="'gb-' + field.name"
                         class="gb-input"
                         type="text"

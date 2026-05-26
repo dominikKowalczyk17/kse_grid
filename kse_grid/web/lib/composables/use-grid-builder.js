@@ -40,12 +40,16 @@ export function useGridBuilder({ network, applyNetwork, presentError }) {
     const activeSchema = computed(() => {
         const tab = activeTab.value;
         const fmt = formatMode.value;
+        let raw;
         if (fmt === 'matpower') {
             // matpower schema uses 'branch' for line/trafo
             const key = (tab === 'line' || tab === 'trafo') ? 'branch' : tab;
-            return createSchema.value.matpower?.[key] || [];
+            raw = createSchema.value.matpower?.[key] || [];
+        } else {
+            raw = createSchema.value.pandapower?.[tab] || [];
         }
-        return createSchema.value.pandapower?.[tab] || [];
+        // pandapower schema uses key "field"; matpower uses "name" — normalize to "name"
+        return raw.map(f => f.name !== undefined ? f : { ...f, name: f.field });
     });
 
     const activeRows = computed(() => {
