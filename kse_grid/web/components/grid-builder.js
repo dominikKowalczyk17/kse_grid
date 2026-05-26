@@ -51,7 +51,7 @@ const TAB_HINTS = {
 
 const _BUS_FIELD_NAMES = new Set(['bus', 'from_bus', 'to_bus', 'hv_bus', 'lv_bus']);
 
-function _colVal(row, key) {
+function colVal(row, key) {
     const v = row[key];
     return v === null || v === undefined ? '—' : v;
 }
@@ -144,7 +144,7 @@ export const GridBuilder = {
 
         return {
             columns, activeHint, helpField, fieldErrors, busOptions,
-            isBusField, setField, validateField, submitForm, deleteRow, openHelp, closeHelp, _colVal,
+            isBusField, setField, validateField, submitForm, deleteRow, openHelp, closeHelp, colVal,
         };
     },
     template: `
@@ -215,7 +215,7 @@ export const GridBuilder = {
             <tbody>
                 <tr v-for="row in activeRows" :key="row.id">
                     <td v-for="[, key] in columns" :key="key" class="gb-cell">
-                        {{ _colVal(row, key) }}
+                        {{ colVal(row, key) }}
                     </td>
                     <td class="gb-col-action">
                         <button class="btn btn-xs btn-danger"
