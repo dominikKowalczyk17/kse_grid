@@ -1,4 +1,5 @@
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { IconClose } from '/icons.js';
 
 // Column definitions per element kind (display name → data key)
 const COLUMNS = {
@@ -10,12 +11,46 @@ const COLUMNS = {
     ext_grid: [['ID', 'id'], ['Nazwa', 'name'], ['Szyna', 'bus']],
 };
 
+const TAB_HINTS = {
+    bus: {
+        title: 'Szyna (Bus)',
+        body: 'Podstawowy węzeł sieci — punkt połączenia elementów. Każda szyna ma napięcie znamionowe (Un), które wyznacza poziom napięcia danego fragmentu sieci. Od szyn należy zaczynać budowę każdej sieci.',
+        note: 'Dodaj co najmniej 1 szynę przed dodaniem linii, transformatorów, odbiorników lub generatorów.',
+    },
+    line: {
+        title: 'Linia',
+        body: 'Odcinek linii elektrycznej łączący dwie szyny. Opisują ją parametry jednostkowe: rezystancja R (straty czynne), reaktancja X (przepływ mocy biernej) i pojemność C (efekt Ferrantiego) — mnożone przez długość.',
+        note: 'Wymagane są co najmniej 2 szyny. Podaj ich ID w polach „Od" (from_bus) i „Do" (to_bus).',
+    },
+    trafo: {
+        title: 'Transformator',
+        body: 'Transformator dwuuzwojeniowy łączący szynę WN (wyższe napięcie) z szyną nN (niższe napięcie). Umożliwia przesył mocy między różnymi poziomami napięcia i zapewnia izolację galwaniczną.',
+        note: 'Podaj ID szyny WN i szyny nN. Napięcia znamionowe szyn powinny być zgodne z parametrami vn_hv_kv i vn_lv_kv transformatora.',
+    },
+    load: {
+        title: 'Odbiornik (Load)',
+        body: 'Pobór mocy czynnej P [MW] i biernej Q [Mvar] przyłączony do szyny. Reprezentuje konsumentów: zakłady przemysłowe, sieci dystrybucyjne, linie odbiorcze. W load flow traktowany jako stałe PQ.',
+        note: 'Podaj ID szyny, do której przyłączony jest odbiornik.',
+    },
+    gen: {
+        title: 'Generator (węzeł PV)',
+        body: 'Źródło mocy czynnej z regulacją napięcia (węzeł PV). Utrzymuje zadane napięcie na szynie i dostarcza określoną moc czynną. Moc bierna jest wyznaczana automatycznie w trakcie load flow.',
+        note: 'W sieci wymagany jest przynajmniej jeden węzeł bilansu (sieć zewnętrzna). Podaj ID szyny generatora.',
+    },
+    ext_grid: {
+        title: 'Sieć zewnętrzna (Slack)',
+        body: 'Idealny węzeł bilansujący (slack) — utrzymuje zadane napięcie i kąt, przejmując nadwyżkę lub niedobór mocy. Jest to węzeł odniesienia dla obliczeń kątów fazowych i bilansu mocy.',
+        note: 'Każda sieć musi mieć dokładnie jeden węzeł bilansu. Podaj ID szyny referencyjnej (zazwyczaj szyna z transformatorem sieciowym).',
+    },
+};
+
 function _colVal(row, key) {
     const v = row[key];
     return v === null || v === undefined ? '—' : v;
 }
 
 export const GridBuilder = {
+    components: { IconClose },
     props: {
         network:      { type: Object,   required: true },
         TABS:         { type: Array,    required: true },
@@ -36,6 +71,8 @@ export const GridBuilder = {
     ],
     setup(props, { emit }) {
         const columns = computed(() => COLUMNS[props.activeTab] || [['ID', 'id']]);
+        const activeHint = computed(() => TAB_HINTS[props.activeTab] || null);
+        const helpField = ref(null);
 
         function setField(name, value) {
             emit('update:formFields', { ...props.formFields, [name]: value });
@@ -49,7 +86,15 @@ export const GridBuilder = {
             emit('delete-element', props.activeTab, elementId);
         }
 
-        return { columns, setField, submitForm, deleteRow, _colVal };
+        function openHelp(field) {
+            helpField.value = field;
+        }
+
+        function closeHelp() {
+            helpField.value = null;
+        }
+
+        return { columns, activeHint, helpField, setField, submitForm, deleteRow, openHelp, closeHelp, _colVal };
     },
     template: `
 <div class="grid-builder">
@@ -88,6 +133,17 @@ export const GridBuilder = {
                 {{ (network[tab.netKey] || []).length }}
             </span>
         </button>
+    </div>
+
+    <div v-if="activeHint" class="gb-tab-hint">
+        <div class="gb-tab-hint-header">
+            <span class="gb-tab-hint-title">{{ activeHint.title }}</span>
+        </div>
+        <p class="gb-tab-hint-body">{{ activeHint.body }}</p>
+        <p class="gb-tab-hint-note">
+            <span class="gb-tab-hint-note-label">Uwaga:</span>
+            {{ activeHint.note }}
+        </p>
     </div>
 
     <div class="gb-table-wrap">
@@ -145,15 +201,23 @@ export const GridBuilder = {
                     :key="field.name"
                     class="gb-field">
                     <label :for="'gb-' + field.name" class="gb-label">
-                        {{ field.name }}
-                        <span v-if="field.unit" class="gb-unit">[{{ field.unit }}]</span>
-                        <span v-if="field.required" class="gb-required" title="Wymagane">*</span>
+                        <span class="gb-label-text">
+                            {{ field.label || field.name }}
+                            <span v-if="field.unit" class="gb-unit">[{{ field.unit }}]</span>
+                            <span v-if="field.required" class="gb-required" title="Wymagane">*</span>
+                        </span>
+                        <button v-if="field.description"
+                                type="button"
+                                class="edit-help-btn"
+                                :title="'Pomoc: ' + (field.label || field.name)"
+                                :aria-label="'Pomoc: ' + (field.label || field.name)"
+                                @click="openHelp(field)">?</button>
                     </label>
                     <input
                         :id="'gb-' + field.name"
                         class="gb-input"
                         type="text"
-                        :placeholder="field.description || ''"
+                        placeholder=""
                         :value="formFields[field.name] ?? ''"
                         @input="setField(field.name, $event.target.value)"
                     />
@@ -170,6 +234,28 @@ export const GridBuilder = {
             Brak schematu pól dla tego elementu w wybranym formacie.
         </div>
     </div>
+
+    <teleport to="body">
+        <div v-if="helpField" class="param-help-overlay" @click.self="closeHelp">
+            <div class="param-help-modal" role="dialog" aria-modal="true" :aria-label="'Pomoc: ' + (helpField.label || helpField.name)">
+                <div class="param-help-header">
+                    <div>
+                        <div class="param-help-kind">Pomoc parametru</div>
+                        <div class="param-help-title">
+                            {{ helpField.label || helpField.name }}<span v-if="helpField.unit" class="edit-unit"> ({{ helpField.unit }})</span>
+                        </div>
+                        <div class="param-help-field">{{ helpField.name }}</div>
+                    </div>
+                    <button type="button" class="card-icon-btn" aria-label="Zamknij" @click="closeHelp"><IconClose /></button>
+                </div>
+                <p class="param-help-body">{{ helpField.description }}</p>
+                <div v-if="helpField.options && helpField.options.length" class="param-help-options">
+                    <span class="param-help-options-label">Dopuszczalne wartości:</span>
+                    <code v-for="opt in helpField.options" :key="opt" class="param-help-opt">{{ opt || '∅' }}</code>
+                </div>
+            </div>
+        </div>
+    </teleport>
 </div>
 `,
 };
