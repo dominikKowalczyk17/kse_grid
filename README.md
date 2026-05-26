@@ -1,5 +1,7 @@
 # kse-grid
 
+[![CI](https://github.com/dominikKowalczyk17/kse_grid/actions/workflows/ci.yml/badge.svg)](https://github.com/dominikKowalczyk17/kse_grid/actions/workflows/ci.yml)
+
 Interaktywna aplikacja do analizy i wizualizacji sieci elektroenergetycznych na podstawie plików **MATPOWER** (`.m`). Projekt łączy obliczenia rozpływu mocy w **pandapower** z webowym interfejsem uruchamianym lokalnie przez **FastAPI**, **Vue 3**, **Plotly** i **PixiJS**.
 
 `kse-grid` pozwala:
