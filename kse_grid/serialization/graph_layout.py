@@ -27,6 +27,8 @@ def compute_graph_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, flo
 
 
 def compute_bounds(positions: dict[int, tuple[float, float]]) -> dict[str, list[float]]:
+    if not positions:
+        return {"x": [-1.0, 1.0], "y": [-1.0, 1.0]}
     xs = [x for x, _ in positions.values()]
     ys = [y for _, y in positions.values()]
     x_min, x_max = min(xs), max(xs)

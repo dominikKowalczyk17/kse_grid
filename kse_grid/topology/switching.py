@@ -58,9 +58,10 @@ class SwitchingSession:
         self._pending_recalc = False
         self._pending_change_count = 0
 
-        # Gdy serwer dostanie sieć bez wyników, liczymy stan startowy od razu,
-        # żeby frontend nie zaczynał od pustych tabel wynikowych.
-        if not self._last_run_succeeded:
+        if net.bus.empty:
+            self._last_run_succeeded = None
+            self._last_run_message = "Brak szyn — nie można uruchomić obliczeń."
+        elif not self._last_run_succeeded:
             self._recalculate_in_place(self.working_net)
 
     def build_payload(self) -> dict[str, Any]:
@@ -170,6 +171,10 @@ class SwitchingSession:
         return self.build_update_payload(changed_element=changed_element)
 
     def _recalculate_in_place(self, net: pp.pandapowerNet) -> None:
+        if net.bus.empty:
+            self._last_run_succeeded = None
+            self._last_run_message = "Brak szyn — nie można uruchomić obliczeń."
+            return
         _clear_results(net)
         opts = self._powerflow_options
         result = run_powerflow(

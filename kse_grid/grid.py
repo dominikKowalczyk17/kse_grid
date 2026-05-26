@@ -38,6 +38,17 @@ class KSEGrid:
         return grid
 
     # ------------------------------------------------------------------
+    @classmethod
+    def new_empty(cls, f_hz: int = 50) -> "KSEGrid":
+        """Tworzy KSEGrid z pustą siecią gotową do ręcznego budowania."""
+        from kse_grid.loading.network_normalizer import normalize_network
+        grid = cls()
+        grid.net = pp.create_empty_network(name="New Grid", f_hz=f_hz)
+        normalize_network(grid.net)
+        print("Nowa pusta sieć: gotowa do edycji.")
+        return grid
+
+    # ------------------------------------------------------------------
     def run_powerflow(self,
                       algorithm: str = "nr",
                       max_iteration: int = 100,
