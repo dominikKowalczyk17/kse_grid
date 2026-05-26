@@ -16,7 +16,8 @@ from kse_grid.topology.element_editing import (
     validate_creation_fields,
 )
 from kse_grid.loading.matpower_importer import seed_operational_switches
-from kse_grid.powerflow.engine import load_powerflow_options, run_powerflow
+from kse_grid.powerflow.engine import load_powerflow_options
+from kse_grid.powerflow.island_powerflow import run_island_powerflow
 from kse_grid.serialization.graph_layout import recompute_graph_positions
 from kse_grid.serialization.serializer import (
     compute_graph_positions,
@@ -204,15 +205,36 @@ class SwitchingSession:
             return
         _clear_results(net)
         opts = self._powerflow_options
-        result = run_powerflow(
+        island_results = run_island_powerflow(
             net,
             algorithm=str(opts["algorithm"]),
             max_iteration=int(opts["max_iteration"]),
             tolerance_mva=float(opts["tolerance_mva"]),
         )
-        net.converged = result.converged
-        self._last_run_succeeded = result.converged
-        self._last_run_message = result.message if not result.converged else None
+        net._island_pf_results = island_results
+
+        energized = [r for r in island_results if r.status != "unsupplied"]
+        failed = [r for r in energized if not r.converged]
+
+        if not island_results:
+            net.converged = False
+            self._last_run_succeeded = False
+            self._last_run_message = "Brak wysp do obliczenia."
+        elif not energized:
+            net.converged = False
+            self._last_run_succeeded = False
+            self._last_run_message = "Wszystkie wyspy są niezasilone — brak źródła odniesienia."
+        elif failed:
+            net.converged = False
+            self._last_run_succeeded = False
+            msgs = "; ".join(r.message for r in failed if r.message)
+            self._last_run_message = (
+                f"Brak zbieżności w {len(failed)} wyspie/wyspach. {msgs}"
+            )
+        else:
+            net.converged = True
+            self._last_run_succeeded = True
+            self._last_run_message = None
 
 
     def delete_element(self, kind: str, element_id: int) -> dict[str, Any]:

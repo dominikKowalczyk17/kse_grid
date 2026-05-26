@@ -15,13 +15,22 @@ def compute_topology(net: pp.pandapowerNet) -> dict[str, Any]:
     graph = _build_topology_graph(net)
     slack_bus_ids = _active_slack_bus_ids(net)
     unsupplied = _find_unsupplied_buses(net, graph, slack_bus_ids)
-    islands = _build_islands(graph, slack_bus_ids, unsupplied)
+    pf_lookup = _index_island_pf_results(net)
+    islands = _build_islands(graph, slack_bus_ids, unsupplied, pf_lookup)
 
     closed_switches = int(net.switch["closed"].fillna(False).astype(bool).sum()) if not net.switch.empty else 0
+
+    if pf_lookup is not None:
+        energized_count = int(sum(i["pfStatus"] in ("converged", "not_converged") for i in islands))
+        unsupplied_count = int(sum(i["pfStatus"] == "unsupplied" for i in islands))
+    else:
+        energized_count = int(sum(island["unsuppliedBusCount"] == 0 for island in islands))
+        unsupplied_count = int(sum(island["unsuppliedBusCount"] > 0 for island in islands))
+
     return {
         "islandCount": len(islands),
-        "energizedIslandCount": int(sum(island["unsuppliedBusCount"] == 0 for island in islands)),
-        "unsuppliedIslandCount": int(sum(island["unsuppliedBusCount"] > 0 for island in islands)),
+        "energizedIslandCount": energized_count,
+        "unsuppliedIslandCount": unsupplied_count,
         "unsuppliedBusCount": len(unsupplied),
         "switchCount": int(len(net.switch)),
         "closedSwitchCount": closed_switches,
@@ -63,6 +72,7 @@ def _build_islands(
     graph: nx.Graph,
     slack_bus_ids: set[int],
     unsupplied: set[int],
+    pf_lookup: dict[frozenset[int], Any] | None,
 ) -> list[dict[str, Any]]:
     components = [
         sorted(_to_int(bus_id) for bus_id in component)
@@ -74,15 +84,32 @@ def _build_islands(
     for island_idx, bus_ids in enumerate(components, start=1):
         island_slacks = [bus_id for bus_id in bus_ids if bus_id in slack_bus_ids]
         island_unsupplied = [bus_id for bus_id in bus_ids if bus_id in unsupplied]
-        islands.append({
+        entry: dict[str, Any] = {
             "id": island_idx,
             "busCount": len(bus_ids),
             "hasSlack": bool(island_slacks),
             "slackBusIds": island_slacks,
             "unsuppliedBusCount": len(island_unsupplied),
             "sampleBusIds": bus_ids[:5],
-        })
+        }
+        if pf_lookup is not None:
+            pf = pf_lookup.get(frozenset(bus_ids))
+            entry["pfStatus"] = pf.status if pf else None
+            entry["pfConverged"] = pf.converged if pf else None
+            entry["pfMessage"] = pf.message if pf else None
+        else:
+            entry["pfStatus"] = None
+            entry["pfConverged"] = None
+            entry["pfMessage"] = None
+        islands.append(entry)
     return islands
+
+
+def _index_island_pf_results(net: pp.pandapowerNet) -> dict[frozenset[int], Any] | None:
+    results = getattr(net, "_island_pf_results", None)
+    if not results:
+        return None
+    return {frozenset(r.bus_ids): r for r in results}
 
 
 def _active_bus_ids(net: pp.pandapowerNet) -> list[int]:

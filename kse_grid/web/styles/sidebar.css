@@ -848,6 +848,81 @@
 
 /* ---------- Line loading legend -------------------------------------- */
 
+/* Island PF status list */
+
+.section-subheader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.75rem;
+    margin-bottom: 0.3rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+
+.section-subheader.clickable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.section-subheader.clickable:hover {
+    color: var(--foreground);
+}
+
+.expand-arrow {
+    font-size: 0.6rem;
+}
+
+.island-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.island-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: var(--radius-sm);
+    background: var(--muted-40);
+    font-size: 0.72rem;
+}
+
+.island-id {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    min-width: 2rem;
+    color: var(--muted-foreground);
+}
+
+.island-buses {
+    font-family: var(--font-mono);
+    font-size: 0.67rem;
+    color: var(--muted-foreground);
+    min-width: 3.5rem;
+}
+
+.island-status {
+    flex: 1;
+    font-size: 0.7rem;
+}
+
+.island-status.good    { color: var(--good); }
+.island-status.bad     { color: var(--bad); }
+.island-status.warn    { color: var(--warn); }
+.island-status.muted   { color: var(--muted-foreground); }
+
+.island-msg {
+    font-size: 0.75rem;
+    cursor: help;
+    color: var(--warn);
+}
+
 .legend-bar {
     height: 10px;
     border-radius: 999px;

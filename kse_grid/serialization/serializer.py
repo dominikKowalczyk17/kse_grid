@@ -118,7 +118,7 @@ def _collect_bus_results(
     for bus_idx in net.bus.index:
         bus_id = _to_int(bus_idx)
         item: dict[str, Any] = {"id": bus_id}
-        if has_results:
+        if has_results and bus_id in net.res_bus.index:
             item["vmPu"] = _safe_float(net.res_bus.at[bus_id, "vm_pu"])
             item["vaDeg"] = _safe_float(net.res_bus.at[bus_id, "va_degree"])
         else:
@@ -141,7 +141,7 @@ def _collect_line_results(net: pp.pandapowerNet, has_results: bool) -> list[dict
     for line_idx in net.line.index:
         line_id = _to_int(line_idx)
         item: dict[str, Any] = {"id": line_id}
-        if has_results:
+        if has_results and line_id in net.res_line.index:
             item["loading"] = _safe_float(net.res_line.at[line_id, "loading_percent"])
             item["pFromMw"] = _safe_float(net.res_line.at[line_id, "p_from_mw"])
             item["qFromMvar"] = _safe_float(net.res_line.at[line_id, "q_from_mvar"])
@@ -162,7 +162,7 @@ def _collect_trafo_results(net: pp.pandapowerNet, has_results: bool) -> list[dic
     for trafo_idx in net.trafo.index:
         trafo_id = _to_int(trafo_idx)
         item: dict[str, Any] = {"id": trafo_id}
-        if has_results:
+        if has_results and trafo_id in net.res_trafo.index:
             item["loading"] = _safe_float(net.res_trafo.at[trafo_id, "loading_percent"])
             item["pHvMw"] = _safe_float(net.res_trafo.at[trafo_id, "p_hv_mw"])
             item["qHvMvar"] = _safe_float(net.res_trafo.at[trafo_id, "q_hv_mvar"])

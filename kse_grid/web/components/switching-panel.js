@@ -1,5 +1,8 @@
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { polishPlural } from '/lib/formatters.js';
+
+const _STATUS_LABEL = { converged: 'zbieżna', unsupplied: 'brak zasilenia', not_converged: 'niezbieżna' };
+const _STATUS_CLASS = { converged: 'good', unsupplied: 'muted', not_converged: 'bad' };
 
 export const SwitchingPanel = {
     props: {
@@ -15,7 +18,28 @@ export const SwitchingPanel = {
         const runMessageClass = computed(() => pendingRecalc.value
             ? 'helper helper-warn'
             : topology.value.lastRunSucceeded === false ? 'helper helper-bad' : 'helper');
-        return { topology, pendingRecalc, pendingChangeCount, pendingChangeLabel, runMessageClass };
+
+        const islands = computed(() => Array.isArray(topology.value.islands) ? topology.value.islands : []);
+        const showIslands = computed(() =>
+            islands.value.length > 1 ||
+            islands.value.some(i => i.pfStatus && i.pfStatus !== 'converged')
+        );
+        const islandsExpanded = ref(true);
+
+        function islandStatusLabel(island) {
+            if (!island.pfStatus) return pendingRecalc.value ? '—' : null;
+            return _STATUS_LABEL[island.pfStatus] ?? island.pfStatus;
+        }
+        function islandStatusClass(island) {
+            if (!island.pfStatus) return 'muted';
+            return _STATUS_CLASS[island.pfStatus] ?? '';
+        }
+
+        return {
+            topology, pendingRecalc, pendingChangeCount, pendingChangeLabel, runMessageClass,
+            islands, showIslands, islandsExpanded,
+            islandStatusLabel, islandStatusClass,
+        };
     },
     template: `
     <section class="section-card">
@@ -50,6 +74,23 @@ export const SwitchingPanel = {
                 </span>
             </div>
         </div>
+
+        <template v-if="showIslands">
+            <div class="section-subheader clickable" @click="islandsExpanded = !islandsExpanded">
+                <span>Status wysp</span>
+                <span class="expand-arrow">{{ islandsExpanded ? '▲' : '▼' }}</span>
+            </div>
+            <div v-if="islandsExpanded" class="island-list">
+                <div v-for="island in islands" :key="island.id" class="island-row">
+                    <span class="island-id">W{{ island.id }}</span>
+                    <span class="island-buses tabular">{{ island.busCount }} sz.</span>
+                    <span class="island-status" :class="islandStatusClass(island)">
+                        {{ islandStatusLabel(island) }}
+                    </span>
+                    <span v-if="island.pfMessage" class="island-msg" :title="island.pfMessage">⚠</span>
+                </div>
+            </div>
+        </template>
 
         <p class="helper">Odłączniki pokazują stan łączeniowy wysp. Klik marker na diagramie, potem użyj akcji Otwórz / Zamknij w karcie szczegółów.</p>
         <p v-if="pendingRecalc" class="helper helper-warn">
