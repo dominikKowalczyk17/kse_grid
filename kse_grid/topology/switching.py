@@ -117,6 +117,7 @@ class SwitchingSession:
                 seed_operational_switches(net)
 
         topology_update = self._stage_change(mutator, pending_message=f"Dodano nowy element {kind}.")
+        self._commit_topology_to_base()
         self._graph_positions = recompute_graph_positions(self.working_net)
         topology_update["positions"] = {str(k): list(v) for k, v in self._graph_positions.items()}
         return {"newElementId": new_id[0], "topologyUpdate": topology_update}
@@ -239,6 +240,11 @@ class SwitchingSession:
             self._last_run_message = None
 
 
+    def _commit_topology_to_base(self) -> None:
+        """Promote current working topology to base so Reset reverts only switch changes."""
+        self.base_net = deepcopy(self.working_net)
+        _clear_results(self.base_net)
+
     def delete_element(self, kind: str, element_id: int) -> dict[str, Any]:
         """Usuwa element z sieci roboczej i odkłada przeliczenie load flow.
 
@@ -252,6 +258,7 @@ class SwitchingSession:
         topology_update = self._stage_change(
             mutator, pending_message=f"Usunięto {kind} #{element_id}."
         )
+        self._commit_topology_to_base()
         self._graph_positions = recompute_graph_positions(self.working_net)
         topology_update["positions"] = {str(k): list(v) for k, v in self._graph_positions.items()}
         return {"deletedElement": {"kind": kind, "id": element_id}, "topologyUpdate": topology_update}
