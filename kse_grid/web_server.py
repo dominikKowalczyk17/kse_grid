@@ -66,7 +66,11 @@ def _create_matpower(
     elif kind in _BRANCH_KINDS_MP:
         # Derive baseKV from the from_bus / hv_bus voltage.
         ref_bus_key = "from_bus" if kind == "line" else "hv_bus"
+        if ref_bus_key not in fields:
+            raise ValueError(f"Brakuje wymaganego pola '{ref_bus_key}' (id szyny).")
         ref_bus_id = int(fields[ref_bus_key])
+        if ref_bus_id not in session.working_net.bus.index:
+            raise ValueError(f"Szyna o id {ref_bus_id} nie istnieje w sieci.")
         base_kv = float(session.working_net.bus.at[ref_bus_id, "vn_kv"])
         kind_out, converted = convert_branch(fields, base_kv=base_kv)
         result = session.create_element(kind_out, converted)
@@ -198,6 +202,11 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
                 result = current_session().create_element(kind, update.fields)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Brakuje wymaganego pola {exc} w danych elementu {kind!r}.",
+            ) from exc
         return JSONResponse(result, status_code=201)
 
     @app.get("/api/elements/schema")

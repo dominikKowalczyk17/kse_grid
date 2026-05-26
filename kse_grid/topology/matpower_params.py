@@ -13,6 +13,16 @@ _BASE_MVA = 100.0  # MATPOWER system base (MVA)
 _MAX_I_KA_DEFAULT = 9999.0  # unlimited thermal rating sentinel
 
 
+def _require(fields: dict[str, Any], key: str, label: str = "") -> Any:
+    """Return fields[key] or raise ValueError with a user-readable message."""
+    if key not in fields:
+        msg = f"Brakuje wymaganego pola '{key}'"
+        if label:
+            msg += f" ({label})"
+        raise ValueError(msg + ".")
+    return fields[key]
+
+
 # ---------------------------------------------------------------------------
 # Bus conversion
 # ---------------------------------------------------------------------------
@@ -26,7 +36,7 @@ def convert_bus(
     The first entry is always ("bus", ...). Subsequent entries have
     bus=None as a placeholder; callers must substitute the actual bus id.
     """
-    base_kv = float(fields["baseKV"])
+    base_kv = float(_require(fields, "baseKV", "napięcie znamionowe w kV"))
     bus_type = int(fields.get("type", 1))
     name = str(fields.get("name", ""))
 
@@ -90,8 +100,8 @@ def convert_branch(
     is_line = math.isclose(ratio, 0.0) or math.isclose(ratio, 1.0)
 
     name = str(fields.get("name", ""))
-    r_pu = float(fields["r_pu"])
-    x_pu = float(fields["x_pu"])
+    r_pu = float(_require(fields, "r_pu", "rezystancja szeregowa w j.w."))
+    x_pu = float(_require(fields, "x_pu", "reaktancja szeregowa w j.w."))
     b_pu = float(fields.get("b_pu", 0.0))
     rate_a = float(fields.get("rateA", 0.0))
 
@@ -143,8 +153,8 @@ def convert_branch(
 def convert_gen(fields: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     """Convert MATPOWER gen row to ('gen', pandapower_fields)."""
     return ("gen", {
-        "bus": fields["bus"],
-        "p_mw": float(fields["Pg"]),
+        "bus": _require(fields, "bus", "id szyny"),
+        "p_mw": float(_require(fields, "Pg", "moc czynna w MW")),
         "vm_pu": float(fields.get("Vg", 1.0)),
         "max_p_mw": float(fields["Pmax"]) if "Pmax" in fields else None,
         "min_p_mw": float(fields["Pmin"]) if "Pmin" in fields else None,
