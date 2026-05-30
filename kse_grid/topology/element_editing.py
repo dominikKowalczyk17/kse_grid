@@ -293,7 +293,7 @@ _CREATION_SCHEMA: dict[str, dict[str, Any]] = {
         "optional": [
             ("name", "str", None),
             ("type", "enum", ["b", "n", "m"]),
-            ("in_service", "bool", None),
+            ("in_service", "bool", ["true", "false"]),
         ],
         "defaults": {"name": "", "type": "b", "in_service": True},
     },
@@ -303,7 +303,7 @@ _CREATION_SCHEMA: dict[str, dict[str, Any]] = {
             ("name", "str", None),
             ("q_mvar", "float", None),
             ("scaling", "float", None),
-            ("in_service", "bool", None),
+            ("in_service", "bool", ["true", "false"]),
         ],
         "defaults": {"name": "", "q_mvar": 0.0, "scaling": 1.0, "in_service": True},
     },
@@ -313,7 +313,7 @@ _CREATION_SCHEMA: dict[str, dict[str, Any]] = {
             ("name", "str", None),
             ("q_mvar", "float", None),
             ("scaling", "float", None),
-            ("in_service", "bool", None),
+            ("in_service", "bool", ["true", "false"]),
         ],
         "defaults": {"name": "", "q_mvar": 0.0, "scaling": 1.0, "in_service": True},
     },
@@ -323,7 +323,7 @@ _CREATION_SCHEMA: dict[str, dict[str, Any]] = {
             ("name", "str", None),
             ("vm_pu", "float", None),
             ("va_degree", "float", None),
-            ("in_service", "bool", None),
+            ("in_service", "bool", ["true", "false"]),
         ],
         "defaults": {"name": "", "vm_pu": 1.0, "va_degree": 0.0, "in_service": True},
     },
@@ -332,7 +332,7 @@ _CREATION_SCHEMA: dict[str, dict[str, Any]] = {
         "optional": [
             ("name", "str", None),
             ("p_mw", "float", None),
-            ("in_service", "bool", None),
+            ("in_service", "bool", ["true", "false"]),
         ],
         "defaults": {"name": "", "p_mw": 0.0, "in_service": True},
     },
@@ -345,8 +345,8 @@ _CREATION_SCHEMA: dict[str, dict[str, Any]] = {
         "optional": [
             ("name", "str", None),
             ("g_us_per_km", "float", None),
-            ("parallel", "int", None),
-            ("in_service", "bool", None),
+            ("parallel", "int", [1, 2, 3, 4, 5, 6]),
+            ("in_service", "bool", ["true", "false"]),
         ],
         "defaults": {"name": "", "g_us_per_km": 0.0, "parallel": 1, "in_service": True},
     },
@@ -364,8 +364,8 @@ _CREATION_SCHEMA: dict[str, dict[str, Any]] = {
             ("tap_max", "int", None),
             ("tap_step_percent", "float", None),
             ("tap_pos", "int", None),
-            ("parallel", "int", None),
-            ("in_service", "bool", None),
+            ("parallel", "int", [1, 2, 3, 4, 5, 6]),
+            ("in_service", "bool", ["true", "false"]),
         ],
         "defaults": {
             "name": "", "tap_neutral": 0, "tap_min": -2, "tap_max": 2,
@@ -381,7 +381,7 @@ _CREATION_SCHEMA: dict[str, dict[str, Any]] = {
             ("min_q_mvar", "float", None),
             ("max_p_mw", "float", None),
             ("min_p_mw", "float", None),
-            ("in_service", "bool", None),
+            ("in_service", "bool", ["true", "false"]),
         ],
         "defaults": {"name": "", "vm_pu": 1.0, "in_service": True},
     },
@@ -470,9 +470,9 @@ _CREATION_FIELD_META: dict[str, tuple] = {
     "va_degree":       ("δ",              "°",      "Kąt napięcia węzła referencyjnego.",            None),
     "name":            ("Nazwa",          None,     "Etykieta tekstowa elementu.",                    None),
     "type":            ("Typ szyny",      None,     "Rodzaj węzła (b=szyna, n=węzeł, m=pomocniczy).", ["b", "n", "m"]),
-    "in_service":      ("W eksploatacji", None,     "Czy element jest aktywny.",                      None),
-    "g_us_per_km":     ("G",              "μS/km",  "Konduktancja jednostkowa.",                      None),
-    "parallel":        ("Równoległe",     None,     "Liczba równoległych torów.",                     None),
+    "in_service":      ("W eksploatacji", None,     "Czy element jest aktywny.",                      ["true", "false"], ["Tak", "Nie"]),
+    "g_us_per_km":     ("G",              "μS/km",  "Konduktancja jednostkowa.",                      None,                None),
+    "parallel":        ("Równoległe",     None,     "Liczba równoległych torów.",                     [1, 2, 3, 4, 5, 6],  None),
     "scaling":         ("Scaling",        None,     "Współczynnik skalowania mocy.",                  None),
     "max_q_mvar":      ("Qmax",           "Mvar",   "Maksymalna moc bierna generatora.",              None),
     "min_q_mvar":      ("Qmin",           "Mvar",   "Minimalna moc bierna generatora.",               None),
@@ -499,10 +499,11 @@ def creation_field_schema() -> dict[str, list[dict[str, Any]]]:
         fields: list[dict[str, Any]] = []
         for name, ftype, schema_options in all_fields:
             meta = _CREATION_FIELD_META.get(name, (name, None, None, None))
-            label, unit, description, meta_options = meta
+            label, unit, description, meta_options, *_rest = (*meta, None)
+            labels: list | None = _rest[0] if _rest else None
             options = schema_options if schema_options is not None else meta_options
             resolved_type = "enum" if options else ftype
-            fields.append({
+            entry: dict[str, Any] = {
                 "name": name,
                 "label": label,
                 "type": resolved_type,
@@ -510,7 +511,10 @@ def creation_field_schema() -> dict[str, list[dict[str, Any]]]:
                 "options": options,
                 "description": description,
                 "required": name in required_names,
-            })
+            }
+            if labels is not None:
+                entry["labels"] = labels
+            fields.append(entry)
         result[kind] = fields
     return result
 
