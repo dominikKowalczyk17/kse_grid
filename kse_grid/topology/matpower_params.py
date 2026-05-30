@@ -90,14 +90,17 @@ def convert_branch(
     fields: dict[str, Any],
     base_kv: float,
     base_mva: float = _BASE_MVA,
+    *,
+    kind: str = "line",
 ) -> tuple[str, dict[str, Any]]:
     """Convert MATPOWER branch to (kind, pandapower_fields).
 
-    ratio==0 or ratio==1 → line; any other ratio → trafo.
+    When kind='line', ratio is assumed 0 (linia).
+    When kind='trafo', ratio from fields determines the tap; must be ≠ 0/1.
     base_kv comes from the from_bus / hv_bus voltage level (kV).
     """
-    ratio = float(fields.get("ratio", 0.0))
-    is_line = math.isclose(ratio, 0.0) or math.isclose(ratio, 1.0)
+    is_line = kind == "line"
+    ratio = 0.0 if is_line else float(fields.get("ratio", 0.0))
 
     name = str(fields.get("name", ""))
     r_pu = float(_require(fields, "r_pu", "rezystancja szeregowa w j.w."))
@@ -130,11 +133,13 @@ def convert_branch(
     vk_percent = math.sqrt(r_pu ** 2 + x_pu ** 2) * 100.0
     vkr_percent = r_pu * 100.0
     # HV/LV voltages from buses; the ratio encodes the tap
-    vn_hv_kv = float(fields.get("vn_hv_kv", base_kv * ratio))
+    vn_hv_kv = float(fields.get("vn_hv_kv", base_kv * (ratio if ratio > 0 else 1.0)))
     vn_lv_kv = float(fields.get("vn_lv_kv", base_kv))
+    hv_bus = fields.get("hv_bus") or fields.get("from_bus")
+    lv_bus = fields.get("lv_bus") or fields.get("to_bus")
     return ("trafo", {
-        "hv_bus": fields["hv_bus"],
-        "lv_bus": fields["lv_bus"],
+        "hv_bus": hv_bus,
+        "lv_bus": lv_bus,
         "sn_mva": sn_mva,
         "vn_hv_kv": vn_hv_kv,
         "vn_lv_kv": vn_lv_kv,
@@ -169,9 +174,11 @@ def convert_gen(fields: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 BUS_SCHEMA: list[dict[str, Any]] = [
-    {"name": "baseKV", "unit": "kV", "required": True,
+    {"name": "baseKV", "unit": "kV", "required": True, "type": "enum",
+     "options": [15.0, 30.0, 110.0, 220.0, 400.0],
      "description": "Napięcie znamionowe szyny [kV]; ustawia vn_kv."},
     {"name": "type", "unit": None, "required": True, "type": "enum", "options": [1, 2, 3],
+     "labels": ["1 — PQ (odbiornikowa)", "2 — PV (generatorowa)", "3 — Slack (bilansowa)"],
      "description": "Typ szyny: 1=szyna PQ (odbiornikowa), 2=szyna PV (generatorowa), 3=szyna bilansu (slack)."},
     {"name": "Pd", "unit": "MW", "required": False,
      "description": "Zapotrzebowanie na moc czynną [MW]; tworzy odbiór gdy niezerowe."},
@@ -189,26 +196,41 @@ BUS_SCHEMA: list[dict[str, Any]] = [
      "description": "Etykieta tekstowa szyny."},
 ]
 
-BRANCH_SCHEMA: list[dict[str, Any]] = [
+LINE_SCHEMA: list[dict[str, Any]] = [
     {"name": "from_bus", "unit": None, "required": True,
-     "description": "Id szyny początkowej (linia) lub szyny WN (transformator)."},
+     "description": "Szyna, od której odchodzi linia."},
     {"name": "to_bus", "unit": None, "required": True,
-     "description": "Id szyny końcowej (linia) lub szyny NN (transformator)."},
+     "description": "Szyna, do której dochodzi linia."},
     {"name": "r_pu", "unit": "p.u.", "required": True,
-     "description": "Rezystancja szeregowa [p.u.] na bazie systemowej."},
+     "description": "Rezystancja szeregowa [p.u.] na bazie systemowej (Sbase=100 MVA)."},
     {"name": "x_pu", "unit": "p.u.", "required": True,
      "description": "Reaktancja szeregowa [p.u.] na bazie systemowej."},
     {"name": "b_pu", "unit": "p.u.", "required": False,
      "description": "Susceptancja bocznikowa całkowita [p.u.]; 0 = brak shuntu."},
-    {"name": "ratio", "unit": None, "required": True,
-     "description": "Przekładnia: 0 lub 1 → linia, inna wartość → transformator."},
     {"name": "rateA", "unit": "MVA", "required": False,
      "description": "Dopuszczalne obciążenie ciągłe [MVA]; 0 = bez ograniczeń."},
-    {"name": "sn_mva", "unit": "MVA", "required": False,
-     "description": "Moc znamionowa transformatora [MVA]; używana tylko gdy ratio ≠ 0 i ≠ 1."},
     {"name": "name", "unit": None, "required": False,
-     "description": "Etykieta tekstowa gałęzi."},
+     "description": "Etykieta tekstowa linii."},
 ]
+
+TRAFO_SCHEMA: list[dict[str, Any]] = [
+    {"name": "hv_bus", "unit": None, "required": True,
+     "description": "Szyna strony wysokiego napięcia (WN)."},
+    {"name": "lv_bus", "unit": None, "required": True,
+     "description": "Szyna strony niskiego napięcia (nN)."},
+    {"name": "r_pu", "unit": "p.u.", "required": True,
+     "description": "Rezystancja szeregowa [p.u.] na bazie systemowej (Sbase=100 MVA)."},
+    {"name": "x_pu", "unit": "p.u.", "required": True,
+     "description": "Reaktancja szeregowa [p.u.] na bazie systemowej."},
+    {"name": "ratio", "unit": None, "required": True,
+     "description": "Przekładnia napięciowa (np. 110/30 kV → wpisz 1.1 dla 10% powyżej znamionowej). Musi być różna od 0 i 1."},
+    {"name": "sn_mva", "unit": "MVA", "required": False,
+     "description": "Moc znamionowa transformatora [MVA]; domyślnie 100 MVA."},
+    {"name": "name", "unit": None, "required": False,
+     "description": "Etykieta tekstowa transformatora."},
+]
+
+BRANCH_SCHEMA = LINE_SCHEMA  # backward compat alias
 
 GEN_SCHEMA: list[dict[str, Any]] = [
     {"name": "bus", "unit": None, "required": True,
@@ -231,7 +253,8 @@ GEN_SCHEMA: list[dict[str, Any]] = [
 
 MATPOWER_SCHEMA: dict[str, list[dict[str, Any]]] = {
     "bus": BUS_SCHEMA,
-    "branch": BRANCH_SCHEMA,
+    "line": LINE_SCHEMA,
+    "trafo": TRAFO_SCHEMA,
     "gen": GEN_SCHEMA,
 }
 
