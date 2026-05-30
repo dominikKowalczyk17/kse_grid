@@ -135,8 +135,8 @@ def convert_branch(
     # HV/LV voltages from buses; the ratio encodes the tap
     vn_hv_kv = float(fields.get("vn_hv_kv", base_kv * (ratio if ratio > 0 else 1.0)))
     vn_lv_kv = float(fields.get("vn_lv_kv", base_kv))
-    hv_bus = fields.get("hv_bus") or fields.get("from_bus")
-    lv_bus = fields.get("lv_bus") or fields.get("to_bus")
+    hv_bus = fields["hv_bus"] if fields.get("hv_bus") is not None else fields.get("from_bus")
+    lv_bus = fields["lv_bus"] if fields.get("lv_bus") is not None else fields.get("to_bus")
     return ("trafo", {
         "hv_bus": hv_bus,
         "lv_bus": lv_bus,

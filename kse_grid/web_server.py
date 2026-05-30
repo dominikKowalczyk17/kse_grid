@@ -66,7 +66,10 @@ def _create_matpower(
         # Derive baseKV from the from_bus / hv_bus voltage.
         ref_bus_key = "from_bus" if kind == "line" else "hv_bus"
         fallback_key = "to_bus" if kind == "line" else "lv_bus"
-        ref_bus_id_raw = fields.get(ref_bus_key) or fields.get(fallback_key)
+        ref_bus_id_raw = (
+            fields[ref_bus_key] if fields.get(ref_bus_key) is not None
+            else fields.get(fallback_key)
+        )
         if ref_bus_id_raw is None:
             raise ValueError(f"Brakuje wymaganego pola '{ref_bus_key}' (id szyny).")
         ref_bus_id = int(ref_bus_id_raw)
