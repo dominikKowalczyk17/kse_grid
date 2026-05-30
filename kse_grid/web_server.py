@@ -65,13 +65,18 @@ def _create_matpower(
     elif kind in _BRANCH_KINDS_MP:
         # Derive baseKV from the from_bus / hv_bus voltage.
         ref_bus_key = "from_bus" if kind == "line" else "hv_bus"
-        if ref_bus_key not in fields:
+        fallback_key = "to_bus" if kind == "line" else "lv_bus"
+        ref_bus_id_raw = (
+            fields[ref_bus_key] if fields.get(ref_bus_key) is not None
+            else fields.get(fallback_key)
+        )
+        if ref_bus_id_raw is None:
             raise ValueError(f"Brakuje wymaganego pola '{ref_bus_key}' (id szyny).")
-        ref_bus_id = int(fields[ref_bus_key])
+        ref_bus_id = int(ref_bus_id_raw)
         if ref_bus_id not in session.working_net.bus.index:
             raise ValueError(f"Szyna o id {ref_bus_id} nie istnieje w sieci.")
         base_kv = float(session.working_net.bus.at[ref_bus_id, "vn_kv"])
-        kind_out, converted = convert_branch(fields, base_kv=base_kv)
+        kind_out, converted = convert_branch(fields, base_kv=base_kv, kind=kind)
         result = session.create_element(kind_out, converted)
         return {
             "created": [{"kind": kind_out,

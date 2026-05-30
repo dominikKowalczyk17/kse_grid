@@ -44,9 +44,7 @@ export function useGridBuilder({ network, applyNetwork, presentError }) {
         const fmt = formatMode.value;
         let raw;
         if (fmt === 'matpower') {
-            // matpower schema uses 'branch' for line/trafo
-            const key = (tab === 'line' || tab === 'trafo') ? 'branch' : tab;
-            raw = createSchema.value.matpower?.[key] || [];
+            raw = createSchema.value.matpower?.[tab] || [];
         } else {
             raw = createSchema.value.pandapower?.[tab] || [];
         }

@@ -293,7 +293,9 @@ export const GridBuilder = {
                         :value="formFields[field.name] ?? ''"
                         @change="setField(field.name, typeof field.options[0] === 'number' ? Number($event.target.value) : $event.target.value)"
                         @keydown.enter.prevent="submitForm">
-                        <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt === '' ? '—' : opt }}</option>
+                        <option v-for="(opt, i) in field.options" :key="opt" :value="opt">
+                            {{ field.labels?.[i] ?? (opt === '' ? '—' : opt) }}
+                        </option>
                     </select>
                     <select v-else-if="isBusField(field) && busOptions.length"
                         :id="'gb-' + field.name"
