@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import mimetypes
 import tempfile
 import traceback
 import webbrowser
 from pathlib import Path
 from threading import Lock, Timer
+
+mimetypes.add_type("application/javascript", ".mjs")
 
 import pandapower as pp
 import uvicorn
