@@ -9,8 +9,6 @@ import webbrowser
 from pathlib import Path
 from threading import Lock, Timer
 
-mimetypes.add_type("application/javascript", ".mjs")
-
 import pandapower as pp
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
@@ -29,6 +27,8 @@ from kse_grid.topology.matpower_params import (
     convert_gen,
 )
 from kse_grid.topology.switching import SwitchingSession
+
+mimetypes.add_type("application/javascript", ".mjs")
 
 _WEB_DIR = Path(__file__).parent / "web"
 _DATA_DIR = Path(__file__).parent.parent / "data"
