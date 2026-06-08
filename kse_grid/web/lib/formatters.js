@@ -20,6 +20,14 @@ export function formatMw (value) {
     return Math.abs(numeric) >= 1000 ? `${(numeric / 1000).toFixed(2)} GW` : `${numeric.toFixed(1)} MW`;
 }
 
+export function formatMvar(value) {
+    if (value == null) return '—';
+    const numeric = Number(value);
+    return Math.abs(numeric) >= 1000
+        ? `${(numeric / 1000).toFixed(2)} GVAr`
+        : `${numeric.toFixed(1)} MVAr`;
+}
+
 export function polishPlural (count, one, few, many) {
     if (count === 1) return one;
     const mod10 = count % 10;

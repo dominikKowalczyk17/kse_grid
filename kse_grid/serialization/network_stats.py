@@ -1,4 +1,4 @@
-"""Obliczanie statystyk i bilansów mocy sieci."""
+"""Computing network statistics and power balances."""
 
 from __future__ import annotations
 
@@ -34,6 +34,11 @@ def compute_totals(net: pp.pandapowerNet) -> dict[str, Any]:
     p_load = _sum_load(net)
     p_loss = _sum_losses(net)
 
+    q_gen = _sum_q_generation(net)
+    q_slack = _sum_q_slack(net)
+    q_load = _sum_q_load(net)
+    q_loss = _sum_q_losses(net)
+
     slack_id = _find_slack_bus_id(net)
     gen_units = _count_gen_units(net)
 
@@ -46,6 +51,10 @@ def compute_totals(net: pp.pandapowerNet) -> dict[str, Any]:
         "slackMw": p_slack,
         "lossesMw": p_loss,
         "lossPct": loss_pct,
+        "qLoadMvar": q_load,
+        "qGenerationMvar": q_gen + q_slack,
+        "qSlackMvar": q_slack,
+        "qLossesMvar": q_loss,
         "slackBusId": slack_id,
         "genUnits": gen_units,
     }
@@ -137,6 +146,43 @@ def _find_slack_bus_id(net: pp.pandapowerNet) -> int | None:
         if not slack_gen.empty:
             return _to_int(slack_gen.iloc[0]["bus"])
     return None
+
+
+def _sum_q_load(net: pp.pandapowerNet) -> float:
+    if hasattr(net, "res_load") and not net.res_load.empty and "q_mvar" in net.res_load.columns:
+        return float(net.res_load["q_mvar"].fillna(0.0).sum())
+    return 0.0
+
+
+def _sum_q_generation(net: pp.pandapowerNet) -> float:
+    total = 0.0
+    if hasattr(net, "res_gen") and not net.res_gen.empty and "q_mvar" in net.res_gen.columns:
+        total += float(net.res_gen["q_mvar"].fillna(0.0).sum())
+    if hasattr(net, "res_sgen") and not net.res_sgen.empty and "q_mvar" in net.res_sgen.columns:
+        total += float(net.res_sgen["q_mvar"].fillna(0.0).sum())
+    return total
+
+
+def _sum_q_slack(net: pp.pandapowerNet) -> float:
+    total = 0.0
+    if hasattr(net, "res_ext_grid") and not net.res_ext_grid.empty and "q_mvar" in net.res_ext_grid.columns:
+        total += float(net.res_ext_grid["q_mvar"].fillna(0.0).sum())
+    if hasattr(net, "res_gen") and not net.res_gen.empty and "q_mvar" in net.res_gen.columns:
+        slack_mask = net.gen["slack"].fillna(False).astype(bool) if "slack" in net.gen.columns else None
+        if slack_mask is not None and slack_mask.any():
+            total += float(net.res_gen.loc[slack_mask, "q_mvar"].fillna(0.0).sum())
+    return total
+
+
+def _sum_q_losses(net: pp.pandapowerNet) -> float:
+    total = 0.0
+    if hasattr(net, "res_line") and not net.res_line.empty and "ql_mvar" in net.res_line.columns:
+        total += float(net.res_line["ql_mvar"].fillna(0.0).sum())
+    if hasattr(net, "res_trafo") and not net.res_trafo.empty and "ql_mvar" in net.res_trafo.columns:
+        total += float(net.res_trafo["ql_mvar"].fillna(0.0).sum())
+    if hasattr(net, "res_trafo3w") and not net.res_trafo3w.empty and "ql_mvar" in net.res_trafo3w.columns:
+        total += float(net.res_trafo3w["ql_mvar"].fillna(0.0).sum())
+    return total
 
 
 def _count_gen_units(net: pp.pandapowerNet) -> int:

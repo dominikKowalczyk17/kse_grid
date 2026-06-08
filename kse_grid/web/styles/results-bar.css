@@ -305,3 +305,19 @@
 .report-row--bad .report-row__val {
     color: var(--bad);
 }
+
+/* ── Tabela napięć — 4 kolumny (badge, name, U, δ) ──────────────── */
+
+.report-table--voltage .report-thead,
+.report-table--voltage .report-row {
+    grid-template-columns: 1.8rem 1fr 4rem 3.5rem;
+}
+
+.report-row__angle {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+    text-align: right;
+}

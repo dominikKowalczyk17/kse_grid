@@ -1,4 +1,4 @@
-"""Serializacja sieci pandapower do prostego JSON-a dla frontendu."""
+"""Serialisation of a pandapower network to a simple JSON for the frontend."""
 
 from __future__ import annotations
 
@@ -41,7 +41,6 @@ from kse_grid.serialization.graph_layout import compute_graph_positions
 from kse_grid.serialization.network_stats import compute_stats as _compute_stats
 from kse_grid.serialization.network_stats import compute_totals as _compute_totals
 from kse_grid.serialization.topology_analysis import compute_topology as _compute_topology
-from kse_grid.thresholds import CORE_VOLTAGE_KV as _CORE_VOLTAGE_KV
 from kse_grid.type_coercion import safe_float as _safe_float
 from kse_grid.type_coercion import to_int as _to_int
 
@@ -51,7 +50,7 @@ def serialize_network(
     *,
     graph_positions: dict[int, tuple[float, float]] | None = None,
 ) -> dict[str, Any]:
-    """Zwraca słownik z całą siecią + wynikami load flow gotowy do JSON-a."""
+    """Return a dict with the full network + load flow results ready for JSON."""
     positions = graph_positions or compute_graph_positions(net)
     geo_positions = _extract_geo_positions(net)
     has_bus_results = not net.res_bus.empty
@@ -59,7 +58,7 @@ def serialize_network(
     has_trafo_results = not net.res_trafo.empty
 
     voltage_levels = sorted({float(v) for v in net.bus.vn_kv.dropna().tolist() if v > 0}, reverse=True)
-    default_voltage_filter = [v for v in voltage_levels if v >= _CORE_VOLTAGE_KV] or list(voltage_levels)
+    default_voltage_filter = list(voltage_levels)
     graph_bounds = _compute_bounds(positions)
     geo_view = _compute_geo_view(geo_positions) if geo_positions else None
 
@@ -97,10 +96,10 @@ def serialize_topology_update(
     changed_element: tuple[str, int] | None = None,
 ) -> dict[str, Any]:
     """
-    Zwraca slim payload z polami, które zmieniają się po zmianie stanu switcha
-    i ponownym load flow. Celowo nie zawiera pozycji szyn, geometrii linii ani
-    innych pól layoutu — frontend mutuje istniejący obiekt sieci w miejscu, żeby
-    zachować edycje użytkownika (drag busa, łamanie linii).
+    Return a slim payload with fields that change after a switch state change
+    and re-run of load flow. Intentionally excludes bus positions, line geometry,
+    and other layout fields — the frontend mutates the existing network object in
+    place to preserve user edits (bus drag, line bending).
     """
     has_bus_results = not net.res_bus.empty
     has_line_results = not net.res_line.empty
@@ -202,7 +201,7 @@ def _serialize_changed_element(
     net: pp.pandapowerNet,
     changed_element: tuple[str, int] | None,
 ) -> dict[str, Any] | None:
-    """Re-serializuje pojedynczy element po edycji parametrów."""
+    """Re-serialise a single element after parameter editing."""
     if changed_element is None:
         return None
     kind, element_id = changed_element
@@ -212,8 +211,8 @@ def _serialize_changed_element(
     has_trafo_results = not net.res_trafo.empty
 
     if kind == "bus" and element_id in net.bus.index:
-        # Pozycje grafowe trzymamy po stronie sesji — element wraca bez x/y,
-        # frontend zachowa istniejące pozycje.
+        # Graph positions are held on the session side — the element is returned
+        # without x/y so the frontend keeps existing positions.
         items = _serialize_buses(net, {element_id: (0.0, 0.0)}, geo_positions, has_bus_results)
         for item in items:
             if item["id"] == element_id:

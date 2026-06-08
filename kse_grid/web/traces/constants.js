@@ -82,6 +82,8 @@ export const FLOW_ARROW_MIN_MW = 0.1;
 export const FLOW_ARROW_SIZE_LINE = 14;
 export const FLOW_ARROW_SIZE_TRAFO = 12;
 export const FLOW_ARROW_OUTLINE_WIDTH = 1.0;
+export const FLOW_ARROW_MIN_ZOOM_SCALE = 550;   // viewport.scale below which arrows are hidden
+export const FLOW_ARROW_SIDE_OFFSET_PX = 10;   // lateral P/Q separation in screen pixels
 
 // Markery „placeholder” podświetlenia selekcji rysowane na końcu listy traces.
 export const SELECTION_OUTER_SIZE = 18;

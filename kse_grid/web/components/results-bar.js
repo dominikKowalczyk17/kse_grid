@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import { formatMw, voltageColorVar } from '/lib/formatters.js';
+import { formatMw, formatMvar, voltageColorVar } from '/lib/formatters.js';
 
 export const ResultsBar = {
     props: {
@@ -18,8 +18,7 @@ export const ResultsBar = {
             if (!props.hasResults || !props.buses) return [];
             return [...props.buses]
                 .filter(b => b.vmPu != null)
-                .sort((a, b) => Math.abs(b.vmPu - 1) - Math.abs(a.vmPu - 1))
-                .slice(0, 30);
+                .sort((a, b) => a.id - b.id);
         });
 
         const sortedBranches = computed(() => {
@@ -55,6 +54,7 @@ export const ResultsBar = {
             selectElement,
             loadingRowClass,
             formatMw,
+            formatMvar,
             voltageColorVar,
         };
     },
@@ -122,16 +122,33 @@ export const ResultsBar = {
                                     <span class="rb-row__label">Straty ΔP</span>
                                     <span class="rb-row__val">{{ formatMw(totals.lossesMw) }}<template v-if="totals.lossPct != null"> ({{ totals.lossPct.toFixed(2) }}%)</template></span>
                                 </div>
+                                <div class="rb-row rb-row--sep">
+                                    <span class="rb-row__label">Obciążenie Σ Q</span>
+                                    <span class="rb-row__val">{{ formatMvar(totals.qLoadMvar) }}</span>
+                                </div>
+                                <div class="rb-row">
+                                    <span class="rb-row__label">Generacja Σ Q</span>
+                                    <span class="rb-row__val">{{ formatMvar(totals.qGenerationMvar) }}</span>
+                                </div>
+                                <div class="rb-row">
+                                    <span class="rb-row__label">w tym slack Q</span>
+                                    <span class="rb-row__val muted">{{ formatMvar(totals.qSlackMvar) }}</span>
+                                </div>
+                                <div class="rb-row rb-row--sep">
+                                    <span class="rb-row__label">Straty ΔQ</span>
+                                    <span class="rb-row__val">{{ formatMvar(totals.qLossesMvar) }}</span>
+                                </div>
                             </div>
                         </div>
 
                         <div class="report-col">
                             <div class="report-col__title">Ranking napięć ({{ sortedBuses.length }} szyn)</div>
-                            <div class="report-table">
+                            <div class="report-table report-table--voltage">
                                 <div class="report-thead">
                                     <span class="report-row__badge">kV</span>
                                     <span class="report-row__name">Szyna</span>
                                     <span class="report-row__val">U [p.u.]</span>
+                                    <span class="report-row__angle">δ [°]</span>
                                 </div>
                                 <div class="report-list">
                                     <button
@@ -144,7 +161,8 @@ export const ResultsBar = {
                                     >
                                         <span class="report-row__badge">{{ Math.round(bus.vn_kv) }}</span>
                                         <span class="report-row__name">{{ bus.name }}</span>
-                                        <span class="report-row__val" :style="{ color: voltageColorVar(bus.vmPu) }">{{ bus.vmPu.toFixed(3) }}</span>
+                                        <span class="report-row__val" :style="{ color: voltageColorVar(bus.vn_kv) }">{{ bus.vmPu.toFixed(3) }}</span>
+                                        <span class="report-row__angle">{{ bus.vaDeg?.toFixed(2) }}°</span>
                                     </button>
                                 </div>
                             </div>

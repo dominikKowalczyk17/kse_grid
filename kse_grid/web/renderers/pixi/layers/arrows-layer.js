@@ -2,20 +2,23 @@
  * Flow direction arrows layer — triangle sprites placed near each branch endpoint
  * (offset along the line tangent, like switch markers).
  *
- *   - red triangle near the "from" end (HV for trafo) — active power P
- *     direction = sign(p_from) × tangent_into_line
- *     i.e. arrow points INTO the line if power flows from from-bus into the line.
- *   - green triangle near the "to" end (LV for trafo) — reactive power Q
- *     direction = sign(q_to) × tangent_into_line (from the to-bus toward from-bus)
+ *   Four arrows per branch:
+ *   - red triangle near the "from" end — active power P (pFromMw)
+ *   - green triangle near the "from" end — reactive power Q (qFromMvar), laterally offset
+ *   - red triangle near the "to" end — active power P (pToMw)
+ *   - green triangle near the "to" end — reactive power Q (qToMvar), laterally offset
  *
- * Skipped per channel when the magnitude is below FLOW_ARROW_MIN_MW or the
- * branch is disconnected.
+ *   Arrows only appear above FLOW_ARROW_MIN_ZOOM_SCALE viewport scale.
+ *   Skipped per channel when the magnitude is below FLOW_ARROW_MIN_MW or the
+ *   branch is disconnected.
  */
 
 import { Sprite } from 'pixi.js';
 import {
     FLOW_ARROW_MIN_MW,
+    FLOW_ARROW_MIN_ZOOM_SCALE,
     FLOW_ARROW_OUTLINE_WIDTH,
+    FLOW_ARROW_SIDE_OFFSET_PX,
     FLOW_ARROW_SIZE_LINE,
     FLOW_ARROW_SIZE_TRAFO,
     SWITCH_OFFSET_LENGTH_FACTOR,
@@ -42,8 +45,8 @@ export class ArrowsLayer {
         this.project = project;
         this.getLinePoints = getLinePoints;
         this.viewMode = 'graph';
-        this._sprites = new Map(); // key (`line:id:P` etc.) -> Sprite
-        this._meta = new Map();    // key -> { kind, id, channel, sign, size, end: 'from'|'to' }
+        this._sprites = new Map(); // key (`line:id:channel`) -> Sprite
+        this._meta = new Map();    // key -> { kind, id, channel, sign, size, end, side }
     }
 
     setViewMode (m) { this.viewMode = m; }
@@ -59,20 +62,24 @@ export class ArrowsLayer {
         for (const ln of this.network.lines) {
             if (!filterCtx.lineOk(ln)) continue;
             if (disconnectedIds.line.has(ln.id)) continue;
-            this._addArrow('line', ln.id, 'P', ln.pFromMw, FLOW_ARROW_SIZE_LINE, COLOR_P, 'from');
-            this._addArrow('line', ln.id, 'Q', ln.qToMvar, FLOW_ARROW_SIZE_LINE, COLOR_Q, 'to');
+            this._addArrow('line', ln.id, 'Pfrom', ln.pFromMw,   FLOW_ARROW_SIZE_LINE,  COLOR_P, 'from', +1);
+            this._addArrow('line', ln.id, 'Qfrom', ln.qFromMvar, FLOW_ARROW_SIZE_LINE,  COLOR_Q, 'from', -1);
+            this._addArrow('line', ln.id, 'Pto',   ln.pToMw,     FLOW_ARROW_SIZE_LINE,  COLOR_P, 'to',   +1);
+            this._addArrow('line', ln.id, 'Qto',   ln.qToMvar,   FLOW_ARROW_SIZE_LINE,  COLOR_Q, 'to',   -1);
         }
         for (const tr of this.network.trafos) {
             if (!filterCtx.trafoOk(tr)) continue;
             if (disconnectedIds.trafo.has(tr.id)) continue;
-            this._addArrow('trafo', tr.id, 'P', tr.pHvMw, FLOW_ARROW_SIZE_TRAFO, COLOR_P, 'from');
-            this._addArrow('trafo', tr.id, 'Q', tr.qLvMvar, FLOW_ARROW_SIZE_TRAFO, COLOR_Q, 'to');
+            this._addArrow('trafo', tr.id, 'Pfrom', tr.pHvMw,   FLOW_ARROW_SIZE_TRAFO, COLOR_P, 'from', +1);
+            this._addArrow('trafo', tr.id, 'Qfrom', tr.qHvMvar, FLOW_ARROW_SIZE_TRAFO, COLOR_Q, 'from', -1);
+            this._addArrow('trafo', tr.id, 'Pto',   tr.pLvMw,   FLOW_ARROW_SIZE_TRAFO, COLOR_P, 'to',   +1);
+            this._addArrow('trafo', tr.id, 'Qto',   tr.qLvMvar, FLOW_ARROW_SIZE_TRAFO, COLOR_Q, 'to',   -1);
         }
         this.applyZoom();
         this.updateAllPositions();
     }
 
-    _addArrow (kind, id, channel, value, size, color, end) {
+    _addArrow (kind, id, channel, value, size, color, end, side) {
         if (!Number.isFinite(value) || Math.abs(value) < FLOW_ARROW_MIN_MW) return;
         const sign = value >= 0 ? 1 : -1;
         const tex = this.textures.arrowTriangle(size, color, 0x000000, FLOW_ARROW_OUTLINE_WIDTH);
@@ -81,14 +88,14 @@ export class ArrowsLayer {
         this.container.addChild(sp);
         const key = `${kind}:${id}:${channel}`;
         this._sprites.set(key, sp);
-        this._meta.set(key, { kind, id, channel, sign, size, end });
+        this._meta.set(key, { kind, id, channel, sign, size, end, side });
     }
 
     updateAllPositions () {
         for (const key of this._sprites.keys()) this.updateOne(key);
     }
 
-    /** Update all arrows belonging to a single branch (both P and Q channels). */
+    /** Update all arrows belonging to a single branch (all channels). */
     updateBranch (kind, id) {
         const prefix = `${kind}:${id}:`;
         for (const key of this._sprites.keys()) {
@@ -97,7 +104,7 @@ export class ArrowsLayer {
     }
 
     /** Anchor a sprite at (busPoint + tangent_into_line × offset).
-     *  Offset is ~2× the switch offset so arrows sit past the switch markers. */
+     *  Returns pos, into (tangent toward line interior), and perp (left-normal). */
     _endpointAnchor (busPoint, neighborPoint) {
         const u = unitVector(busPoint, neighborPoint);
         if (u.len === 0) return null;
@@ -108,6 +115,7 @@ export class ArrowsLayer {
         return {
             pos: { x: busPoint.x + u.x * offset, y: busPoint.y + u.y * offset },
             into: u,
+            perp: { x: -u.y, y: u.x },
         };
     }
 
@@ -139,7 +147,13 @@ export class ArrowsLayer {
 
         const anchor = this._endpointAnchor(busPoint, neighborPoint);
         if (!anchor) return;
-        sp.position.set(anchor.pos.x, anchor.pos.y);
+
+        // Lateral P/Q separation: fixed screen-pixel distance, converted to world units.
+        const sideOffset = FLOW_ARROW_SIDE_OFFSET_PX / this.viewport.scale;
+        sp.position.set(
+            anchor.pos.x + anchor.perp.x * meta.side * sideOffset,
+            anchor.pos.y + anchor.perp.y * meta.side * sideOffset,
+        );
 
         const dx = anchor.into.x * meta.sign;
         const dy = anchor.into.y * meta.sign;
@@ -161,7 +175,13 @@ export class ArrowsLayer {
 
     applyZoom () {
         const inv = 1 / this.viewport.scale;
-        for (const sp of this._sprites.values()) sp.scale.set(inv);
+        const visible = this.viewport.scale >= FLOW_ARROW_MIN_ZOOM_SCALE;
+        for (const sp of this._sprites.values()) {
+            sp.scale.set(inv);
+            sp.visible = visible;
+        }
+        // Recompute positions: lateral offset depends on viewport.scale.
+        if (visible) this.updateAllPositions();
     }
 
     onZoom () { this.applyZoom(); }
