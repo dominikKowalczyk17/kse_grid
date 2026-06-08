@@ -1,4 +1,4 @@
-"""Normalizacja zaimportowanej sieci pandapower — nazwy elementów, bus referencyjny."""
+"""Normalisation of an imported pandapower network — element names, reference bus."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ _DEFAULT_TRAFO_NAME_RE = re.compile(r"^Trafo\s+\d+:\s")
 
 
 def normalize_network(net: pp.pandapowerNet) -> None:
-    """Uzupełnia puste nazwy elementów i zapewnia poprawny bus referencyjny."""
+    """Fill in empty element names and ensure a valid reference bus."""
     _fill_bus_names(net)
     _fill_line_names(net)
     _fill_trafo_names(net)
@@ -21,10 +21,10 @@ def normalize_network(net: pp.pandapowerNet) -> None:
 
 
 def refresh_composite_names(net: pp.pandapowerNet) -> None:
-    """Odświeża złożone nazwy linii i trafów po zmianie nazw szyn.
+    """Refresh composite line and trafo names after bus names have changed.
 
-    Wywołać po zaaplikowaniu sidecaru GeoJSON, który może nadpisać nazwy szyn
-    na czytelne nazwy stacji.
+    Call after applying a GeoJSON sidecar that may overwrite bus names
+    with human-readable station names.
     """
     for line_idx, row in net.line.iterrows():
         current = str(net.line.at[line_idx, "name"] or "").strip()

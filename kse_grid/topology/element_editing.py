@@ -1,9 +1,9 @@
-"""Schemat edytowalnych parametrów elementów sieci pandapower.
+"""Schema of editable parameters for pandapower network elements.
 
-Moduł trzyma w jednym miejscu listę pól, które frontend może modyfikować w karcie
-selekcji oraz logikę bezpiecznej koercji typów. Chodzi o to, żeby warstwa HTTP
-nie musiała znać szczegółów modelu pandapower, a `SwitchingSession` miał jedno
-proste API do mutacji elementów.
+Keeps in one place the list of fields the frontend can modify in the selection
+panel, plus the type-coercion logic. The goal is that the HTTP layer does not
+need to know pandapower model details, while `SwitchingSession` has a single
+simple API for mutating elements.
 """
 
 from __future__ import annotations
@@ -15,278 +15,275 @@ import pandapower as pp
 import pandas as pd
 
 # ---------------------------------------------------------------------------
-# Schemat
+# Schema
 # ---------------------------------------------------------------------------
 
-# Każdy wpis: (column, label, type, unit, options, description)
+# Each entry: (column, label, type, unit, options, description)
 # - type ∈ {"str", "float", "int", "bool", "enum"}
-# - options używane tylko dla "enum"
-# - description: krótki opis po polsku do tooltipa / modala pomocy
+# - options used only for "enum"
+# - description: short English description for tooltip / help modal
 _BUS_FIELDS: list[tuple] = [
-    ("name", "Nazwa", "str", None, None,
-     "Etykieta szyny — pomocna do identyfikacji w wynikach i na grafie. "
-     "Nie wpływa na wyniki obliczeń."),
+    ("name", "Name", "str", None, None,
+     "Bus label — useful for identification in results and on the graph. "
+     "Does not affect calculation results."),
     ("vn_kv", "Un", "float", "kV", None,
-     "Napięcie znamionowe szyny (kV). Wartość bazowa do przeliczeń per-unit. "
-     "Zmiana wymaga spójności z napięciami znamionowymi przyłączonych elementów."),
-    ("type", "Typ szyny", "enum", None, ["b", "n", "m"],
-     "Rodzaj węzła w modelu pandapower:\n"
-     "• b – bus szyny (busbar),\n"
-     "• n – węzeł (node) bez fizycznej szyny,\n"
-     "• m – węzeł pomocniczy (muff) np. dla łamania linii."),
-    ("zone", "Strefa", "str", None, None,
-     "Dowolna etykieta strefy/regionu. Używana przy raportowaniu i grupowaniu, "
-     "nie wpływa na load flow."),
+     "Nominal voltage of the bus (kV). Base value for per-unit conversions. "
+     "Changing it requires consistency with the nominal voltages of connected elements."),
+    ("type", "Bus type", "enum", None, ["b", "n", "m"],
+     "Node type in the pandapower model:\n"
+     "• b – busbar,\n"
+     "• n – node without a physical busbar,\n"
+     "• m – auxiliary node (muff), e.g. for line bending."),
+    ("zone", "Zone", "str", None, None,
+     "Arbitrary zone/region label. Used in reporting and grouping; "
+     "does not affect load flow."),
     ("max_vm_pu", "U max", "float", "p.u.", None,
-     "Górny dopuszczalny poziom napięcia (p.u.). Wykorzystywany w analizach "
-     "naruszeń napięciowych i w OPF."),
+     "Upper permissible voltage level (p.u.). Used in voltage violation analyses "
+     "and in OPF."),
     ("min_vm_pu", "U min", "float", "p.u.", None,
-     "Dolny dopuszczalny poziom napięcia (p.u.). Wykorzystywany w analizach "
-     "naruszeń napięciowych i w OPF."),
-    ("in_service", "W eksploatacji", "bool", None, None,
-     "Gdy wyłączone, szyna i wszystkie podłączone do niej elementy są pomijane "
-     "w obliczeniach (jak fizyczne odłączenie)."),
+     "Lower permissible voltage level (p.u.). Used in voltage violation analyses "
+     "and in OPF."),
+    ("in_service", "In service", "bool", None, None,
+     "When disabled, the bus and all elements connected to it are excluded "
+     "from calculations (equivalent to physical disconnection)."),
 ]
 
 _LINE_FIELDS: list[tuple] = [
-    ("name", "Nazwa", "str", None, None,
-     "Etykieta linii — nie wpływa na wyniki, ułatwia identyfikację."),
-    ("length_km", "Długość", "float", "km", None,
-     "Długość linii w kilometrach. Mnożona przez parametry jednostkowe "
-     "(R', X', C', G') przy budowaniu macierzy admitancji."),
+    ("name", "Name", "str", None, None,
+     "Line label — does not affect results, aids identification."),
+    ("length_km", "Length", "float", "km", None,
+     "Line length in kilometres. Multiplied by per-unit parameters "
+     "(R', X', C', G') when building the admittance matrix."),
     ("r_ohm_per_km", "R'", "float", "Ω/km", None,
-     "Rezystancja jednostkowa linii (Ω/km). Decyduje o stratach czynnych "
-     "i spadkach napięcia w stanie ustalonym."),
+     "Per-unit resistance of the line (Ω/km). Determines active losses "
+     "and voltage drops in steady state."),
     ("x_ohm_per_km", "X'", "float", "Ω/km", None,
-     "Reaktancja jednostkowa linii (Ω/km). Główny parametr decydujący "
-     "o przepływie mocy biernej i kątach napięć."),
-    ("c_nf_per_km", "C' (źródło B')", "float", "nF/km", None,
-     "Pojemność jednostkowa do ziemi (nF/km). To pole jest źródłem susceptancji "
-     "linii w macierzy admitancji — pandapower nie trzyma B' osobno, lecz wylicza "
-     "B' = 2π·f·C'·10⁻³ [µS/km] (przy 50 Hz: B' ≈ 0.3142·C').\n"
-     "Z MATPOWER: kolumna `b` (per-unit, total) jest konwertowana na C' przez "
-     "importer. Wpływa na generację mocy biernej linii (efekt Ferrantiego "
-     "przy małym obciążeniu)."),
-    ("g_us_per_km", "G' (upływność)", "float", "µS/km", None,
-     "Konduktancja jednostkowa upływu do ziemi (µS/km). Z MATPOWER nie jest "
-     "wczytywana (matpower nie ma kolumny G dla branchu) — zwykle bliska 0 "
-     "dla linii napowietrznych."),
+     "Per-unit reactance of the line (Ω/km). Main parameter determining "
+     "reactive power flow and voltage angles."),
+    ("c_nf_per_km", "C' (source of B')", "float", "nF/km", None,
+     "Per-unit shunt capacitance to ground (nF/km). This field is the source of "
+     "line susceptance in the admittance matrix — pandapower does not store B' "
+     "separately but computes B' = 2π·f·C'·10⁻³ [µS/km] (at 50 Hz: B' ≈ 0.3142·C').\n"
+     "From MATPOWER: the `b` column (per-unit, total) is converted to C' by the "
+     "importer. Affects reactive power generation of the line (Ferranti effect "
+     "under light load)."),
+    ("g_us_per_km", "G' (shunt conductance)", "float", "µS/km", None,
+     "Per-unit shunt conductance to ground (µS/km). Not imported from MATPOWER "
+     "(MATPOWER has no G column for branches) — usually close to 0 for overhead lines."),
     ("max_i_ka", "I max", "float", "kA", None,
-     "Termiczny prąd dopuszczalny linii (kA). Z tego oraz Un wyliczane jest "
-     "obciążenie procentowe linii."),
-    ("df", "Współ. derate", "float", None, None,
-     "Współczynnik obniżenia obciążalności (derating factor). Wartość 1.0 "
-     "oznacza brak obniżenia. Stosowany np. dla linii w niekorzystnych warunkach."),
-    ("parallel", "Liczba równoległych", "int", None, None,
-     "Liczba równolegle pracujących torów linii o identycznych parametrach. "
-     "Zwiększenie zmniejsza wypadkową impedancję i zwiększa obciążalność."),
-    ("type", "Typ linii", "enum", None, ["", "cs", "ol"],
-     "Rodzaj linii w modelu pandapower:\n"
-     "• cs – kabel (cable),\n"
-     "• ol – linia napowietrzna (overhead line),\n"
-     "• puste – nieokreślony."),
-    ("max_loading_percent", "Max obciążenie", "float", "%", None,
-     "Górny dopuszczalny poziom obciążenia linii (%). Wykorzystywany "
-     "do oznaczania przeciążeń i w OPF."),
-    ("in_service", "W eksploatacji", "bool", None, None,
-     "Gdy wyłączone, linia jest pomijana w obliczeniach (odłączenie obu końców)."),
+     "Thermal current rating of the line (kA). Used together with Un to compute "
+     "the percentage loading of the line."),
+    ("df", "Derating factor", "float", None, None,
+     "Capacity derating factor. A value of 1.0 means no derating. Applied e.g. "
+     "for lines operating in adverse conditions."),
+    ("parallel", "Parallel circuits", "int", None, None,
+     "Number of parallel circuits with identical parameters. Increasing it reduces "
+     "the effective impedance and increases the current rating."),
+    ("type", "Line type", "enum", None, ["", "cs", "ol"],
+     "Line type in the pandapower model:\n"
+     "• cs – underground cable,\n"
+     "• ol – overhead line,\n"
+     "• empty – unspecified."),
+    ("max_loading_percent", "Max loading", "float", "%", None,
+     "Upper permissible loading level of the line (%). Used for overload flagging "
+     "and in OPF."),
+    ("in_service", "In service", "bool", None, None,
+     "When disabled, the line is excluded from calculations (both ends disconnected)."),
 ]
 
 _TRAFO_FIELDS: list[tuple] = [
-    ("name", "Nazwa", "str", None, None,
-     "Etykieta transformatora — nie wpływa na wyniki."),
+    ("name", "Name", "str", None, None,
+     "Transformer label — does not affect results."),
     ("sn_mva", "Sn", "float", "MVA", None,
-     "Moc znamionowa transformatora (MVA). Bazowa wartość do wyliczania "
-     "obciążenia procentowego oraz impedancji w jednostkach fizycznych."),
+     "Nominal power of the transformer (MVA). Base value for computing "
+     "percentage loading and physical-unit impedances."),
     ("vn_hv_kv", "Un HV", "float", "kV", None,
-     "Napięcie znamionowe strony górnego napięcia (kV). Powinno odpowiadać "
-     "napięciu szyny HV, do której trafo jest podłączone."),
+     "Nominal voltage on the high-voltage side (kV). Should match the "
+     "voltage of the HV bus the transformer is connected to."),
     ("vn_lv_kv", "Un LV", "float", "kV", None,
-     "Napięcie znamionowe strony dolnego napięcia (kV). Powinno odpowiadać "
-     "napięciu szyny LV."),
+     "Nominal voltage on the low-voltage side (kV). Should match the LV bus voltage."),
     ("vk_percent", "uk", "float", "%", None,
-     "Napięcie zwarcia transformatora (%). Definiuje całkowitą impedancję "
-     "krótkotrwałą — kluczowe dla rozpływu mocy i prądów zwarciowych."),
+     "Short-circuit voltage of the transformer (%). Defines the total short-term "
+     "impedance — critical for power flow and fault current calculations."),
     ("vkr_percent", "ukr", "float", "%", None,
-     "Czynna część napięcia zwarcia (%). Z niej wyliczane są straty obciążeniowe "
-     "(uzwojenia). Musi być ≤ uk."),
+     "Resistive component of the short-circuit voltage (%). Used to compute load "
+     "losses (winding losses). Must be ≤ uk."),
     ("pfe_kw", "ΔP Fe", "float", "kW", None,
-     "Straty jałowe (w żelazie) w kW. Stałe straty niezależne od obciążenia."),
+     "No-load (iron core) losses in kW. Constant losses independent of loading."),
     ("i0_percent", "i0", "float", "%", None,
-     "Prąd jałowy w procentach prądu znamionowego. Determinuje gałąź "
-     "magnesowania w schemacie zastępczym."),
-    ("shift_degree", "Przesunięcie fazowe", "float", "°", None,
-     "Przesunięcie fazowe wnoszone przez grupę połączeń uzwojeń (np. Yd11 = 30°). "
-     "Istotne dla analiz wielofazowych i zwarć asymetrycznych."),
-    ("tap_side", "Strona zaczepu", "enum", None, ["", "hv", "lv"],
-     "Strona transformatora, na której znajduje się przełącznik zaczepów: "
-     "hv = górne napięcie, lv = dolne napięcie."),
-    ("tap_neutral", "Zaczep neutralny", "int", None, None,
-     "Pozycja zaczepu odpowiadająca przekładni znamionowej (zwykle 0)."),
-    ("tap_min", "Zaczep min", "int", None, None,
-     "Najniższa dopuszczalna pozycja zaczepu."),
-    ("tap_max", "Zaczep max", "int", None, None,
-     "Najwyższa dopuszczalna pozycja zaczepu."),
-    ("tap_step_percent", "Krok zaczepu", "float", "%", None,
-     "Zmiana przekładni napięciowej na jeden zaczep (%)."),
-    ("tap_step_degree", "Krok kąta zaczepu", "float", "°", None,
-     "Zmiana przesunięcia fazowego na jeden zaczep (°). Dotyczy transformatorów "
-     "fazoprzesuwnikowych."),
-    ("tap_pos", "Pozycja zaczepu", "int", None, None,
-     "Aktualna pozycja zaczepu używana w obliczeniach."),
-    ("parallel", "Liczba równoległych", "int", None, None,
-     "Liczba równolegle pracujących identycznych transformatorów reprezentowanych "
-     "przez ten obiekt."),
-    ("df", "Współ. derate", "float", None, None,
-     "Współczynnik obniżenia obciążalności (derating factor)."),
-    ("max_loading_percent", "Max obciążenie", "float", "%", None,
-     "Górny dopuszczalny poziom obciążenia transformatora (%)."),
-    ("in_service", "W eksploatacji", "bool", None, None,
-     "Gdy wyłączone, transformator jest pomijany w obliczeniach."),
+     "No-load current as a percentage of rated current. Determines the "
+     "magnetising branch in the equivalent circuit."),
+    ("shift_degree", "Phase shift", "float", "°", None,
+     "Phase shift introduced by the winding connection group (e.g. Yd11 = 30°). "
+     "Relevant for multi-phase analyses and asymmetric fault studies."),
+    ("tap_side", "Tap side", "enum", None, ["", "hv", "lv"],
+     "Side of the transformer where the tap changer is located: "
+     "hv = high voltage, lv = low voltage."),
+    ("tap_neutral", "Neutral tap", "int", None, None,
+     "Tap position corresponding to the nominal turns ratio (usually 0)."),
+    ("tap_min", "Tap min", "int", None, None,
+     "Lowest permissible tap position."),
+    ("tap_max", "Tap max", "int", None, None,
+     "Highest permissible tap position."),
+    ("tap_step_percent", "Tap step", "float", "%", None,
+     "Voltage ratio change per tap step (%)."),
+    ("tap_step_degree", "Tap angle step", "float", "°", None,
+     "Phase shift change per tap step (°). Applies to phase-shifting transformers."),
+    ("tap_pos", "Tap position", "int", None, None,
+     "Current tap position used in calculations."),
+    ("parallel", "Parallel units", "int", None, None,
+     "Number of identical transformers operating in parallel represented "
+     "by this object."),
+    ("df", "Derating factor", "float", None, None,
+     "Capacity derating factor."),
+    ("max_loading_percent", "Max loading", "float", "%", None,
+     "Upper permissible loading level of the transformer (%)."),
+    ("in_service", "In service", "bool", None, None,
+     "When disabled, the transformer is excluded from calculations."),
 ]
 
 _SWITCH_FIELDS: list[tuple] = [
-    ("name", "Nazwa", "str", None, None,
-     "Etykieta łącznika — nie wpływa na wyniki."),
-    ("type", "Typ", "enum", None, ["", "CB", "LBS", "LS", "DS"],
-     "Rodzaj aparatu:\n"
-     "• CB – wyłącznik (Circuit Breaker),\n"
-     "• LBS – rozłącznik mocy (Load-Break Switch),\n"
-     "• LS – odłącznik mocy (Load Switch),\n"
-     "• DS – odłącznik (Disconnector)."),
-    ("closed", "Zamknięty", "bool", None, None,
-     "Stan łącznika: zamknięty (przewodzi) lub otwarty (przerwa). "
-     "Zmiana wpływa bezpośrednio na topologię i wynik load flow."),
-    ("z_ohm", "Impedancja", "float", "Ω", None,
-     "Impedancja zastępcza łącznika w stanie zamkniętym (Ω). Zwykle 0 — "
-     "ustawiana niezerowo dla modelowania impedancji styków."),
+    ("name", "Name", "str", None, None,
+     "Switch label — does not affect results."),
+    ("type", "Type", "enum", None, ["", "CB", "LBS", "LS", "DS"],
+     "Apparatus type:\n"
+     "• CB – Circuit Breaker,\n"
+     "• LBS – Load-Break Switch,\n"
+     "• LS – Load Switch,\n"
+     "• DS – Disconnector."),
+    ("closed", "Closed", "bool", None, None,
+     "Switch state: closed (conducting) or open (break). "
+     "Changes directly affect topology and load flow results."),
+    ("z_ohm", "Impedance", "float", "Ω", None,
+     "Equivalent impedance of the switch when closed (Ω). Normally 0 — "
+     "set non-zero to model contact impedance."),
     ("in_ka", "I max", "float", "kA", None,
-     "Znamionowy prąd ciągły aparatu (kA)."),
+     "Rated continuous current of the apparatus (kA)."),
 ]
 
 
 _GEN_FIELDS: list[tuple] = [
-    ("name", "Nazwa", "str", None, None,
-     "Etykieta generatora — pomocna do identyfikacji."),
-    ("in_service", "W eksploatacji", "bool", None, None,
-     "Gdy wyłączone, generator jest pomijany w obliczeniach (wyłączony z ruchu). "
-     "Wyłączenie zmienia szyne z PV na PQ i kasuje regulację napięcia."),
-    ("p_mw", "P zadana", "float", "MW", None,
-     "Nastawiona moc czynna generatora (MW). W load flow PV generator utrzymuje "
-     "to nastawienie do granic Pmax/Pmin."),
-    ("vm_pu", "U zadane", "float", "p.u.", None,
-     "Nastawiony poziom napięcia (p.u.) na szynie, którą generator reguluje. "
-     "Aktywne tylko gdy generator jest PV (in_service=True)."),
+    ("name", "Name", "str", None, None,
+     "Generator label — useful for identification."),
+    ("in_service", "In service", "bool", None, None,
+     "When disabled, the generator is excluded from calculations (taken out of service). "
+     "Disabling converts the bus from PV to PQ and removes voltage regulation."),
+    ("p_mw", "P setpoint", "float", "MW", None,
+     "Active power setpoint of the generator (MW). In PV load flow the generator "
+     "maintains this setpoint within the Pmax/Pmin limits."),
+    ("vm_pu", "U setpoint", "float", "p.u.", None,
+     "Voltage setpoint (p.u.) on the bus the generator regulates. "
+     "Active only when the generator is PV (in_service=True)."),
     ("max_p_mw", "P max", "float", "MW", None,
-     "Maksymalna moc czynna generatora (MW). Ogranicza output w OPF."),
+     "Maximum active power of the generator (MW). Limits output in OPF."),
     ("min_p_mw", "P min", "float", "MW", None,
-     "Minimalna moc czynna generatora (MW). Ogranicza output w OPF."),
+     "Minimum active power of the generator (MW). Limits output in OPF."),
     ("max_q_mvar", "Q max", "float", "Mvar", None,
-     "Maksymalna moc bierna (Mvar). Po osiągnięciu limitu generator przełącza się "
-     "z regulacji napięcia na regulację Q."),
+     "Maximum reactive power (Mvar). When the limit is reached the generator "
+     "switches from voltage regulation to Q regulation."),
     ("min_q_mvar", "Q min", "float", "Mvar", None,
-     "Minimalna moc bierna (Mvar). Ogranicza Q od dołu."),
+     "Minimum reactive power (Mvar). Lower bound on Q."),
 ]
 
 
 _LOAD_FIELDS: list[tuple] = [
-    ("name", "Nazwa", "str", None, None,
-     "Etykieta obciążenia — pomocna do identyfikacji."),
-    ("p_mw", "P obc.", "float", "MW", None,
-     "Pobierana moc czynna (MW). MATPOWER `Pd` w wierszu szyny mapuje się tutaj."),
-    ("q_mvar", "Q obc.", "float", "Mvar", None,
-     "Pobierana moc bierna (Mvar). MATPOWER `Qd`."),
-    ("const_z_percent", "Udział stałej Z", "float", "%", None,
-     "Procent obciążenia modelowany jako stała impedancja (ZIP). Suma Z+I+P powinna = 100."),
-    ("const_i_percent", "Udział stałego I", "float", "%", None,
-     "Procent obciążenia modelowany jako stały prąd (ZIP)."),
+    ("name", "Name", "str", None, None,
+     "Load label — useful for identification."),
+    ("p_mw", "P load", "float", "MW", None,
+     "Consumed active power (MW). MATPOWER `Pd` in the bus row maps here."),
+    ("q_mvar", "Q load", "float", "Mvar", None,
+     "Consumed reactive power (Mvar). MATPOWER `Qd`."),
+    ("const_z_percent", "Constant Z share", "float", "%", None,
+     "Percentage of load modelled as constant impedance (ZIP). Z+I+P should sum to 100."),
+    ("const_i_percent", "Constant I share", "float", "%", None,
+     "Percentage of load modelled as constant current (ZIP)."),
     ("sn_mva", "Sn", "float", "MVA", None,
-     "Moc znamionowa obciążenia (MVA) — używana do skalowania ZIP."),
-    ("scaling", "Współ. skalowania", "float", None, None,
-     "Mnożnik P i Q stosowany w obliczeniach (np. profil dobowy)."),
-    ("type", "Typ", "enum", None, ["", "wye", "delta"],
-     "Schemat połączenia: wye (gwiazda) lub delta (trójkąt)."),
-    ("controllable", "Sterowalne (OPF)", "bool", None, None,
-     "Czy OPF może modyfikować P/Q (load shedding / DSM)."),
-    ("in_service", "W eksploatacji", "bool", None, None,
-     "Gdy wyłączone, obciążenie nie jest uwzględniane w obliczeniach."),
+     "Nominal power of the load (MVA) — used for ZIP scaling."),
+    ("scaling", "Scaling factor", "float", None, None,
+     "Multiplier applied to P and Q in calculations (e.g. daily load profile)."),
+    ("type", "Type", "enum", None, ["", "wye", "delta"],
+     "Connection scheme: wye (star) or delta."),
+    ("controllable", "Controllable (OPF)", "bool", None, None,
+     "Whether OPF can modify P/Q (load shedding / DSM)."),
+    ("in_service", "In service", "bool", None, None,
+     "When disabled, the load is excluded from calculations."),
 ]
 
 _SGEN_FIELDS: list[tuple] = [
-    ("name", "Nazwa", "str", None, None,
-     "Etykieta generatora statycznego (PV/wiatr/farma)."),
+    ("name", "Name", "str", None, None,
+     "Static generator label (PV / wind / farm)."),
     ("p_mw", "P", "float", "MW", None,
-     "Wstrzykiwana moc czynna (MW). Konwencja: dodatnie = generacja."),
+     "Injected active power (MW). Convention: positive = generation."),
     ("q_mvar", "Q", "float", "Mvar", None,
-     "Wstrzykiwana moc bierna (Mvar)."),
+     "Injected reactive power (Mvar)."),
     ("sn_mva", "Sn", "float", "MVA", None,
-     "Moc znamionowa (MVA)."),
-    ("scaling", "Współ. skalowania", "float", None, None,
-     "Mnożnik P i Q stosowany w obliczeniach."),
-    ("type", "Typ", "str", None, None,
-     "Dowolna etykieta typu (np. 'PV', 'WT'). Nie wpływa na load flow."),
-    ("current_source", "Źródło prądowe", "bool", None, None,
-     "Gdy True, model traktuje jak źródło prądowe (istotne dla zwarć)."),
+     "Nominal power (MVA)."),
+    ("scaling", "Scaling factor", "float", None, None,
+     "Multiplier applied to P and Q in calculations."),
+    ("type", "Type", "str", None, None,
+     "Arbitrary type label (e.g. 'PV', 'WT'). Does not affect load flow."),
+    ("current_source", "Current source", "bool", None, None,
+     "When True, the model treats this as a current source (relevant for fault analysis)."),
     ("max_p_mw", "P max", "float", "MW", None,
-     "Maksymalna moc czynna (OPF)."),
+     "Maximum active power (OPF)."),
     ("min_p_mw", "P min", "float", "MW", None,
-     "Minimalna moc czynna (OPF)."),
+     "Minimum active power (OPF)."),
     ("max_q_mvar", "Q max", "float", "Mvar", None,
-     "Maksymalna moc bierna (OPF)."),
+     "Maximum reactive power (OPF)."),
     ("min_q_mvar", "Q min", "float", "Mvar", None,
-     "Minimalna moc bierna (OPF)."),
-    ("controllable", "Sterowalne (OPF)", "bool", None, None,
-     "Czy OPF może zmieniać P/Q."),
-    ("in_service", "W eksploatacji", "bool", None, None,
-     "Gdy wyłączone, pomijany w obliczeniach."),
+     "Minimum reactive power (OPF)."),
+    ("controllable", "Controllable (OPF)", "bool", None, None,
+     "Whether OPF can change P/Q."),
+    ("in_service", "In service", "bool", None, None,
+     "When disabled, excluded from calculations."),
 ]
 
 _EXT_GRID_FIELDS: list[tuple] = [
-    ("name", "Nazwa", "str", None, None,
-     "Etykieta zasilania zewnętrznego (slack)."),
-    ("vm_pu", "U zadane", "float", "p.u.", None,
-     "Nastawione napięcie szyny slack (p.u.). MATPOWER `Vg` dla wiersza slack."),
-    ("va_degree", "Kąt zadany", "float", "°", None,
-     "Kąt napięcia szyny slack (°). Zwykle 0 jako węzeł referencyjny."),
-    ("slack_weight", "Waga slack", "float", None, None,
-     "Udział w pokryciu strat — istotne tylko gdy jest wiele slacków."),
+    ("name", "Name", "str", None, None,
+     "External grid (slack) label."),
+    ("vm_pu", "U setpoint", "float", "p.u.", None,
+     "Slack bus voltage setpoint (p.u.). MATPOWER `Vg` for the slack row."),
+    ("va_degree", "Angle setpoint", "float", "°", None,
+     "Slack bus voltage angle (°). Usually 0 as the reference node."),
+    ("slack_weight", "Slack weight", "float", None, None,
+     "Share of loss coverage — relevant only when multiple slacks are present."),
     ("max_p_mw", "P max", "float", "MW", None,
-     "Maksymalna moc czynna oddawana do sieci (OPF)."),
+     "Maximum active power injected into the network (OPF)."),
     ("min_p_mw", "P min", "float", "MW", None,
-     "Minimalna moc czynna (OPF, może być ujemna = pobór)."),
+     "Minimum active power (OPF; may be negative = consumption)."),
     ("max_q_mvar", "Q max", "float", "Mvar", None,
-     "Maksymalna moc bierna (OPF)."),
+     "Maximum reactive power (OPF)."),
     ("min_q_mvar", "Q min", "float", "Mvar", None,
-     "Minimalna moc bierna (OPF)."),
-    ("controllable", "Sterowalne (OPF)", "bool", None, None,
-     "Czy OPF może modyfikować P/Q slacka."),
-    ("in_service", "W eksploatacji", "bool", None, None,
-     "Gdy wyłączone, slack nie jest aktywny — system traci punkt referencyjny."),
+     "Minimum reactive power (OPF)."),
+    ("controllable", "Controllable (OPF)", "bool", None, None,
+     "Whether OPF can modify P/Q of the slack."),
+    ("in_service", "In service", "bool", None, None,
+     "When disabled, the slack is inactive — the system loses its reference point."),
 ]
 
 _SHUNT_FIELDS: list[tuple] = [
-    ("name", "Nazwa", "str", None, None,
-     "Etykieta elementu boczngo (bateria kondensatorów / dławik)."),
+    ("name", "Name", "str", None, None,
+     "Shunt element label (capacitor bank / reactor)."),
     ("p_mw", "P (Gs)", "float", "MW", None,
-     "Czynne straty bocznika przy napięciu znamionowym. MATPOWER `Gs`."),
+     "Active losses of the shunt at nominal voltage. MATPOWER `Gs`."),
     ("q_mvar", "Q (Bs)", "float", "Mvar", None,
-     "Generacja Q przy U=1 p.u. Dodatnie = kondensator, ujemne = dławik. MATPOWER `Bs`."),
+     "Q generation at U=1 p.u. Positive = capacitor, negative = reactor. MATPOWER `Bs`."),
     ("vn_kv", "Un", "float", "kV", None,
-     "Napięcie znamionowe bocznika (kV) — baza do przeliczenia admitancji."),
-    ("step", "Bieżący stopień", "int", None, None,
-     "Aktualnie załączony stopień regulacji."),
-    ("max_step", "Liczba stopni", "int", None, None,
-     "Maksymalna liczba stopni regulacji."),
-    ("in_service", "W eksploatacji", "bool", None, None,
-     "Gdy wyłączone, bocznik nie wnosi admitancji do macierzy."),
+     "Nominal voltage of the shunt (kV) — base for admittance conversion."),
+    ("step", "Current step", "int", None, None,
+     "Currently connected regulation step."),
+    ("max_step", "Step count", "int", None, None,
+     "Maximum number of regulation steps."),
+    ("in_service", "In service", "bool", None, None,
+     "When disabled, the shunt contributes no admittance to the matrix."),
 ]
 
 
 # ---------------------------------------------------------------------------
-# Schemat tworzenia elementów
+# Element creation schema
 # ---------------------------------------------------------------------------
 
-# Struktura: {kind: {required: [(name, type)], optional: [(name, type, options)], defaults: {name: value}}}
+# Structure: {kind: {required: [(name, type)], optional: [(name, type, options)], defaults: {name: value}}}
 _CREATION_SCHEMA: dict[str, dict[str, Any]] = {
     "bus": {
         "required": [("vn_kv", "float")],
@@ -424,7 +421,7 @@ _TABLES = {
 
 
 def field_schema() -> dict[str, list[dict[str, Any]]]:
-    """Zwraca schemat edytowalnych pól w formacie nadającym się do JSON-a."""
+    """Return the editable field schema in a JSON-serialisable format."""
     schema: dict[str, list[dict[str, Any]]] = {}
     for kind, (_table, fields) in _TABLES.items():
         schema[kind] = [
@@ -442,52 +439,52 @@ def field_schema() -> dict[str, list[dict[str, Any]]]:
 
 
 # ---------------------------------------------------------------------------
-# Schemat formularza tworzenia elementów
+# Element creation form schema
 # ---------------------------------------------------------------------------
 
 _CREATION_FIELD_META: dict[str, tuple] = {
-    "vn_kv":           ("Un",             "kV",     "Napięcie znamionowe szyny.",                     [15.0, 30.0, 110.0, 220.0, 400.0]),
-    "from_bus":        ("Szyna źródłowa", None,     "Szyna, od której odchodzi linia.",               None),
-    "to_bus":          ("Szyna docelowa", None,     "Szyna, do której dochodzi linia.",               None),
-    "hv_bus":          ("Szyna WN",       None,     "Szyna strony wysokiego napięcia.",               None),
-    "lv_bus":          ("Szyna nN",       None,     "Szyna strony niskiego napięcia.",                None),
-    "bus":             ("Szyna",          None,     "Szyna przyłączenia elementu.",                   None),
-    "p_mw":            ("P",              "MW",     "Moc czynna.",                                    None),
-    "q_mvar":          ("Q",              "Mvar",   "Moc bierna.",                                    None),
-    "length_km":       ("Długość",        "km",     "Długość odcinka linii.",                         None),
-    "r_ohm_per_km":    ("R",              "Ω/km",   "Rezystancja jednostkowa.",                       None),
-    "x_ohm_per_km":    ("X",              "Ω/km",   "Reaktancja jednostkowa.",                        None),
-    "c_nf_per_km":     ("C",              "nF/km",  "Pojemność jednostkowa.",                         None),
-    "max_i_ka":        ("Imax",           "kA",     "Maksymalny prąd długotrwały.",                   None),
-    "sn_mva":          ("Sn",             "MVA",    "Moc znamionowa transformatora.",                 None),
-    "vn_hv_kv":        ("Un WN",          "kV",     "Napięcie znamionowe strony WN.",                None),
-    "vn_lv_kv":        ("Un nN",          "kV",     "Napięcie znamionowe strony nN.",                None),
-    "vk_percent":      ("uk",             "%",      "Napięcie zwarcia transformatora.",               None),
-    "vkr_percent":     ("ukr",            "%",      "Rezystancyjna składowa napięcia zwarcia.",       None),
-    "pfe_kw":          ("Pfe",            "kW",     "Straty w żelazie (bieg jałowy).",               None),
-    "i0_percent":      ("i0",             "%",      "Prąd biegu jałowego.",                           None),
-    "vm_pu":           ("Um",             "p.u.",   "Zadane napięcie (moduł).",                      None),
-    "va_degree":       ("δ",              "°",      "Kąt napięcia węzła referencyjnego.",            None),
-    "name":            ("Nazwa",          None,     "Etykieta tekstowa elementu.",                    None),
-    "type":            ("Typ szyny",      None,     "Rodzaj węzła (b=szyna, n=węzeł, m=pomocniczy).", ["b", "n", "m"]),
-    "in_service":      ("W eksploatacji", None,     "Czy element jest aktywny.",                      ["true", "false"], ["Tak", "Nie"]),
-    "g_us_per_km":     ("G",              "μS/km",  "Konduktancja jednostkowa.",                      None,                None),
-    "parallel":        ("Równoległe",     None,     "Liczba równoległych torów.",                     [1, 2, 3, 4, 5, 6],  None),
-    "scaling":         ("Scaling",        None,     "Współczynnik skalowania mocy.",                  None),
-    "max_q_mvar":      ("Qmax",           "Mvar",   "Maksymalna moc bierna generatora.",              None),
-    "min_q_mvar":      ("Qmin",           "Mvar",   "Minimalna moc bierna generatora.",               None),
-    "max_p_mw":        ("Pmax",           "MW",     "Maksymalna moc czynna generatora.",              None),
-    "min_p_mw":        ("Pmin",           "MW",     "Minimalna moc czynna generatora.",               None),
-    "tap_neutral":     ("Zacisk nom.",    None,     "Zacisk regulatora przy pozycji nominalnej.",     None),
-    "tap_min":         ("Zacisk min.",    None,     "Minimalna pozycja regulatora.",                  None),
-    "tap_max":         ("Zacisk max.",    None,     "Maksymalna pozycja regulatora.",                 None),
-    "tap_step_percent":("Krok reg.",      "%",      "Krok zmiany napięcia regulatora.",               None),
-    "tap_pos":         ("Pozycja reg.",   None,     "Aktualna pozycja regulatora.",                   None),
+    "vn_kv":           ("Un",             "kV",     "Nominal bus voltage.",                          [15.0, 30.0, 110.0, 220.0, 400.0]),
+    "from_bus":        ("From bus",        None,     "Bus from which the line departs.",              None),
+    "to_bus":          ("To bus",          None,     "Bus at which the line arrives.",                None),
+    "hv_bus":          ("HV bus",          None,     "High-voltage side bus.",                        None),
+    "lv_bus":          ("LV bus",          None,     "Low-voltage side bus.",                         None),
+    "bus":             ("Bus",             None,     "Connection bus of the element.",                None),
+    "p_mw":            ("P",              "MW",     "Active power.",                                  None),
+    "q_mvar":          ("Q",              "Mvar",   "Reactive power.",                                None),
+    "length_km":       ("Length",         "km",     "Line section length.",                           None),
+    "r_ohm_per_km":    ("R",              "Ω/km",   "Per-unit resistance.",                           None),
+    "x_ohm_per_km":    ("X",              "Ω/km",   "Per-unit reactance.",                            None),
+    "c_nf_per_km":     ("C",              "nF/km",  "Per-unit capacitance.",                          None),
+    "max_i_ka":        ("Imax",           "kA",     "Maximum continuous current.",                    None),
+    "sn_mva":          ("Sn",             "MVA",    "Nominal transformer power.",                     None),
+    "vn_hv_kv":        ("Un HV",          "kV",     "Nominal voltage on the HV side.",               None),
+    "vn_lv_kv":        ("Un LV",          "kV",     "Nominal voltage on the LV side.",               None),
+    "vk_percent":      ("uk",             "%",      "Short-circuit voltage of the transformer.",      None),
+    "vkr_percent":     ("ukr",            "%",      "Resistive component of short-circuit voltage.",  None),
+    "pfe_kw":          ("Pfe",            "kW",     "Iron core losses (no-load).",                   None),
+    "i0_percent":      ("i0",             "%",      "No-load current.",                               None),
+    "vm_pu":           ("Um",             "p.u.",   "Voltage setpoint (magnitude).",                 None),
+    "va_degree":       ("δ",              "°",      "Voltage angle of the reference node.",          None),
+    "name":            ("Name",           None,     "Text label for the element.",                    None),
+    "type":            ("Bus type",       None,     "Node type (b=busbar, n=node, m=auxiliary).",     ["b", "n", "m"]),
+    "in_service":      ("In service",     None,     "Whether the element is active.",                 ["true", "false"], ["Yes", "No"]),
+    "g_us_per_km":     ("G",              "μS/km",  "Per-unit conductance.",                          None,                None),
+    "parallel":        ("Parallel",       None,     "Number of parallel circuits.",                   [1, 2, 3, 4, 5, 6],  None),
+    "scaling":         ("Scaling",        None,     "Power scaling factor.",                          None),
+    "max_q_mvar":      ("Qmax",           "Mvar",   "Maximum reactive power of the generator.",       None),
+    "min_q_mvar":      ("Qmin",           "Mvar",   "Minimum reactive power of the generator.",       None),
+    "max_p_mw":        ("Pmax",           "MW",     "Maximum active power of the generator.",         None),
+    "min_p_mw":        ("Pmin",           "MW",     "Minimum active power of the generator.",         None),
+    "tap_neutral":     ("Tap neutral",    None,     "Tap regulator position at nominal ratio.",       None),
+    "tap_min":         ("Tap min",        None,     "Minimum regulator position.",                    None),
+    "tap_max":         ("Tap max",        None,     "Maximum regulator position.",                    None),
+    "tap_step_percent":("Tap step",       "%",      "Voltage change per regulator step.",             None),
+    "tap_pos":         ("Tap position",   None,     "Current regulator position.",                    None),
 }
 
 
 def creation_field_schema() -> dict[str, list[dict[str, Any]]]:
-    """Zwraca schemat pól formularza tworzenia elementów (pandapower)."""
+    """Return the element creation form field schema (pandapower)."""
     result: dict[str, list[dict[str, Any]]] = {}
     for kind, schema in _CREATION_SCHEMA.items():
         required_names = {name for name, _ in schema["required"]}
@@ -520,21 +517,21 @@ def creation_field_schema() -> dict[str, list[dict[str, Any]]]:
 
 
 # ---------------------------------------------------------------------------
-# Odczyt / zapis
+# Read / write
 # ---------------------------------------------------------------------------
 
 def _resolve(net: pp.pandapowerNet, kind: str, element_id: int) -> tuple[pd.DataFrame, list[tuple]]:
     if kind not in _TABLES:
-        raise KeyError(f"Nieznany typ elementu: {kind!r}.")
+        raise KeyError(f"Unknown element type: {kind!r}.")
     table_name, fields = _TABLES[kind]
     table = getattr(net, table_name)
     if element_id not in table.index:
-        raise KeyError(f"Nie istnieje element {kind} #{element_id}.")
+        raise KeyError(f"Element {kind} #{element_id} does not exist.")
     return table, fields
 
 
 def read_element_params(net: pp.pandapowerNet, kind: str, element_id: int) -> dict[str, Any]:
-    """Zwraca bieżące wartości pól edytowalnych dla danego elementu."""
+    """Return the current values of editable fields for the given element."""
     table, fields = _resolve(net, kind, element_id)
     out: dict[str, Any] = {}
     for name, _label, ftype, _unit, _options, _description in fields:
@@ -552,10 +549,10 @@ def apply_element_update(
     element_id: int,
     fields: dict[str, Any],
 ) -> None:
-    """Mutuje wiersz elementu zgodnie z dostarczonymi polami.
+    """Mutate the element row according to the supplied fields.
 
-    Rzuca `ValueError` przy nieznanym polu lub nieudanej koercji typu, dzięki
-    czemu warstwa HTTP może bez analizy zwrócić 400.
+    Raises `ValueError` on an unknown field or failed type coercion so that
+    the HTTP layer can return 400 without any additional inspection.
     """
     table, schema_fields = _resolve(net, kind, element_id)
     schema_index = {
@@ -565,7 +562,7 @@ def apply_element_update(
 
     for raw_name, raw_value in fields.items():
         if raw_name not in schema_index:
-            raise ValueError(f"Pole {raw_name!r} nie jest edytowalne dla {kind}.")
+            raise ValueError(f"Field {raw_name!r} is not editable for {kind}.")
         ftype, options = schema_index[raw_name]
         coerced = _coerce(raw_name, raw_value, ftype, options)
         if raw_name not in table.columns:
@@ -574,7 +571,7 @@ def apply_element_update(
 
 
 # ---------------------------------------------------------------------------
-# Helpery typów
+# Type helpers
 # ---------------------------------------------------------------------------
 
 def _normalize_for_json(value: Any, ftype: str) -> Any:
@@ -601,7 +598,7 @@ def _normalize_for_json(value: Any, ftype: str) -> Any:
 
 def _coerce(name: str, value: Any, ftype: str, options: list | None) -> Any:
     if value is None or (isinstance(value, str) and value == "" and ftype != "str"):
-        # Pola opcjonalne – pozwalamy na "wyzerowanie" (NaN) wszędzie poza str.
+        # Optional fields — allow "clearing" (NaN) everywhere except str.
         if ftype == "str":
             return ""
         return float("nan") if ftype in {"float", "int"} else None
@@ -610,51 +607,51 @@ def _coerce(name: str, value: Any, ftype: str, options: list | None) -> Any:
         if isinstance(value, bool):
             return value
         if isinstance(value, str):
-            return value.strip().lower() in {"true", "1", "yes", "tak"}
+            return value.strip().lower() in {"true", "1", "yes"}
         return bool(value)
 
     if ftype == "int":
         try:
             return int(float(value))
         except (TypeError, ValueError) as exc:
-            raise ValueError(f"Pole {name!r} wymaga liczby całkowitej.") from exc
+            raise ValueError(f"Field {name!r} requires an integer.") from exc
 
     if ftype == "float":
         try:
             result = float(value)
         except (TypeError, ValueError) as exc:
-            raise ValueError(f"Pole {name!r} wymaga liczby.") from exc
+            raise ValueError(f"Field {name!r} requires a number.") from exc
         if math.isnan(result) or math.isinf(result):
-            raise ValueError(f"Pole {name!r} ma nieprawidłową wartość.")
+            raise ValueError(f"Field {name!r} has an invalid value.")
         return result
 
     if ftype == "enum":
         text = str(value)
         if options is not None and text not in options:
-            raise ValueError(f"Pole {name!r} przyjmuje tylko: {options}.")
+            raise ValueError(f"Field {name!r} only accepts: {options}.")
         return text
 
     return str(value)
 
 
 # ---------------------------------------------------------------------------
-# Tworzenie elementów
+# Element creation
 # ---------------------------------------------------------------------------
 
 def validate_creation_fields(kind: str, fields: dict[str, Any]) -> None:
-    """Rzuca ValueError jeśli brakuje wymaganych pól dla danego rodzaju elementu."""
+    """Raise ValueError if required fields for the given element kind are missing."""
     if kind not in _CREATION_SCHEMA:
-        raise ValueError(f"Tworzenie elementu {kind!r} nie jest obsługiwane.")
+        raise ValueError(f"Creating element {kind!r} is not supported.")
     schema = _CREATION_SCHEMA[kind]
     missing = [name for name, _ in schema["required"] if name not in fields or fields[name] is None]
     if missing:
-        raise ValueError(f"Brakujące wymagane pola: {', '.join(missing)}.")
+        raise ValueError(f"Missing required fields: {', '.join(missing)}.")
 
 
 def create_element_in_net(net: pp.pandapowerNet, kind: str, fields: dict[str, Any]) -> int:
-    """Tworzy element w sieci i zwraca jego index.
+    """Create an element in the network and return its index.
 
-    Rzuca ValueError przy brakujących polach, nieznanych wartościach lub złej referencji szyny.
+    Raises ValueError for missing fields, invalid values, or bad bus references.
     """
     validate_creation_fields(kind, fields)
     schema = _CREATION_SCHEMA[kind]
@@ -672,34 +669,34 @@ def create_element_in_net(net: pp.pandapowerNet, kind: str, fields: dict[str, An
             kwargs[name] = _coerce(name, value, ftype, options)
 
     if "bus" in kwargs and not net.bus.empty and int(kwargs["bus"]) not in net.bus.index:
-        raise ValueError(f"Szyna o id={kwargs['bus']} nie istnieje.")
+        raise ValueError(f"Bus with id={kwargs['bus']} does not exist.")
 
     for bus_field in ("from_bus", "to_bus", "hv_bus", "lv_bus"):
         if bus_field in kwargs and not net.bus.empty and int(kwargs[bus_field]) not in net.bus.index:
-            raise ValueError(f"Szyna o id={kwargs[bus_field]} ({bus_field}) nie istnieje.")
+            raise ValueError(f"Bus with id={kwargs[bus_field]} ({bus_field}) does not exist.")
 
     if kind == "line" and "from_bus" in kwargs and "to_bus" in kwargs:
         if int(kwargs["from_bus"]) == int(kwargs["to_bus"]):
-            raise ValueError("Linia nie może łączyć szyny z samą sobą (from_bus == to_bus).")
+            raise ValueError("A line cannot connect a bus to itself (from_bus == to_bus).")
 
     if kind == "trafo" and "hv_bus" in kwargs and "lv_bus" in kwargs:
         if int(kwargs["hv_bus"]) == int(kwargs["lv_bus"]):
-            raise ValueError("Transformator nie może łączyć szyny z samą sobą (hv_bus == lv_bus).")
+            raise ValueError("A transformer cannot connect a bus to itself (hv_bus == lv_bus).")
 
     if kind == "gen" and "bus" in kwargs:
         bus_id = int(kwargs["bus"])
         if not net.ext_grid.empty and bus_id in net.ext_grid["bus"].values:
             raise ValueError(
-                f"Szyna #{bus_id} jest już węzłem slack (ext_grid) — "
-                "dodanie generatora PV spowodowałoby konflikt węzłów referencyjnych."
+                f"Bus #{bus_id} is already a slack node (ext_grid) — "
+                "adding a PV generator would cause a reference node conflict."
             )
 
     try:
         idx = int(_CREATORS[kind](net, **kwargs))
     except (ValueError, KeyError) as exc:
-        raise ValueError(f"Błąd pandapower przy tworzeniu {kind}: {exc}") from exc
+        raise ValueError(f"pandapower error when creating {kind}: {exc}") from exc
     except Exception as exc:
-        raise ValueError(f"Nieoczekiwany błąd przy tworzeniu {kind}: {exc}") from exc
+        raise ValueError(f"Unexpected error when creating {kind}: {exc}") from exc
 
     table = getattr(net, kind)
     if "name" in table.columns and not str(table.at[idx, "name"]).strip():

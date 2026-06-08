@@ -1,4 +1,4 @@
-"""Ładowanie sidecarów GeoJSON z lokalizacjami geograficznymi szyn."""
+"""Loading GeoJSON sidecars with geographic bus locations."""
 
 from __future__ import annotations
 
@@ -19,9 +19,9 @@ _ASCII_FALLBACK = {"ł": "l", "Ł": "L", "ø": "o", "Ø": "O", "?": ""}
 
 
 def load_geo_sidecar(net: pp.pandapowerNet, base_path: str | Path) -> bool:
-    """Szuka i aplikuje sidecar GeoJSON względem podanej ścieżki bazowej.
+    """Search for and apply a GeoJSON sidecar relative to the given base path.
 
-    Zwraca True jeśli sidecar został znaleziony i zaaplikowany.
+    Returns True if a sidecar was found and applied.
     """
     before = getattr(net, "_geo_source", None)
     _try_load_sidecar(net, Path(base_path))
@@ -53,7 +53,7 @@ def _apply_sidecar(net: pp.pandapowerNet, sidecar_path: Path) -> None:
     payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
     features = payload.get("features", [])
     if payload.get("type") != "FeatureCollection" or not isinstance(features, list):
-        raise ValueError(f"{sidecar_path.name} musi być GeoJSON FeatureCollection")
+        raise ValueError(f"{sidecar_path.name} must be a GeoJSON FeatureCollection")
 
     id_lookup = {int(idx): int(idx) for idx in net.bus.index}
     one_based_lookup = {int(idx) + 1: int(idx) for idx in net.bus.index}
@@ -98,7 +98,7 @@ def _apply_sidecar(net: pp.pandapowerNet, sidecar_path: Path) -> None:
         matched += 1
 
     if matched == 0:
-        raise ValueError(f"{sidecar_path.name} nie zawiera żadnych dopasowanych punktów szyn")
+        raise ValueError(f"{sidecar_path.name} contains no matched bus points")
 
     if renamed:
         refresh_composite_names(net)

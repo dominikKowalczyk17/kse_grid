@@ -1,4 +1,4 @@
-"""Ładowanie przypadków MATPOWER do pandapower."""
+"""Loading MATPOWER cases into pandapower."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from kse_grid.loading.network_normalizer import normalize_network
 
 
 def load_matpower_case(case_file: str | Path, f_hz: int = 50) -> pp.pandapowerNet:
-    """Ładuje przypadek matpower (.m) do pandapower."""
+    """Load a MATPOWER case (.m) into pandapower."""
     case_path = Path(case_file).expanduser().resolve()
     net = import_matpower_case(case_path, f_hz=f_hz)
     net.name = case_path.stem

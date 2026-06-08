@@ -1,15 +1,15 @@
-"""Konwerter KSE_2019.kmz -> wbudowane GeoJSON-y warstwy referencyjnej.
+"""Converter KSE_2019.kmz -> built-in GeoJSON files for the reference layer.
 
-Wyciąga z atlasu KSE 2019 (OpenInfraMap / OSM):
-- stacje (Point) z kategorią po hierarchii folderów,
-- linie (LineString) z kategorią po hierarchii folderów.
+Extracts from the KSE 2019 atlas (OpenInfraMap / OSM):
+- substations (Point) with category from the folder hierarchy,
+- lines (LineString) with category from the folder hierarchy.
 
-Kategorie:
-- "osp" - sieć przesyłowa (PSE / NN, 220-400 kV),
-- "osd" - sieć dystrybucyjna 110 kV (OSD: PGE, Tauron, Enea, Energa, RWE),
-- "jw"  - linie blokowe / JW (elektrownie, farmy wiatrowe).
+Categories:
+- "osp" - transmission network (PSE / HV, 220-400 kV),
+- "osd" - 110 kV distribution network (DSO: PGE, Tauron, Enea, Energa, RWE),
+- "jw"  - unit/block lines (power plants, wind farms).
 
-Generuje dwa pliki w `kse_grid/web/`:
+Generates two files in `kse_grid/web/`:
 - kse_atlas_points.geojson
 - kse_atlas_lines.geojson
 """
@@ -125,11 +125,11 @@ def convert(kmz_path: Path, out_dir: Path) -> tuple[int, int]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("kmz", type=Path, help="Ścieżka do KSE_2019.kmz")
+    parser.add_argument("kmz", type=Path, help="Path to KSE_2019.kmz")
     parser.add_argument(
         "--out-dir", type=Path,
         default=Path(__file__).parent / "web",
-        help="Katalog docelowy (domyślnie kse_grid/web/)",
+        help="Output directory (default: kse_grid/web/)",
     )
     args = parser.parse_args()
     n_points, n_lines = convert(args.kmz, args.out_dir)

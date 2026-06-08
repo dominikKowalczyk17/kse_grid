@@ -1,4 +1,4 @@
-"""Serializacja poszczególnych typów elementów sieci do JSON."""
+"""Serialisation of individual network element types to JSON."""
 
 from __future__ import annotations
 
@@ -144,7 +144,7 @@ def serialize_switches(net: pp.pandapowerNet) -> list[dict[str, Any]]:
             remote_bus_name = str(net.bus.at[remote_bus_id, "name"])
             parent_kind = "bus"
 
-        display_name = str(row.get("name") or element_name or f"Odłącznik {switch_id}")
+        display_name = str(row.get("name") or element_name or f"Switch {switch_id}")
 
         out.append({
             "id": switch_id,

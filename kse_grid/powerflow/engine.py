@@ -1,4 +1,4 @@
-"""Silnik obliczeniowy load flow — wykonuje obliczenia bez wiedzy o prezentacji."""
+"""Load flow computation engine — runs calculations without any presentation concerns."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def run_powerflow(
     max_iteration: int = _DEFAULT_MAX_ITERATION,
     tolerance_mva: float = _DEFAULT_TOLERANCE_MVA,
 ) -> PowerFlowResult:
-    """Uruchamia load flow z flat-start. Zapisuje parametry na sieci dla sesji przełączeniowej."""
+    """Run load flow with a flat start. Stores options on the network for the switching session."""
     setattr(net, "_powerflow_options", {
         "algorithm": algorithm,
         "max_iteration": max_iteration,
@@ -45,7 +45,7 @@ def run_powerflow(
 
 
 def load_powerflow_options(net: pp.pandapowerNet) -> dict[str, object]:
-    """Odczytuje parametry load flow zapisane na sieci; zwraca domyślne gdy brak."""
+    """Read load flow options stored on the network; return defaults when absent."""
     raw = getattr(net, "_powerflow_options", None)
     if isinstance(raw, dict) and {"algorithm", "max_iteration", "tolerance_mva"} <= raw.keys():
         return dict(raw)

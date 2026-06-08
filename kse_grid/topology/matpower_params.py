@@ -16,7 +16,7 @@ _MAX_I_KA_DEFAULT = 9999.0  # unlimited thermal rating sentinel
 def _require(fields: dict[str, Any], key: str, label: str = "") -> Any:
     """Return fields[key] or raise ValueError with a user-readable message."""
     if key not in fields:
-        msg = f"Brakuje wymaganego pola '{key}'"
+        msg = f"Missing required field '{key}'"
         if label:
             msg += f" ({label})"
         raise ValueError(msg + ".")
@@ -36,7 +36,7 @@ def convert_bus(
     The first entry is always ("bus", ...). Subsequent entries have
     bus=None as a placeholder; callers must substitute the actual bus id.
     """
-    base_kv = float(_require(fields, "baseKV", "napięcie znamionowe w kV"))
+    base_kv = float(_require(fields, "baseKV", "nominal voltage in kV"))
     bus_type = int(fields.get("type", 1))
     name = str(fields.get("name", ""))
 
@@ -103,8 +103,8 @@ def convert_branch(
     ratio = 0.0 if is_line else float(fields.get("ratio", 0.0))
 
     name = str(fields.get("name", ""))
-    r_pu = float(_require(fields, "r_pu", "rezystancja szeregowa w j.w."))
-    x_pu = float(_require(fields, "x_pu", "reaktancja szeregowa w j.w."))
+    r_pu = float(_require(fields, "r_pu", "series resistance in p.u."))
+    x_pu = float(_require(fields, "x_pu", "series reactance in p.u."))
     b_pu = float(fields.get("b_pu", 0.0))
     rate_a = float(fields.get("rateA", 0.0))
 
@@ -158,8 +158,8 @@ def convert_branch(
 def convert_gen(fields: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     """Convert MATPOWER gen row to ('gen', pandapower_fields)."""
     return ("gen", {
-        "bus": _require(fields, "bus", "id szyny"),
-        "p_mw": float(_require(fields, "Pg", "moc czynna w MW")),
+        "bus": _require(fields, "bus", "bus id"),
+        "p_mw": float(_require(fields, "Pg", "active power in MW")),
         "vm_pu": float(fields.get("Vg", 1.0)),
         "max_p_mw": float(fields["Pmax"]) if "Pmax" in fields else None,
         "min_p_mw": float(fields["Pmin"]) if "Pmin" in fields else None,
@@ -176,79 +176,79 @@ def convert_gen(fields: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 BUS_SCHEMA: list[dict[str, Any]] = [
     {"name": "baseKV", "unit": "kV", "required": True, "type": "enum",
      "options": [15.0, 30.0, 110.0, 220.0, 400.0],
-     "description": "Napięcie znamionowe szyny [kV]; ustawia vn_kv."},
+     "description": "Nominal bus voltage [kV]; sets vn_kv."},
     {"name": "type", "unit": None, "required": True, "type": "enum", "options": [1, 2, 3],
-     "labels": ["1 — PQ (odbiornikowa)", "2 — PV (generatorowa)", "3 — Slack (bilansowa)"],
-     "description": "Typ szyny: 1=szyna PQ (odbiornikowa), 2=szyna PV (generatorowa), 3=szyna bilansu (slack)."},
+     "labels": ["1 — PQ (load bus)", "2 — PV (generator bus)", "3 — Slack (reference bus)"],
+     "description": "Bus type: 1=PQ (load bus), 2=PV (generator bus), 3=slack (reference bus)."},
     {"name": "Pd", "unit": "MW", "required": False,
-     "description": "Zapotrzebowanie na moc czynną [MW]; tworzy odbiór gdy niezerowe."},
+     "description": "Active power demand [MW]; creates a load element when non-zero."},
     {"name": "Qd", "unit": "Mvar", "required": False,
-     "description": "Zapotrzebowanie na moc bierną [Mvar]; tworzy odbiór gdy niezerowe."},
+     "description": "Reactive power demand [Mvar]; creates a load element when non-zero."},
     {"name": "Gs", "unit": "MW", "required": False,
-     "description": "Konduktancja gałęzi równoległej [MW przy 1 p.u.]; tworzy shunt gdy niezerowa."},
+     "description": "Shunt conductance [MW at 1 p.u.]; creates a shunt element when non-zero."},
     {"name": "Bs", "unit": "Mvar", "required": False,
-     "description": "Susceptancja gałęzi równoległej [Mvar przy 1 p.u.]; tworzy shunt gdy niezerowa."},
+     "description": "Shunt susceptance [Mvar at 1 p.u.]; creates a shunt element when non-zero."},
     {"name": "Vm", "unit": "p.u.", "required": False,
-     "description": "Nastawione napięcie [p.u.] dla szyn slack i PV."},
+     "description": "Set voltage [p.u.] for slack and PV buses."},
     {"name": "Va", "unit": "deg", "required": False,
-     "description": "Kąt napięcia [°] dla szyny bilansu (referencja, zazwyczaj 0)."},
+     "description": "Voltage angle [°] for the reference bus (usually 0)."},
     {"name": "name", "unit": None, "required": False,
-     "description": "Etykieta tekstowa szyny."},
+     "description": "Bus label text."},
 ]
 
 LINE_SCHEMA: list[dict[str, Any]] = [
     {"name": "from_bus", "unit": None, "required": True,
-     "description": "Szyna, od której odchodzi linia."},
+     "description": "Sending-end bus of the line."},
     {"name": "to_bus", "unit": None, "required": True,
-     "description": "Szyna, do której dochodzi linia."},
+     "description": "Receiving-end bus of the line."},
     {"name": "r_pu", "unit": "p.u.", "required": True,
-     "description": "Rezystancja szeregowa [p.u.] na bazie systemowej (Sbase=100 MVA)."},
+     "description": "Series resistance [p.u.] on the system base (Sbase=100 MVA)."},
     {"name": "x_pu", "unit": "p.u.", "required": True,
-     "description": "Reaktancja szeregowa [p.u.] na bazie systemowej."},
+     "description": "Series reactance [p.u.] on the system base."},
     {"name": "b_pu", "unit": "p.u.", "required": False,
-     "description": "Susceptancja bocznikowa całkowita [p.u.]; 0 = brak shuntu."},
+     "description": "Total shunt susceptance [p.u.]; 0 = no shunt."},
     {"name": "rateA", "unit": "MVA", "required": False,
-     "description": "Dopuszczalne obciążenie ciągłe [MVA]; 0 = bez ograniczeń."},
+     "description": "Continuous thermal rating [MVA]; 0 = unlimited."},
     {"name": "name", "unit": None, "required": False,
-     "description": "Etykieta tekstowa linii."},
+     "description": "Line label text."},
 ]
 
 TRAFO_SCHEMA: list[dict[str, Any]] = [
     {"name": "hv_bus", "unit": None, "required": True,
-     "description": "Szyna strony wysokiego napięcia (WN)."},
+     "description": "High-voltage (HV) side bus."},
     {"name": "lv_bus", "unit": None, "required": True,
-     "description": "Szyna strony niskiego napięcia (nN)."},
+     "description": "Low-voltage (LV) side bus."},
     {"name": "r_pu", "unit": "p.u.", "required": True,
-     "description": "Rezystancja szeregowa [p.u.] na bazie systemowej (Sbase=100 MVA)."},
+     "description": "Series resistance [p.u.] on the system base (Sbase=100 MVA)."},
     {"name": "x_pu", "unit": "p.u.", "required": True,
-     "description": "Reaktancja szeregowa [p.u.] na bazie systemowej."},
+     "description": "Series reactance [p.u.] on the system base."},
     {"name": "ratio", "unit": None, "required": True,
-     "description": "Przekładnia napięciowa (np. 110/30 kV → wpisz 1.1 dla 10% powyżej znamionowej). Musi być różna od 0 i 1."},
+     "description": "Voltage ratio (e.g. 110/30 kV → enter 1.1 for 10% above nominal). Must not be 0 or 1."},
     {"name": "sn_mva", "unit": "MVA", "required": False,
-     "description": "Moc znamionowa transformatora [MVA]; domyślnie 100 MVA."},
+     "description": "Rated transformer power [MVA]; defaults to 100 MVA."},
     {"name": "name", "unit": None, "required": False,
-     "description": "Etykieta tekstowa transformatora."},
+     "description": "Transformer label text."},
 ]
 
 BRANCH_SCHEMA = LINE_SCHEMA  # backward compat alias
 
 GEN_SCHEMA: list[dict[str, Any]] = [
     {"name": "bus", "unit": None, "required": True,
-     "description": "Id szyny, do której przyłączony jest generator."},
+     "description": "Bus id to which the generator is connected."},
     {"name": "Pg", "unit": "MW", "required": True,
-     "description": "Moc czynna generatora [MW]; mapuje się na p_mw."},
+     "description": "Generator active power [MW]; maps to p_mw."},
     {"name": "Vg", "unit": "p.u.", "required": False,
-     "description": "Zadane napięcie generatora [p.u.]; mapuje się na vm_pu."},
+     "description": "Generator set-point voltage [p.u.]; maps to vm_pu."},
     {"name": "Pmax", "unit": "MW", "required": False,
-     "description": "Maksymalna moc czynna generatora [MW]."},
+     "description": "Maximum active power output [MW]."},
     {"name": "Pmin", "unit": "MW", "required": False,
-     "description": "Minimalna moc czynna generatora [MW]."},
+     "description": "Minimum active power output [MW]."},
     {"name": "Qmax", "unit": "Mvar", "required": False,
-     "description": "Maksymalna moc bierna generatora [Mvar]."},
+     "description": "Maximum reactive power output [Mvar]."},
     {"name": "Qmin", "unit": "Mvar", "required": False,
-     "description": "Minimalna moc bierna generatora [Mvar]."},
+     "description": "Minimum reactive power output [Mvar]."},
     {"name": "name", "unit": None, "required": False,
-     "description": "Etykieta tekstowa generatora."},
+     "description": "Generator label text."},
 ]
 
 MATPOWER_SCHEMA: dict[str, list[dict[str, Any]]] = {

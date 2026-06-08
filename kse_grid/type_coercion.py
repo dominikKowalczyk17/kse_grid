@@ -1,4 +1,4 @@
-"""Konwersja typów — helpery używane w wielu modułach."""
+"""Type coercion helpers used across multiple modules."""
 
 from __future__ import annotations
 

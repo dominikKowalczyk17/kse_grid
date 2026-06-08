@@ -1,4 +1,4 @@
-"""Fasada łącząca silnik load flow z raportowaniem wyników."""
+"""Facade combining the load flow engine with result reporting."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from kse_grid.powerflow.report import print_load_flow_summary, voltage_violation
 
 
 class PowerFlowRunner:
-    """Uruchamia obliczenia load flow i raportuje wyniki."""
+    """Runs load flow calculations and reports results."""
 
     def __init__(self, net: pp.pandapowerNet):
         self.net = net
@@ -20,16 +20,16 @@ class PowerFlowRunner:
         max_iteration: int = 100,
         tolerance_mva: float = 1e-6,
     ) -> bool:
-        """Uruchamia load flow. Zwraca True jeśli zbieżny, False jeśli nie."""
+        """Run load flow. Returns True if converged, False otherwise."""
         result = run_powerflow(self.net, algorithm=algorithm, max_iteration=max_iteration, tolerance_mva=tolerance_mva)
         if not result.converged:
-            print(f"❌ Load flow nie zbiegł po {max_iteration} iteracjach!")
+            print(f"❌ Load flow did not converge after {max_iteration} iterations!")
         return result.converged
 
     def summary(self) -> None:
-        """Drukuje sformatowane podsumowanie wyników load flow."""
+        """Print a formatted summary of load flow results."""
         print_load_flow_summary(self.net)
 
     def voltage_violations(self):
-        """Zwraca DataFrame z szynami poza pasmem ±5% Un."""
+        """Return a DataFrame of buses outside the ±5% Un band."""
         return voltage_violations(self.net)

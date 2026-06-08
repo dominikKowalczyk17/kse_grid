@@ -78,7 +78,7 @@ def run_island_powerflow(
                 slack_bus_ids=[],
                 status="unsupplied",
                 converged=False,
-                message="Brak źródła odniesienia w wyspie.",
+                message="No reference source in the island.",
             ))
             continue
 
@@ -109,7 +109,7 @@ def run_island_powerflow(
                 slack_bus_ids=island_slacks,
                 status="not_converged",
                 converged=False,
-                message=f"Błąd obliczeniowy: {exc}",
+                message=f"Computation error: {exc}",
             ))
 
     return results

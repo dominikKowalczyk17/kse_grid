@@ -1,4 +1,4 @@
-"""Serwer FastAPI: REST API + statyczny frontend Vue."""
+"""FastAPI server: REST API + static Vue frontend."""
 
 from __future__ import annotations
 
@@ -36,13 +36,13 @@ _MAX_UPLOAD_BYTES = 32 * 1024 * 1024  # 32 MiB
 
 
 class SwitchStateUpdate(BaseModel):
-    """Payload PATCH dla pojedynczego switcha."""
+    """PATCH payload for a single switch."""
 
     closed: bool
 
 
 class ElementUpdate(BaseModel):
-    """Payload PATCH dla edycji parametrów elementu sieci."""
+    """PATCH payload for editing network element parameters."""
 
     fields: dict[str, object] = Field(default_factory=dict)
 
@@ -74,10 +74,10 @@ def _create_matpower(
             else fields.get(fallback_key)
         )
         if ref_bus_id_raw is None:
-            raise ValueError(f"Brakuje wymaganego pola '{ref_bus_key}' (id szyny).")
+            raise ValueError(f"Missing required field '{ref_bus_key}' (bus id).")
         ref_bus_id = int(ref_bus_id_raw)
         if ref_bus_id not in session.working_net.bus.index:
-            raise ValueError(f"Szyna o id {ref_bus_id} nie istnieje w sieci.")
+            raise ValueError(f"Bus with id {ref_bus_id} does not exist in the network.")
         base_kv = float(session.working_net.bus.at[ref_bus_id, "vn_kv"])
         kind_out, converted = convert_branch(fields, base_kv=base_kv, kind=kind)
         result = session.create_element(kind_out, converted)
@@ -115,7 +115,7 @@ def _create_matpower(
 
 
 def create_app(net: pp.pandapowerNet) -> FastAPI:
-    """Tworzy aplikację FastAPI dla danej sieci."""
+    """Create a FastAPI application for the given network."""
     state: dict[str, SwitchingSession] = {"session": SwitchingSession(net)}
     state_lock = Lock()
     payload = state["session"].build_payload()
@@ -135,7 +135,7 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
             f"{exc.errors()}"
         )
         return JSONResponse(status_code=422, content={
-            "detail": "Nieprawidłowe dane wejściowe żądania.",
+            "detail": "Invalid request input data.",
             "traceback": tb,
         })
 
@@ -149,7 +149,7 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
             + "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
         )
         return JSONResponse(status_code=500, content={
-            "detail": "Nieoczekiwany błąd serwera. Operacja nie została wykonana.",
+            "detail": "Unexpected server error. The operation was not performed.",
             "traceback": tb,
         })
 
@@ -184,7 +184,7 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
     @app.delete("/api/elements/{kind}/{element_id}")
     def delete_element(kind: str, element_id: int) -> JSONResponse:
         if kind not in _ELEMENT_KINDS:
-            raise HTTPException(status_code=404, detail=f"Nieznany typ elementu: {kind}.")
+            raise HTTPException(status_code=404, detail=f"Unknown element type: {kind}.")
         try:
             result = current_session().delete_element(kind, element_id)
         except KeyError as exc:
@@ -200,7 +200,7 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
         if kind not in _CREATABLE_KINDS:
             raise HTTPException(
                 status_code=404,
-                detail=f"Tworzenie elementu {kind!r} nie jest obsługiwane.",
+                detail=f"Creating element {kind!r} is not supported.",
             )
         try:
             if fmt == "matpower":
@@ -212,7 +212,7 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
         except KeyError as exc:
             raise HTTPException(
                 status_code=400,
-                detail=f"Brakuje wymaganego pola {exc} w danych elementu {kind!r}.",
+                detail=f"Missing required field {exc} in element {kind!r} data.",
             ) from exc
         return JSONResponse(result, status_code=201)
 
@@ -223,7 +223,7 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
     @app.get("/api/elements/{kind}/{element_id}")
     def get_element_params(kind: str, element_id: int) -> JSONResponse:
         if kind not in _ELEMENT_KINDS:
-            raise HTTPException(status_code=404, detail=f"Nieznany typ elementu: {kind}.")
+            raise HTTPException(status_code=404, detail=f"Unknown element type: {kind}.")
         try:
             params = current_session().get_element_params(kind, element_id)
         except KeyError as exc:
@@ -233,7 +233,7 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
     @app.patch("/api/elements/{kind}/{element_id}")
     def patch_element(kind: str, element_id: int, update: ElementUpdate) -> JSONResponse:
         if kind not in _ELEMENT_KINDS:
-            raise HTTPException(status_code=404, detail=f"Nieznany typ elementu: {kind}.")
+            raise HTTPException(status_code=404, detail=f"Unknown element type: {kind}.")
         try:
             payload = current_session().update_element(kind, element_id, update.fields)
         except KeyError as exc:
@@ -247,9 +247,9 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
         filename = file.filename or "uploaded"
         contents = await file.read(_MAX_UPLOAD_BYTES + 1)
         if len(contents) > _MAX_UPLOAD_BYTES:
-            raise HTTPException(status_code=413, detail="Plik przekracza limit 32 MiB.")
+            raise HTTPException(status_code=413, detail="File exceeds the 32 MiB limit.")
         if not contents:
-            raise HTTPException(status_code=400, detail="Pusty plik.")
+            raise HTTPException(status_code=400, detail="Empty file.")
 
         try:
             fmt = detect_format(contents, filename)
@@ -283,7 +283,7 @@ def create_app(net: pp.pandapowerNet) -> FastAPI:
             raise
         except Exception as exc:
             raise HTTPException(
-                status_code=400, detail=f"Nie udało się załadować pliku: {exc}"
+                status_code=400, detail=f"Failed to load file: {exc}"
             ) from exc
 
         with state_lock:
@@ -356,7 +356,7 @@ def serve(
     port: int = 8050,
     auto_open: bool = True,
 ) -> None:
-    """Uruchamia serwer i opcjonalnie otwiera przeglądarkę."""
+    """Start the server and optionally open the browser."""
     app = create_app(net)
     if auto_open:
         Timer(1.5, lambda: webbrowser.open(f"http://{host}:{port}/")).start()

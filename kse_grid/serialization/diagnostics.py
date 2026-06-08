@@ -1,4 +1,4 @@
-"""Diagnostyki napięciowe i obciążeniowe sieci."""
+"""Voltage and loading diagnostics for the network."""
 
 from __future__ import annotations
 

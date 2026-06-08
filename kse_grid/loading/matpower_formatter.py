@@ -1,10 +1,10 @@
-"""Formatter plików MATPOWER (.m) — wyrównuje kolumny w blokach `mpc.X = [ … ];`.
+"""Formatter for MATPOWER (.m) files — aligns columns in `mpc.X = [ … ];` blocks.
 
-Cel: czytelność diff-ów i ręcznej inspekcji. Nie modyfikuje wartości — tylko białe
-znaki. Komentarze końcowe wierszy (np. `% nazwa szyny`) są zachowywane.
+Purpose: readability of diffs and manual inspection. Does not modify values — only
+whitespace. Trailing row comments (e.g. `% bus name`) are preserved.
 
 CLI:
-    python -m kse_grid.loading.matpower_formatter PLIK.m [PLIK2.m ...]
+    python -m kse_grid.loading.matpower_formatter FILE.m [FILE2.m ...]
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ _COL_SEP = "  "
 
 
 def format_text(text: str) -> str:
-    """Zwraca tekst pliku .m z wyrównanymi blokami danych."""
+    """Return the .m file text with aligned data blocks."""
 
     def repl(match: re.Match) -> str:
         return _format_block(match.group(1), match.group(2), match.group(3))
@@ -28,7 +28,7 @@ def format_text(text: str) -> str:
 
 
 def format_file(path: Path) -> bool:
-    """Sformatuj plik w miejscu. Zwraca True jeśli zawartość się zmieniła."""
+    """Format the file in-place. Returns True if the content changed."""
     original = path.read_text(encoding="utf-8")
     formatted = format_text(original)
     if formatted == original:
@@ -70,7 +70,7 @@ def _format_block(prefix: str, body: str, suffix: str) -> str:
             else:
                 widths[i] = max(widths[i], len(f))
 
-    out_lines: list[str] = [""]  # newline tuż po `[`
+    out_lines: list[str] = [""]  # newline right after `[`
     seen_data = False
     for term, fields, comment in parsed:
         if fields is None:
@@ -87,7 +87,7 @@ def _format_block(prefix: str, body: str, suffix: str) -> str:
         out_lines.append(line)
         seen_data = True
 
-    # przytnij końcowe puste linie wewnątrz bloku
+    # strip trailing blank lines inside the block
     while len(out_lines) > 1 and out_lines[-1].strip() == "":
         out_lines.pop()
     return prefix + "\n".join(out_lines) + "\n" + suffix
@@ -95,19 +95,19 @@ def _format_block(prefix: str, body: str, suffix: str) -> str:
 
 def _main(argv: list[str]) -> int:
     if not argv:
-        print("użycie: python -m kse_grid.loading.matpower_formatter PLIK.m [...]", file=sys.stderr)
+        print("usage: python -m kse_grid.loading.matpower_formatter FILE.m [...]", file=sys.stderr)
         return 2
     changed = 0
     for arg in argv:
         path = Path(arg)
         if not path.is_file():
-            print(f"pominięto (brak pliku): {path}", file=sys.stderr)
+            print(f"skipped (file not found): {path}", file=sys.stderr)
             continue
         if format_file(path):
-            print(f"sformatowano: {path}")
+            print(f"formatted: {path}")
             changed += 1
         else:
-            print(f"bez zmian: {path}")
+            print(f"unchanged: {path}")
     return 0 if changed >= 0 else 1
 
 

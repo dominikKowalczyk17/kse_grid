@@ -1,4 +1,4 @@
-"""Analiza topologiczna sieci — wyspy, szyny bez zasilania, stany odłączników."""
+"""Network topology analysis — islands, unsupplied buses, switch states."""
 
 from __future__ import annotations
 

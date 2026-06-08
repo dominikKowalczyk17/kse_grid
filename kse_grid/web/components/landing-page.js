@@ -5,7 +5,7 @@ export const LandingPage = {
     props: {
         theme: { type: String, default: 'dark' },
     },
-    emits: ['upload', 'new-grid', 'toggle-theme'],
+    emits: ['upload', 'new-grid', 'open-docs', 'toggle-theme'],
     template: `
 <div class="landing">
     <button class="btn btn-icon theme-toggle landing-theme-btn"
@@ -49,6 +49,20 @@ export const LandingPage = {
                         transformatory i generatory element po elemencie.
                     </div>
                     <div class="landing-card-meta">Grid Builder</div>
+                </div>
+            </button>
+
+            <button class="landing-card" type="button" @click="$emit('open-docs')">
+                <div class="landing-card-icon-wrap">
+                    <span class="landing-card-icon">?</span>
+                </div>
+                <div class="landing-card-content">
+                    <div class="landing-card-title">Dokumentacja</div>
+                    <div class="landing-card-body">
+                        Python API, REST API, przewodnik po interfejsie i obsługiwane
+                        formaty plików.
+                    </div>
+                    <div class="landing-card-meta">API · UI guide · Formats</div>
                 </div>
             </button>
         </div>

@@ -1,12 +1,12 @@
 """
-kse_grid – plotter sieciowy dla plików MATPOWER (.m)
+kse_grid – network plotter for MATPOWER (.m) files
 
-Użycie
-------
+Usage
+-----
     import kse_grid
 
     grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
-    grid.serve()                      # dashboard FastAPI + Vue w przeglądarce
+    grid.serve()                      # FastAPI + Vue dashboard in the browser
 """
 
 from kse_grid.grid import KSEGrid

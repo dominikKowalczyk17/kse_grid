@@ -2,69 +2,27 @@
 
 [![CI](https://github.com/dominikKowalczyk17/kse_grid/actions/workflows/ci.yml/badge.svg)](https://github.com/dominikKowalczyk17/kse_grid/actions/workflows/ci.yml)
 
-Interaktywna aplikacja do analizy i wizualizacji sieci elektroenergetycznych na podstawie plików **MATPOWER** (`.m`). Projekt łączy obliczenia rozpływu mocy w **pandapower** z webowym interfejsem uruchamianym lokalnie przez **FastAPI**, **Vue 3**, **Plotly** i **PixiJS**.
-
-`kse-grid` pozwala:
-
-- wczytać case MATPOWER z linii poleceń albo z poziomu UI,
-- uruchomić load flow AC,
-- analizować obciążenia linii i transformatorów,
-- filtrować sieć po poziomach napięć, mocy i obciążeniu,
-- pracować w widoku grafowym, geograficznym i referencyjnym atlasu KSE,
-- edytować topologię i wybrane parametry elementów bezpośrednio w interfejsie.
+Interactive power network analysis and visualization tool for **MATPOWER** (`.m`) cases. Combines AC power flow computation via **pandapower** with a locally-served web dashboard built on **FastAPI**, **Vue 3**, **PixiJS**, and **Plotly**.
 
 ![Dashboard preview](docs/03-materialy-zrodlowe/kse-atlas/preview.png)
 
 ---
 
-## Spis treści
+## Feature Highlights
 
-1. [Najważniejsze możliwości](#najważniejsze-możliwości)
-2. [Wymagania](#wymagania)
-3. [Szybki start](#szybki-start)
-4. [Uruchamianie](#uruchamianie)
-5. [Użycie jako biblioteka Python](#użycie-jako-biblioteka-python)
-6. [Interfejs użytkownika](#interfejs-użytkownika)
-7. [Dane geograficzne i pliki pomocnicze](#dane-geograficzne-i-pliki-pomocnicze)
-8. [Struktura projektu](#struktura-projektu)
-9. [Rozwiązywanie problemów](#rozwiązywanie-problemów)
-10. [Licencja](#licencja)
-11. [Afiliacja](#afiliacja)
+- Load MATPOWER cases from the command line or directly from the browser UI.
+- Run AC load flow with pandapower and inspect results immediately.
+- Three view modes: **graph topology**, **OpenStreetMap** (WGS84 coordinates), and **KSE Atlas** reference layer.
+- Filter network elements by voltage level, element type, active/reactive power, and loading percentage.
+- Bus search, per-element detail cards, and inline parameter editing.
+- Branch loading and bus voltage colour-coding with active power flow arrows.
+- Upload a new case from the UI without restarting the server process.
+- Terminal summary report via `KSEGrid.report()`.
+- GeoJSON sidecar support for cases that ship without embedded coordinates.
 
 ---
 
-## Najważniejsze możliwości
-
-- **Obsługa plików MATPOWER (`.m`)** z automatycznym importem do pandapower.
-- **Rozpływ mocy AC** uruchamiany lokalnie podczas startu aplikacji oraz po wgraniu nowego case'a.
-- **Widok grafowy** do szybkiej pracy na topologii i ręcznego kształtowania layoutu.
-- **Widok OpenStreetMap** dla sieci posiadających współrzędne WGS84.
-- **Widok Atlas KSE** jako warstwa referencyjna do porównań z rzeczywistą topologią.
-- **Filtrowanie po napięciu, typie elementu, mocy i obciążeniu** z natychmiastową aktualizacją widoku.
-- **Wyszukiwanie szyn i karta szczegółów** dla busów, linii, transformatorów i łączników.
-- **Tryb edycji** obejmujący przesuwanie węzłów, załamywanie linii oraz edycję parametrów elementów.
-- **Upload nowego case'a z poziomu UI** bez restartu procesu serwera.
-- **Raport tekstowy w terminalu** przez `KSEGrid.report()`.
-
----
-
-## Wymagania
-
-- **Python 3.13** lub nowszy
-- **git**
-- zalecany **[uv](https://docs.astral.sh/uv/)** do instalacji zależności i uruchamiania projektu
-
-Główne zależności runtime:
-
-- `pandapower`
-- `fastapi`
-- `uvicorn`
-- `matpowercaseframes`
-- `python-multipart`
-
----
-
-## Szybki start
+## Quick Start
 
 ### Linux / macOS
 
@@ -84,168 +42,145 @@ uv sync
 uv run python main.py
 ```
 
-Po uruchomieniu aplikacja:
+On startup the application:
 
-1. wczyta domyślny case `data/case2383wp.m`,
-2. policzy rozpływ mocy,
-3. uruchomi lokalny serwer pod adresem `http://127.0.0.1:8050/`,
-4. otworzy interfejs w przeglądarce.
+1. loads the default case `data/case2383wp.m`,
+2. runs the AC power flow,
+3. starts a local server at `http://127.0.0.1:8050/`,
+4. opens the dashboard in the default browser.
 
-Aby zatrzymać serwer, użyj `Ctrl+C`.
+Press `Ctrl+C` to stop the server.
 
-### Instalacja bez `uv`
+### Without `uv`
 
 ```bash
 python3.13 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-python main.py
-```
-
-Na Windows:
-
-```powershell
-py -3.13 -m venv .venv
-.\.venv\Scripts\Activate.ps1
+source .venv/bin/activate   # Windows: .\.venv\Scripts\Activate.ps1
 pip install -e .
 python main.py
 ```
 
 ---
 
-## Uruchamianie
+## Python API
 
-### Domyślny case
+### `KSEGrid`
 
-```bash
-uv run python main.py
+The primary facade for loading, computing, and serving a network.
+
+```python
+import kse_grid
+
+# Load a MATPOWER case and run power flow
+grid = kse_grid.KSEGrid.from_matpower_case("case.m")
+grid.run_powerflow()
+grid.report()   # terminal summary
+grid.serve()    # launches browser dashboard
+
+# Fluent chaining
+kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow().serve()
+
+# Access the underlying pandapower network
+net = grid.net   # pp.pandapowerNet
+print(net.res_bus.head())
+print(net.res_line[net.res_line.loading_percent > 100])
 ```
 
-### Własny plik MATPOWER
+| Method | Signature | Description |
+| --- | --- | --- |
+| `from_matpower_case` | `(path: str) -> KSEGrid` | Load a MATPOWER `.m` file and convert it to a pandapower network. |
+| `new_empty` | `() -> KSEGrid` | Create an empty network (no case file required). |
+| `run_powerflow` | `(algorithm="nr", max_iteration=100, tolerance_mva=1e-8, ...) -> KSEGrid` | Run an AC power flow. Returns `self` for chaining. |
+| `report` | `() -> KSEGrid` | Print a text summary of power flow results to stdout. |
+| `serve` | `(host="127.0.0.1", port=8050) -> None` | Start the FastAPI server and open the dashboard in the browser. |
+
+### `PowerFlowRunner`
+
+Low-level runner for direct control over calculation and result inspection.
+
+```python
+from kse_grid import PowerFlowRunner
+import pandapower as pp
+
+net = pp.from_json("network.json")
+
+runner = PowerFlowRunner(net)
+runner.run()
+runner.summary()
+violations = runner.voltage_violations()  # pd.DataFrame
+```
+
+| Method | Signature | Description |
+| --- | --- | --- |
+| `run` | `(algorithm="nr", ...) -> None` | Execute the AC power flow on the wrapped network. |
+| `summary` | `() -> None` | Print per-bus and per-branch results to stdout. |
+| `voltage_violations` | `() -> pd.DataFrame` | Return a DataFrame of buses outside the configured voltage band. |
+
+### `load_matpower_case`
+
+Standalone function that converts a MATPOWER file to a `pandapowerNet` without constructing a `KSEGrid` object.
+
+```python
+from kse_grid import load_matpower_case
+
+net = load_matpower_case("case.m")   # returns pp.pandapowerNet
+```
+
+---
+
+## CLI Usage
 
 ```bash
+# Start with the default case (data/case2383wp.m)
+uv run python main.py
+
+# Load a specific MATPOWER case
 uv run python main.py path/to/case.m
 ```
 
-### Wgrywanie pliku z poziomu UI
-
-W nagłówku aplikacji dostępny jest przycisk **„Wczytaj plik .m”**. Po wybraniu pliku pojawia się backdrop z paskiem postępu, a nowy case zastępuje aktualną sesję bez restartu serwera.
-
-> Wgrany plik jest przechowywany tylko w bieżącej sesji procesu. Odświeżenie strony zachowuje aktualny case, ale restart procesu bez argumentu wraca do domyślnego `data/case2383wp.m`.
+A file can also be loaded at runtime using the **"Load .m file"** button in the dashboard header. The uploaded case replaces the current session without restarting the server process. The upload is in-memory only: restarting the process without a path argument returns to the default case.
 
 ---
 
-## Użycie jako biblioteka Python
+## Tech Stack
 
-```python
-import kse_grid
-
-# uruchom dashboard dla case'a MATPOWER
-kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow().serve()
-```
-
-```python
-import kse_grid
-
-grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
-grid.report()   # raport tekstowy w terminalu
-grid.serve()    # dashboard w przeglądarce
-```
-
-### Dostęp do obiektu pandapower
-
-```python
-import kse_grid
-
-grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
-print(grid.net.res_bus.head())
-print(grid.net.res_line[grid.net.res_line.loading_percent > 100])
-```
-
-### Parametry obliczeń
-
-```python
-grid.run_powerflow(
-    algorithm="nr",
-    max_iteration=100,
-    tolerance_mva=1.5,
-)
-```
+| Layer | Technology |
+| --- | --- |
+| **Backend** | Python 3.13+, FastAPI 0.115+, pandapower 3.4+, matpowercaseframes 2.1+ |
+| **Frontend** | Vue 3 (ESM CDN, no build step), PixiJS, Plotly 2.35 |
+| **Data formats** | MATPOWER `.m`, pandapower JSON, GeoJSON sidecars |
+| **Server** | `http://127.0.0.1:8050/` |
 
 ---
 
-## Interfejs użytkownika
+## Data Format Support
 
-### Tryby widoku
+### MATPOWER `.m`
 
-- **Graf** — domyślny widok topologiczny do pracy na strukturze sieci.
-- **OpenStreetMap** — widok geograficzny dla case'ów z dostępnymi współrzędnymi WGS84.
-- **Atlas KSE** — widok referencyjny oparty o wbudowane warstwy atlasu KSE 2019.
+The native input format. Pass the file path on the command line or upload it from the UI. Conversion to pandapower is handled automatically, including defensive handling of missing `gencost` blocks and other common issues found in public MATPOWER datasets.
 
-### Panel boczny
+### pandapower JSON
 
-Panel po lewej stronie udostępnia:
+Any `pandapowerNet` serialised with `pp.to_json()` can be loaded directly via `PowerFlowRunner` or the pandapower API before being passed to `KSEGrid`.
 
-- podstawowe statystyki sieci,
-- diagnostykę napięć i obciążeń,
-- histogram napięć,
-- wyszukiwarkę szyn,
-- filtry napięć,
-- filtry typów elementów,
-- filtry mocy i obciążenia,
-- przełączanie trybu widoku,
-- reset widoku i reset topologii.
+### GeoJSON Sidecars
 
-Panel można zwinąć małym uchwytem ze strzałką przy jego prawej krawędzi; ponowne kliknięcie rozwija go z animacją, a wybór jest zapamiętywany w przeglądarce.
-
-### Karta szczegółów i edycja
-
-Po kliknięciu elementu pojawia się karta szczegółów. W zależności od typu elementu można:
-
-- podejrzeć podstawowe parametry i wyniki rozpływu,
-- przełączać stan łączników,
-- edytować parametry elementu,
-- w trybie edycji modyfikować layout grafu.
-
-### Skróty i interakcje
-
-- **klik** — zaznaczenie elementu,
-- **klik w tło** — usunięcie zaznaczenia,
-- **scroll** — zoom,
-- **drag** — pan,
-- **R** — reset widoku,
-- **Esc** — wyczyszczenie zaznaczenia.
-
-### Kolorystyka diagnostyczna
-
-- **linie / transformatory**: kolor odzwierciedla poziom obciążenia,
-- **szyny**: kolor odzwierciedla poziom napięcia w p.u.,
-- **strzałki na gałęziach**: pokazują kierunek przepływu mocy czynnej i biernej.
-
----
-
-## Dane geograficzne i pliki pomocnicze
-
-Nie każdy plik MATPOWER zawiera geometrię. Dla części datasetów — zwłaszcza z paczek TAMU — współrzędne trzeba przygotować osobno.
-
-### Sidecar GeoJSON
-
-Aplikacja obsługuje pomocnicze pliki:
+MATPOWER cases do not always include geographic coordinates. The application looks for a sidecar file alongside the `.m` file using the following naming convention (highest priority first):
 
 - `data/<stem>.geojson`
 - `data/<stem>.json`
 - `data/<stem>_wgs84.geojson`
 - `data/<stem>_geo.geojson`
 
-Plik powinien zawierać `FeatureCollection` z punktami `Point` opisującymi położenie szyn.
+The sidecar must be a GeoJSON `FeatureCollection` of `Point` features representing bus positions in WGS84.
 
-### Konwersja danych TAMU z `.EPC`
+**Convert TAMU `.EPC` to GeoJSON:**
 
 ```bash
 uv run python -m kse_grid.converters.tamu_geo "/path/case.EPC" --out data/case.geojson
 ```
 
-### Dopasowanie do atlasu KSE z pliku KMZ
+**Match a network to the KSE Atlas from a KMZ file:**
 
 ```bash
 uv run python -m kse_grid.converters.kse_kmz \
@@ -254,7 +189,7 @@ uv run python -m kse_grid.converters.kse_kmz \
   --out data/case.geojson
 ```
 
-### Odświeżenie warstw atlasu KSE
+**Refresh KSE Atlas reference layers:**
 
 ```bash
 uv run python -m kse_grid.converters.kse_atlas docs/03-materialy-zrodlowe/kse-atlas/KSE_2019.kmz
@@ -262,80 +197,80 @@ uv run python -m kse_grid.converters.kse_atlas docs/03-materialy-zrodlowe/kse-at
 
 ---
 
-## Struktura projektu
+## Project Structure
 
 ```text
 .
-├── data/                          # przykładowe case'y i pliki pomocnicze
-├── docs/                          # materiały źródłowe i grafiki
+├── data/                          # sample cases and auxiliary files
+├── docs/                          # source materials and graphics
 ├── kse_grid/
-│   ├── grid.py                    # główna klasa KSEGrid (fasada biblioteki)
-│   ├── web_server.py              # FastAPI + REST API + static frontend
-│   ├── type_coercion.py           # współdzielone helpery konwersji typów
-│   ├── thresholds.py              # progi diagnostyczne (napięcie, obciążenie)
+│   ├── grid.py                    # KSEGrid facade
+│   ├── web_server.py              # FastAPI server + REST API + static frontend
+│   ├── type_coercion.py           # shared type-conversion helpers
+│   ├── thresholds.py              # diagnostic thresholds (voltage, loading)
 │   │
-│   ├── loading/                   # wczytywanie sieci z plików
-│   │   ├── matpower.py            # orkiestrator: case.m → pandapowerNet
-│   │   ├── matpower_importer.py   # import .m + obsługa błędów gencost
-│   │   ├── network_normalizer.py  # uzupełnianie nazw, slack bus
-│   │   └── geojson_loader.py      # sidecary GeoJSON z geo szyn
+│   ├── loading/                   # network loading from files
+│   │   ├── matpower.py            # orchestrator: case.m -> pandapowerNet
+│   │   ├── matpower_importer.py   # .m import with gencost error handling
+│   │   ├── network_normalizer.py  # bus name normalisation, slack bus
+│   │   └── geojson_loader.py      # GeoJSON sidecar loader
 │   │
-│   ├── powerflow/                 # obliczenia rozpływu mocy
-│   │   ├── engine.py              # run_powerflow() bez prezentacji
-│   │   ├── report.py              # raport tekstowy w terminalu
-│   │   └── runner.py              # fasada PowerFlowRunner
+│   ├── powerflow/                 # power flow computation
+│   │   ├── engine.py              # run_powerflow() without presentation
+│   │   ├── report.py              # terminal text report
+│   │   └── runner.py              # PowerFlowRunner facade
 │   │
-│   ├── topology/                  # operacje na topologii
-│   │   ├── switching.py           # SwitchingSession — przełączenia
-│   │   └── element_editing.py     # edycja parametrów elementów
+│   ├── topology/                  # topology operations
+│   │   ├── switching.py           # SwitchingSession
+│   │   └── element_editing.py     # element parameter editing
 │   │
-│   ├── serialization/             # format JSON dla frontendu
-│   │   ├── serializer.py          # serialize_network — orkiestrator
-│   │   ├── graph_layout.py        # spring layout grafu
-│   │   ├── geo_positions.py       # pozycje WGS84, widok mapy
-│   │   ├── element_serializers.py # buses/lines/trafos/switches/gens
-│   │   ├── network_stats.py       # statystyki i sumy mocy
-│   │   ├── diagnostics.py         # naruszenia napięcia i przeciążenia
-│   │   └── topology_analysis.py   # wyspy, szyny bez zasilania
+│   ├── serialization/             # JSON serialisation for the frontend
+│   │   ├── serializer.py          # serialize_network orchestrator
+│   │   ├── graph_layout.py        # spring-layout computation
+│   │   ├── geo_positions.py       # WGS84 positions for map view
+│   │   ├── element_serializers.py # buses, lines, transformers, switches, gens
+│   │   ├── network_stats.py       # network statistics and power totals
+│   │   ├── diagnostics.py         # voltage violations and overloads
+│   │   └── topology_analysis.py   # islands and de-energised buses
 │   │
-│   ├── converters/                # konwertery zewnętrznych formatów
-│   │   ├── tamu_geo.py            # TAMU .EPC → sidecar GeoJSON
-│   │   ├── kse_kmz.py             # dopasowanie sieci do atlasu KSE
-│   │   └── kse_atlas.py           # KMZ atlasu KSE → warstwy referencyjne
+│   ├── converters/                # external format converters
+│   │   ├── tamu_geo.py            # TAMU .EPC -> GeoJSON sidecar
+│   │   ├── kse_kmz.py             # network-to-KSE-Atlas matching
+│   │   └── kse_atlas.py           # KMZ atlas -> reference layers
 │   │
-│   └── web/                       # frontend Vue 3 / Plotly / PixiJS
+│   └── web/                       # Vue 3 / Plotly / PixiJS frontend
 │       ├── main.js, icons.js
 │       ├── components/            # app-root, sidebar, graph-panel, ...
 │       ├── lib/
 │       │   ├── api.js, errors.js, formatters.js, thresholds.js, ...
 │       │   └── composables/       # use-network-state, use-topology-ops, ...
-│       ├── renderers/pixi/        # warstwa renderingu PixiJS
-│       ├── traces/                # konfiguracje warstw Plotly
-│       └── styles/                # 7 plików CSS podzielonych wg komponentów
-├── main.py                        # punkt startowy aplikacji
-├── pyproject.toml                 # konfiguracja projektu Python
+│       ├── renderers/pixi/        # PixiJS rendering layer
+│       ├── traces/                # Plotly layer configurations
+│       └── styles/                # CSS split by component
+├── main.py                        # application entry point
+├── pyproject.toml                 # Python project configuration
 └── README.md
 ```
 
 ---
 
-## Rozwiązywanie problemów
+## Troubleshooting
 
-| Problem | Rozwiązanie |
+| Problem | Solution |
 | --- | --- |
-| `ModuleNotFoundError: matpowercaseframes` | Zainstaluj zależności przez `uv sync` albo `pip install -e .`. |
-| Port `8050` jest zajęty | Uruchom aplikację na innym porcie lub zwolnij zajęty port. |
-| Widok **OpenStreetMap** jest zablokowany | Case nie ma danych geograficznych. Przygotuj sidecar GeoJSON albo dane z `.EPC` / `.KMZ`. |
-| Po restarcie aplikacji zniknął wgrany przez UI case | To oczekiwane: upload działa tylko w pamięci bieżącej sesji procesu. |
-| PowerShell blokuje aktywację venv | Ustaw `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`. |
-| `pandapower` zgłasza ostrzeżenia dla niektórych publicznych case'ów | Część datasetów MATPOWER wymaga defensywnego importu; projekt zawiera obsługę typowych problemów wejściowych. |
+| `ModuleNotFoundError: matpowercaseframes` | Run `uv sync` or `pip install -e .` to install all dependencies. |
+| Port `8050` is already in use | Free the port or modify the default port in `main.py`. |
+| **OpenStreetMap** view is unavailable | The case has no geographic data. Prepare a GeoJSON sidecar from `.EPC` or `.KMZ` source files. |
+| Uploaded case disappears after server restart | Expected behaviour: UI uploads are in-memory only for the current process session. |
+| PowerShell blocks venv activation | Run `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`. |
+| pandapower convergence warnings on public cases | Some MATPOWER datasets require defensive import handling; the project includes mitigations for the most common input issues. |
 
 ---
 
-## Licencja
+## License
 
-Projekt jest udostępniany na licencji **MIT**.
+Released under the **MIT License**.
 
-## Afiliacja
+## Affiliation
 
-Projekt powstał w **Instytucie Elektroenergetyki Politechniki Łódzkiej (i22)**.
+Developed at the **Institute of Electrical Power Engineering, Lodz University of Technology (i22)**.

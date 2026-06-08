@@ -5,6 +5,7 @@ import { ResultsBar } from '/components/results-bar.js';
 import { Sidebar } from '/components/sidebar.js';
 import { GraphPanel } from '/components/graph-panel.js';
 import { GridBuilder } from '/components/grid-builder.js';
+import { DocsPage } from '/components/docs-page.js';
 import { IconChevronLeft, IconChevronRight, IconSun, IconMoon } from '/icons.js';
 import { useErrorHandling } from '/lib/composables/use-error-handling.js';
 import { useNetworkState } from '/lib/composables/use-network-state.js';
@@ -15,11 +16,17 @@ import { useUiState } from '/lib/composables/use-ui-state.js';
 import { polishPlural } from '/lib/formatters.js';
 
 export const App = {
-    components: { ErrorModal, LandingPage, ResultsBar, Sidebar, GraphPanel, GridBuilder, IconChevronLeft, IconChevronRight, IconSun, IconMoon },
+    components: { ErrorModal, LandingPage, ResultsBar, Sidebar, GraphPanel, GridBuilder, DocsPage, IconChevronLeft, IconChevronRight, IconSun, IconMoon },
     setup() {
         const errorHandling = useErrorHandling();
         const uiState = useUiState();
         const topologyRevision = ref(0);
+
+        const currentRoute = ref(window.location.hash.startsWith('#/docs') ? 'docs' : '');
+        function openDocs() { window.location.hash = '#/docs/overview'; }
+        function onHashChange() {
+            currentRoute.value = window.location.hash.startsWith('#/docs') ? 'docs' : '';
+        }
 
         const networkState = useNetworkState({
             presentError: errorHandling.presentError,
@@ -117,12 +124,14 @@ export const App = {
             window.addEventListener('error', onWindowError);
             window.addEventListener('unhandledrejection', onUnhandledRejection);
             window.addEventListener('kse-grid:error', onRuntimeErrorEvent);
+            window.addEventListener('hashchange', onHashChange);
         });
 
         onBeforeUnmount(() => {
             window.removeEventListener('error', onWindowError);
             window.removeEventListener('unhandledrejection', onUnhandledRejection);
             window.removeEventListener('kse-grid:error', onRuntimeErrorEvent);
+            window.removeEventListener('hashchange', onHashChange);
         });
 
         return {
@@ -197,17 +206,21 @@ export const App = {
             gbOnExportNetwork: gridBuilder.onExportNetwork,
             gbOnNewNetwork: gridBuilder.onNewNetwork,
             gbOnUpdateFormFields: (f) => { gridBuilder.formFields.value = f; },
+            currentRoute,
+            openDocs,
         };
     },
     template: `
+    <DocsPage v-if="currentRoute === 'docs'" @back="currentRoute = ''" />
     <LandingPage
-        v-if="network && atLanding"
+        v-else-if="network && atLanding"
         :theme="theme"
         @upload="triggerUpload"
         @new-grid="leaveLanding"
+        @open-docs="openDocs"
         @toggle-theme="toggleTheme"
     />
-    <div class="app-shell" v-else-if="network && !atLanding">
+    <div class="app-shell" v-else-if="network && !atLanding && currentRoute !== 'docs'">
         <header class="app-header">
             <div class="brand">
                 <span class="case-name brand-title">{{ network.name }}</span>
@@ -295,6 +308,13 @@ export const App = {
                     title="Utwórz nową pustą sieć"
                     @click="gbOnNewNetwork">
                 {{ gbNewNetBusy ? 'Resetuję…' : 'Nowa sieć' }}
+            </button>
+
+            <button class="btn"
+                    type="button"
+                    title="Otwórz dokumentację"
+                    @click="openDocs">
+                Dokumentacja
             </button>
 
             <button class="btn btn-icon theme-toggle"

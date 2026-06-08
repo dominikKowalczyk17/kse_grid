@@ -1,4 +1,4 @@
-"""Obliczanie pozycji szyn do renderowania grafu topologii sieci."""
+"""Computing bus positions for rendering the network topology graph."""
 
 from __future__ import annotations
 
@@ -14,13 +14,13 @@ _TRAFO_WEIGHT = 50.0
 
 def compute_graph_positions(net: pp.pandapowerNet) -> dict[int, tuple[float, float]]:
     """
-    Liczy pozycje szyn algorytmem spring layout (Fruchterman-Reingold) na grafie
-    topologii sieci. Geodane (`net.bus.geo`) są celowo ignorowane — siatka jest
-    renderowana jako abstrakcyjny graf, nie jako mapa.
+    Compute bus positions using the spring layout algorithm (Fruchterman-Reingold)
+    on the network topology graph. Geodata (`net.bus.geo`) is intentionally ignored —
+    the grid is rendered as an abstract graph, not a map.
 
-    Krawędzie transformatorów dostają znacznie większą wagę niż linie — fizycznie
-    łączą szyny tej samej stacji (różne poziomy napięć), więc na grafie powinny być
-    rysowane bardzo blisko, a nie rozciągnięte przez połowę sieci.
+    Transformer edges receive a much higher weight than lines — they physically
+    connect buses of the same substation (different voltage levels), so they should
+    be drawn very close together rather than stretched across half the network.
     """
     graph = _build_weighted_graph(net)
     return _spring_layout_with_offsets(graph)

@@ -1,4 +1,4 @@
-"""Import pliku MATPOWER do pandapower z obsługą błędów gencost."""
+"""Import a MATPOWER file into pandapower with gencost error handling."""
 
 from __future__ import annotations
 
@@ -25,12 +25,12 @@ def import_matpower_case(case_path: Path, f_hz: int = 50) -> pp.pandapowerNet:
 
 
 def seed_operational_switches(net: pp.pandapowerNet) -> None:
-    """Dodaje operacyjne switche pandapower dla linii i transformatorów.
+    """Add operational pandapower switches for lines and transformers.
 
-    Matpower opisuje gałęzie przez flagę `branch status`; po imporcie tabela
-    `net.switch` zostaje pusta. Ten helper uzupełnia brakujący poziom topologiczny,
-    tworząc po jednym switchu (przy from_bus/hv_bus) dla każdej linii i transformatora.
-    Funkcja jest idempotentna.
+    MATPOWER describes branches via a `branch status` flag; after import the
+    `net.switch` table is empty. This helper fills in the missing topological
+    layer by creating one switch (at from_bus/hv_bus) per line and transformer.
+    The function is idempotent.
     """
     existing_switches = {
         (_to_int(row.bus), _to_int(row.element), str(row.et))
@@ -51,12 +51,12 @@ def seed_operational_switches(net: pp.pandapowerNet) -> None:
 
 
 def _promote_voltage_step_impedances_to_trafos(net: pp.pandapowerNet) -> None:
-    """Reklasyfikuje wpisy `net.impedance` na transformatory zgodnie ze specyfikacją MATPOWER.
+    """Reclassify `net.impedance` entries as transformers per the MATPOWER specification.
 
-    pandapower `from_ppc` traktuje branch jako transformator tylko gdy `tap ∉ {0, 1}`,
-    więc gałęzie z `tap = 1` łączące szyny o różnym `vn_kv` (poprawne trafo wg MATPOWER)
-    lądują w tabeli impedance. Ta funkcja je wykrywa i przenosi do `net.trafo`,
-    odwracając matematykę z `_from_ppc_branch`.
+    pandapower `from_ppc` treats a branch as a transformer only when `tap ∉ {0, 1}`,
+    so branches with `tap = 1` connecting buses with different `vn_kv` (valid trafos
+    per MATPOWER) end up in the impedance table. This function detects them and moves
+    them to `net.trafo`, reversing the maths from `_from_ppc_branch`.
     """
     if net.impedance.empty:
         return
@@ -76,10 +76,10 @@ def _promote_voltage_step_impedances_to_trafos(net: pp.pandapowerNet) -> None:
         bf_pu = float(row.get("bf_pu", 0.0) or 0.0)
         gf_pu = float(row.get("gf_pu", 0.0) or 0.0)
 
-        # Odwrócenie wzorów z _from_ppc_branch: per-unit na sn_mva → trafo %
+        # Invert formulas from _from_ppc_branch: per-unit on sn_mva -> trafo %
         vkr_percent = rft_pu * 100.0
         vk_percent = math.hypot(rft_pu, xft_pu) * 100.0
-        # bf_pu/gf_pu to połówki całkowitego Y branchu (na bazie sn_mva)
+        # bf_pu/gf_pu are half of the total branch Y (on sn_mva base)
         i0_percent = 2.0 * math.hypot(bf_pu, gf_pu) * 100.0
         pfe_kw = 2.0 * gf_pu * sn_mva * 1e3
 
@@ -123,7 +123,7 @@ def _import_without_gencost(case_path: Path, f_hz: int) -> pp.pandapowerNet:
         text,
     )
     if replacements == 0:
-        raise RuntimeError(f"Nie udało się usunąć bloku gencost z {case_path.name}")
+        raise RuntimeError(f"Failed to remove the gencost block from {case_path.name}")
 
     with tempfile.NamedTemporaryFile("w", suffix=".m", delete=False, encoding="utf-8") as handle:
         handle.write(stripped)

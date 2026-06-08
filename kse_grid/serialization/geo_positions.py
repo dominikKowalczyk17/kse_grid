@@ -1,4 +1,4 @@
-"""Obsługa pozycji geograficznych szyn i widoku mapowego."""
+"""Handling of bus geographic positions and map view."""
 
 from __future__ import annotations
 
