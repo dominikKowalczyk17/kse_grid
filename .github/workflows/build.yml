@@ -1,0 +1,77 @@
+name: Build executables
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: PowerFlow-linux
+            binary_path: dist/PowerFlow
+          - os: windows-latest
+            artifact_name: PowerFlow-windows
+            binary_path: dist/PowerFlow.exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Build executable
+        run: uv run pyinstaller PowerFlow.spec --clean
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.binary_path }}
+          retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: PowerFlow-linux
+          path: release/
+
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: PowerFlow-windows
+          path: release/
+
+      - name: Rename artifacts
+        run: |
+          mv release/PowerFlow release/PowerFlow-linux
+          chmod +x release/PowerFlow-linux
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/PowerFlow-linux
+            release/PowerFlow.exe
+          generate_release_notes: true

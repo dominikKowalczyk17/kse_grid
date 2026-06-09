@@ -56,10 +56,65 @@
     border-color: var(--primary);
 }
 
+/* ── Body (sidebar + content) ────────────────────────────── */
+.docs-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ── Left nav sidebar ────────────────────────────────────── */
+.docs-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    background: var(--card);
+    padding: 0.75rem 0;
+}
+
+.docs-nav-group {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted-foreground);
+    padding: 1rem 0 0.25rem;
+}
+
+.docs-nav-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--muted-foreground);
+    font-size: 0.82rem;
+    padding: 0.3rem 0.75rem;
+    cursor: pointer;
+    border-radius: 0;
+    transition: color 0.12s, background 0.12s;
+    font-family: var(--font-sans);
+    line-height: 1.4;
+}
+
+.docs-nav-item:hover {
+    color: var(--foreground);
+    background: var(--muted);
+}
+
+.docs-nav-item.active {
+    color: var(--primary);
+    font-weight: 600;
+    background: var(--accent-bg);
+}
+
 /* ── Scrollable content area ─────────────────────────────── */
 .docs-content {
     overflow-y: auto;
-    height: 100%;
+    flex: 1;
+    min-width: 0;
 }
 
 .docs-content-inner {
@@ -311,3 +366,25 @@
 }
 
 .docs-pagination-btn--next { margin-left: auto; }
+
+/* ── HTTP method badges ──────────────────────────────────── */
+.docs-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    padding: 0.15rem 0.45rem;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+}
+
+.docs-badge-get    { background: #1a7f4420; color: #2da44e; }
+.docs-badge-post   { background: #0969da20; color: #0969da; }
+.docs-badge-patch  { background: #9a6700220; color: #9a6700; }
+.docs-badge-delete { background: #cf222e20; color: #cf222e; }
+
+:root[data-theme="dark"] .docs-badge-get    { background: #23863620; color: #3fb950; }
+:root[data-theme="dark"] .docs-badge-post   { background: #388bfd20; color: #79c0ff; }
+:root[data-theme="dark"] .docs-badge-patch  { background: #d2992220; color: #d29922; }
+:root[data-theme="dark"] .docs-badge-delete { background: #f8514920; color: #ff7b72; }

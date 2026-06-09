@@ -1,5 +1,4 @@
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { NConfigProvider, NLayout, NLayoutSider, NLayoutContent, NMenu, NTag, darkTheme } from 'naive-ui';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import hljs from 'highlight.js';
 
 // ── Navigation tree ────────────────────────────────────────────────────────
@@ -90,45 +89,29 @@ function parseSection(hash) {
     return (m && SECTIONS.find(s => s.id === m[1])) ? m[1] : 'overview';
 }
 
-function navToMenu(nodes) {
-    return nodes.map(n => ({
-        key: n.id,
-        label: n.label,
-        ...(n.children ? { children: navToMenu(n.children) } : {}),
-    }));
-}
-
-function collectGroupIds(nodes) {
-    const ids = [];
+function flattenNav(nodes, level = 0) {
+    const out = [];
     for (const n of nodes) {
-        if (n.children) { ids.push(n.id); ids.push(...collectGroupIds(n.children)); }
+        if (n.children) {
+            out.push({ id: n.id, label: n.label, level, isGroup: true });
+            out.push(...flattenNav(n.children, level + 1));
+        } else {
+            out.push({ id: n.id, label: n.label, level, isGroup: false });
+        }
     }
-    return ids;
+    return out;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
 export const DocsPage = {
-    components: { NConfigProvider, NLayout, NLayoutSider, NLayoutContent, NMenu, NTag },
     emits: ['back'],
     setup(_, { emit }) {
         const currentSection = ref(parseSection(window.location.hash));
 
-        // ── Theme ──────────────────────────────────────────────────────────
-        const isDark = ref(document.documentElement.dataset.theme !== 'light');
-        const naiveTheme = computed(() => isDark.value ? darkTheme : null);
-
         let themeObserver;
 
-        watch(isDark, (dark) => {
-            const elDark  = document.getElementById('hljs-dark');
-            const elLight = document.getElementById('hljs-light');
-            if (elDark)  elDark.disabled  = !dark;
-            if (elLight) elLight.disabled = dark;
-        }, { immediate: true });
-
         // ── Navigation ─────────────────────────────────────────────────────
-        const menuOptions = navToMenu(NAV);
-        const expandedKeys = ref(collectGroupIds(NAV));
+        const flatNav = flattenNav(NAV);
 
         function onMenuSelect(key) { window.location.hash = `#/docs/${key}`; }
         function onHashChange()    { currentSection.value = parseSection(window.location.hash); }
@@ -157,7 +140,11 @@ export const DocsPage = {
         onMounted(() => {
             window.addEventListener('hashchange', onHashChange);
             themeObserver = new MutationObserver(() => {
-                isDark.value = document.documentElement.dataset.theme !== 'light';
+                const dark = document.documentElement.dataset.theme !== 'light';
+                const elDark  = document.getElementById('hljs-dark');
+                const elLight = document.getElementById('hljs-light');
+                if (elDark)  elDark.disabled  = !dark;
+                if (elLight) elLight.disabled = dark;
             });
             themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
             applyHljs();
@@ -169,14 +156,12 @@ export const DocsPage = {
         });
 
         return {
-            currentSection, naiveTheme,
-            menuOptions, expandedKeys, onMenuSelect,
+            currentSection, flatNav, onMenuSelect,
             goBack, prevSection, nextSection,
         };
     },
 
     template: `
-<n-config-provider :theme="naiveTheme">
 <div class="docs-shell">
 
   <!-- ── Top bar ──────────────────────────────────────────── -->
@@ -187,28 +172,17 @@ export const DocsPage = {
   </div>
 
   <!-- ── Two-column layout ────────────────────────────────── -->
-  <n-layout has-sider style="flex: 1; min-height: 0; overflow: hidden">
+  <div class="docs-body">
 
-    <n-layout-sider
-      :width="240"
-      bordered
-      :native-scrollbar="false"
-      content-style="padding: 0.75rem 0"
-    >
-      <n-menu
-        :options="menuOptions"
-        :value="currentSection"
-        :expanded-keys="expandedKeys"
-        @update:value="onMenuSelect"
-        @update:expanded-keys="expandedKeys = $event"
-        :indent="16"
-        :root-indent="16"
-      />
-    </n-layout-sider>
+    <nav class="docs-sidebar">
+      <template v-for="item in flatNav" :key="item.id">
+        <div v-if="item.isGroup" class="docs-nav-group" :style="{'padding-left': (item.level * 12 + 12) + 'px'}">{{ item.label }}</div>
+        <button v-else class="docs-nav-item" :class="{active: currentSection === item.id}" :style="{'padding-left': (item.level * 12 + 20) + 'px'}" type="button" @click="onMenuSelect(item.id)">{{ item.label }}</button>
+      </template>
+    </nav>
 
-    <n-layout-content content-style="overflow: hidden; height: 100%">
-      <div class="docs-content">
-        <div class="docs-content-inner">
+    <div class="docs-content">
+      <div class="docs-content-inner">
 
     <!-- ════════════════════════════════════ OVERVIEW ══ -->
     <template v-if="currentSection === 'overview'">
@@ -794,7 +768,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
+          <span class="docs-badge docs-badge-get">GET</span>
           <span class="docs-endpoint-url">/api/network</span>
           <span class="docs-endpoint-desc">Full network state</span>
         </div>
@@ -824,7 +798,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="primary" size="small" :bordered="false">POST</n-tag>
+          <span class="docs-badge docs-badge-post">POST</span>
           <span class="docs-endpoint-url">/api/network/upload</span>
           <span class="docs-endpoint-desc">Upload and load a network file</span>
         </div>
@@ -837,7 +811,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="primary" size="small" :bordered="false">POST</n-tag>
+          <span class="docs-badge docs-badge-post">POST</span>
           <span class="docs-endpoint-url">/api/network/new</span>
           <span class="docs-endpoint-desc">Reset to empty network</span>
         </div>
@@ -849,7 +823,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="primary" size="small" :bordered="false">POST</n-tag>
+          <span class="docs-badge docs-badge-post">POST</span>
           <span class="docs-endpoint-url">/api/topology/reset</span>
           <span class="docs-endpoint-desc">Revert all topology changes</span>
         </div>
@@ -866,7 +840,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
+          <span class="docs-badge docs-badge-get">GET</span>
           <span class="docs-endpoint-url">/api/elements/{kind}/{id}</span>
           <span class="docs-endpoint-desc">Get editable parameters</span>
         </div>
@@ -877,7 +851,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="warning" size="small" :bordered="false">PATCH</n-tag>
+          <span class="docs-badge docs-badge-patch">PATCH</span>
           <span class="docs-endpoint-url">/api/elements/{kind}/{id}</span>
           <span class="docs-endpoint-desc">Update element parameters</span>
         </div>
@@ -891,7 +865,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="primary" size="small" :bordered="false">POST</n-tag>
+          <span class="docs-badge docs-badge-post">POST</span>
           <span class="docs-endpoint-url">/api/elements/{kind}?format=pandapower</span>
           <span class="docs-endpoint-desc">Create element</span>
         </div>
@@ -905,7 +879,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="error" size="small" :bordered="false">DELETE</n-tag>
+          <span class="docs-badge docs-badge-delete">DELETE</span>
           <span class="docs-endpoint-url">/api/elements/{kind}/{id}</span>
           <span class="docs-endpoint-desc">Delete element</span>
         </div>
@@ -916,7 +890,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
+          <span class="docs-badge docs-badge-get">GET</span>
           <span class="docs-endpoint-url">/api/elements/schema</span>
           <span class="docs-endpoint-desc">Editable field schema</span>
         </div>
@@ -928,7 +902,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
+          <span class="docs-badge docs-badge-get">GET</span>
           <span class="docs-endpoint-url">/api/elements/create-schema</span>
           <span class="docs-endpoint-desc">Creation field schema</span>
         </div>
@@ -940,7 +914,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="warning" size="small" :bordered="false">PATCH</n-tag>
+          <span class="docs-badge docs-badge-patch">PATCH</span>
           <span class="docs-endpoint-url">/api/switches/{id}</span>
           <span class="docs-endpoint-desc">Toggle switch state</span>
         </div>
@@ -958,7 +932,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="primary" size="small" :bordered="false">POST</n-tag>
+          <span class="docs-badge docs-badge-post">POST</span>
           <span class="docs-endpoint-url">/api/powerflow/recalculate</span>
           <span class="docs-endpoint-desc">Re-run load flow</span>
         </div>
@@ -981,7 +955,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
+          <span class="docs-badge docs-badge-get">GET</span>
           <span class="docs-endpoint-url">/api/network/export/json</span>
           <span class="docs-endpoint-desc">Export as pandapower JSON</span>
         </div>
@@ -993,7 +967,7 @@ field_schema() -> dict[str, list[dict]]</div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
+          <span class="docs-badge docs-badge-get">GET</span>
           <span class="docs-endpoint-url">/api/network/export/matpower</span>
           <span class="docs-endpoint-desc">Export as MATPOWER .m</span>
         </div>
@@ -1441,10 +1415,9 @@ pp.to_json(net, "network_solved.json")  # save with results</code></pre>
 
         </div>
       </div>
-    </n-layout-content>
+    </div>
 
-  </n-layout>
+  </div>
 </div>
-</n-config-provider>
 `,
 };

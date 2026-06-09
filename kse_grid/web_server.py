@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import mimetypes
+import sys
 import tempfile
 import traceback
 import webbrowser
@@ -30,8 +31,16 @@ from kse_grid.topology.switching import SwitchingSession
 
 mimetypes.add_type("application/javascript", ".mjs")
 
-_WEB_DIR = Path(__file__).parent / "web"
-_DATA_DIR = Path(__file__).parent.parent / "data"
+
+def _res(*parts: str) -> Path:
+    """Resolve a resource path that works both in dev and as a PyInstaller bundle."""
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS).joinpath(*parts)  # type: ignore[attr-defined]
+    return Path(__file__).parent.parent.joinpath(*parts)
+
+
+_WEB_DIR = _res("kse_grid", "web")
+_DATA_DIR = _res("data")
 _MAX_UPLOAD_BYTES = 32 * 1024 * 1024  # 32 MiB
 
 
