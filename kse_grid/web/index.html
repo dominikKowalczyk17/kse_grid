@@ -15,6 +15,8 @@
     <link rel="stylesheet" href="/styles/grid-builder.css">
     <link rel="stylesheet" href="/styles/docs.css">
     <link rel="stylesheet" href="/vendor/fonts.css">
+    <link id="hljs-dark"  rel="stylesheet" href="/vendor/hljs-dark.min.css">
+    <link id="hljs-light" rel="stylesheet" href="/vendor/hljs-light.min.css" disabled>
     <script src="/vendor/plotly-2.35.2.min.js"></script>
     <script type="importmap">
     {
@@ -22,14 +24,11 @@
             "vue": "/vendor/vue.esm-browser.prod.js",
             "pixi.js": "/vendor/pixi.min.mjs",
             "rbush": "/vendor/rbush.mjs",
-            "naive-ui": "https://cdn.jsdelivr.net/npm/naive-ui@2.38.2/+esm"
+            "naive-ui": "/vendor/naive-ui.prod.mjs",
+            "highlight.js": "/vendor/highlight.min.js"
         }
     }
     </script>
-    <!-- Highlight.js — loaded only when docs page is open -->
-    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/build/highlight.min.js" defer></script>
-    <link id="hljs-dark"  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark-dimmed.min.css">
-    <link id="hljs-light" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" disabled>
 </head>
 <body>
     <div id="app"></div>

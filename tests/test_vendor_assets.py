@@ -21,6 +21,10 @@ REQUIRED_VENDOR_FILES = [
     "pixi.min.mjs",
     "rbush.mjs",
     "fonts.css",
+    "naive-ui.prod.mjs",
+    "highlight.min.js",
+    "hljs-dark.min.css",
+    "hljs-light.min.css",
 ]
 
 

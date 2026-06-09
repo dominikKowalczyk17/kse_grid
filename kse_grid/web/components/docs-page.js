@@ -1,5 +1,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NConfigProvider, NLayout, NLayoutSider, NLayoutContent, NMenu, NTag, darkTheme } from 'naive-ui';
+import hljs from 'highlight.js';
 
 // ── Navigation tree ────────────────────────────────────────────────────────
 const NAV = [
@@ -141,10 +142,9 @@ export const DocsPage = {
         // ── Highlight.js ───────────────────────────────────────────────────
         function applyHljs() {
             nextTick(() => {
-                if (!window.hljs) return;
-                window.hljs.configure({ ignoreUnescapedHTML: true });
+                hljs.configure({ ignoreUnescapedHTML: true });
                 document.querySelectorAll('pre.docs-pre > code:not(.hljs)').forEach(el => {
-                    window.hljs.highlightElement(el);
+                    hljs.highlightElement(el);
                 });
             });
         }
