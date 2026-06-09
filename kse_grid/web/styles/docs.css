@@ -1,21 +1,18 @@
 /* =============================================================
-   docs-page — pandapower-style reference documentation
+   docs-page — Naive UI layout + highlight.js code blocks
    ============================================================= */
 
-.docs-page {
-    display: grid;
-    grid-template-columns: 240px 1fr;
-    grid-template-rows: auto 1fr;
+/* ── Shell (full-page wrapper) ───────────────────────────── */
+.docs-shell {
+    display: flex;
+    flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    background: var(--background);
-    color: var(--foreground);
     font-family: var(--font-sans);
 }
 
 /* ── Top bar ─────────────────────────────────────────────── */
 .docs-topbar {
-    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -24,6 +21,7 @@
     border-bottom: 1px solid var(--border);
     background: var(--card);
     flex-shrink: 0;
+    z-index: 1;
 }
 
 .docs-topbar-title {
@@ -58,110 +56,82 @@
     border-color: var(--primary);
 }
 
-/* ── Sidebar nav ─────────────────────────────────────────── */
-.docs-nav {
-    overflow-y: auto;
-    border-right: 1px solid var(--border);
-    background: var(--sidebar);
-    padding: 1rem 0;
-}
-
-.docs-nav-group {
-    padding: 0 0.75rem 0.5rem;
-}
-
-.docs-nav-group-label {
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted-foreground);
-    padding: 0.5rem 0.5rem 0.25rem;
-    display: block;
-}
-
-.docs-nav-link {
-    display: block;
-    padding: 0.3rem 0.5rem;
-    font-size: 0.82rem;
-    color: var(--muted-foreground);
-    text-decoration: none;
-    border-radius: var(--radius-sm);
-    transition: color 0.12s, background 0.12s;
-}
-
-.docs-nav-link:hover {
-    color: var(--foreground);
-    background: var(--accent-soft);
-}
-
-.docs-nav-link.active {
-    color: var(--primary);
-    background: var(--primary-15);
-}
-
-/* ── Main content ────────────────────────────────────────── */
+/* ── Scrollable content area ─────────────────────────────── */
 .docs-content {
     overflow-y: auto;
+    height: 100%;
+}
+
+.docs-content-inner {
     padding: 2.5rem 3rem 4rem;
-    scroll-behavior: smooth;
+    max-width: 860px;
+    margin: 0 auto;
 }
 
-/* Generic list */
-.docs-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 1.25rem;
-}
-
-.docs-list li {
-    font-size: 0.875rem;
-    line-height: 1.7;
-    color: var(--foreground);
-    padding-left: 1rem;
-    position: relative;
-}
-
-.docs-list li::before {
-    content: '›';
-    position: absolute;
-    left: 0;
-    color: var(--primary);
-    font-weight: 700;
-}
-
-/* Prev/next pagination */
-.docs-pagination {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 3rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border);
-    gap: 1rem;
-}
-
-.docs-pagination-btn {
-    background: none;
+/* ── Code blocks (highlight.js decorated) ────────────────── */
+.docs-pre {
     border: 1px solid var(--border);
-    color: var(--muted-foreground);
-    border-radius: var(--radius-sm);
-    padding: 0.45rem 1rem;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    margin: 0.75rem 0 1.25rem;
+    padding: 0;
+    background: transparent;
+}
+
+.docs-pre > code {
+    display: block;
+    padding: 1rem 1.25rem;
+    font-family: var(--font-mono);
     font-size: 0.82rem;
-    cursor: pointer;
-    transition: color 0.15s, border-color 0.15s, background 0.15s;
-    font-family: var(--font-sans);
+    line-height: 1.6;
+    border-radius: var(--radius);
 }
 
-.docs-pagination-btn:hover {
+/* Fallback when hljs is not yet loaded */
+.docs-pre > code:not(.hljs) {
+    background: var(--muted);
     color: var(--foreground);
-    border-color: var(--primary);
-    background: var(--primary-15);
 }
 
-.docs-pagination-btn--next { margin-left: auto; }
+/* Override hljs background to transparent so our border shows correctly */
+.docs-pre > code.hljs {
+    background: transparent;
+}
 
-/* Headings */
+/* Override hljs background colour per theme */
+:root[data-theme="dark"] .docs-pre {
+    background: #22272e;
+}
+:root[data-theme="light"] .docs-pre {
+    background: #f6f8fa;
+}
+
+/* ── Inline code ─────────────────────────────────────────── */
+.docs-code {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    background: var(--muted);
+    border: 1px solid var(--border);
+    padding: 0.1rem 0.35rem;
+    border-radius: var(--radius-sm);
+    color: var(--primary);
+}
+
+/* ── Method signature blocks ─────────────────────────────── */
+.docs-signature {
+    background: var(--accent-bg);
+    border-left: 3px solid var(--primary);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--foreground);
+    margin: 1rem 0 0.5rem;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+/* ── Headings ────────────────────────────────────────────── */
 .docs-h1 {
     font-size: 1.75rem;
     font-weight: 700;
@@ -198,45 +168,30 @@
     margin: 0 0 0.85rem;
 }
 
-/* Code blocks */
-.docs-pre {
-    background: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1rem 1.25rem;
-    overflow-x: auto;
-    margin: 0.75rem 0 1.25rem;
-    font-family: var(--font-mono);
-    font-size: 0.82rem;
-    line-height: 1.6;
-    color: var(--foreground);
+/* ── Generic list ────────────────────────────────────────── */
+.docs-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.25rem;
 }
 
-.docs-code {
-    font-family: var(--font-mono);
-    font-size: 0.82rem;
-    background: var(--muted);
-    border: 1px solid var(--border);
-    padding: 0.1rem 0.35rem;
-    border-radius: var(--radius-sm);
+.docs-list li {
+    font-size: 0.875rem;
+    line-height: 1.7;
+    color: var(--foreground);
+    padding-left: 1rem;
+    position: relative;
+}
+
+.docs-list li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
     color: var(--primary);
+    font-weight: 700;
 }
 
-/* Method signature blocks */
-.docs-signature {
-    background: var(--accent-bg);
-    border-left: 3px solid var(--primary);
-    border-radius: 0 var(--radius) var(--radius) 0;
-    padding: 0.75rem 1rem;
-    font-family: var(--font-mono);
-    font-size: 0.82rem;
-    color: var(--foreground);
-    margin: 1rem 0 0.5rem;
-    overflow-x: auto;
-    white-space: pre;
-}
-
-/* Parameter tables */
+/* ── Parameter tables ────────────────────────────────────── */
 .docs-table {
     width: 100%;
     border-collapse: collapse;
@@ -262,9 +217,7 @@
     line-height: 1.5;
 }
 
-.docs-table tr:last-child td {
-    border-bottom: none;
-}
+.docs-table tr:last-child td { border-bottom: none; }
 
 .docs-table td:first-child {
     font-family: var(--font-mono);
@@ -277,29 +230,14 @@
     white-space: nowrap;
 }
 
-/* HTTP method badges */
-.docs-method {
-    display: inline-block;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 0.15rem 0.45rem;
-    border-radius: var(--radius-sm);
-    margin-right: 0.4rem;
-}
-
-.docs-method.get    { background: oklch(0.35 0.08 145 / 0.5); color: var(--good); }
-.docs-method.post   { background: oklch(0.35 0.08 220 / 0.5); color: var(--primary); }
-.docs-method.patch  { background: oklch(0.35 0.08 85 / 0.5);  color: var(--warn); }
-.docs-method.delete { background: oklch(0.35 0.08 25 / 0.5);  color: var(--bad); }
-
+/* ── Endpoint URL label ──────────────────────────────────── */
 .docs-endpoint-url {
     font-family: var(--font-mono);
     font-size: 0.85rem;
     color: var(--foreground);
 }
 
-/* Endpoint cards */
+/* ── Endpoint cards ──────────────────────────────────────── */
 .docs-endpoint {
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -329,11 +267,9 @@
     line-height: 1.6;
 }
 
-.docs-endpoint-body .docs-pre {
-    margin: 0.5rem 0 0;
-}
+.docs-endpoint-body .docs-pre { margin: 0.5rem 0 0; }
 
-/* Note / info boxes */
+/* ── Note / info boxes ───────────────────────────────────── */
 .docs-note {
     background: var(--primary-15);
     border-left: 3px solid var(--primary);
@@ -345,47 +281,33 @@
     margin: 1rem 0;
 }
 
-/* Feature list */
-.docs-feature-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 1.25rem;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.4rem 1.5rem;
+/* ── Prev / next pagination ──────────────────────────────── */
+.docs-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    gap: 1rem;
 }
 
-.docs-feature-list li {
-    font-size: 0.875rem;
-    line-height: 1.5;
+.docs-pagination-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted-foreground);
+    border-radius: var(--radius-sm);
+    padding: 0.45rem 1rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    font-family: var(--font-sans);
+}
+
+.docs-pagination-btn:hover {
     color: var(--foreground);
-    padding-left: 1rem;
-    position: relative;
+    border-color: var(--primary);
+    background: var(--primary-15);
 }
 
-.docs-feature-list li::before {
-    content: '›';
-    position: absolute;
-    left: 0;
-    color: var(--primary);
-    font-weight: 700;
-}
-
-/* Responsive: collapse sidebar on narrow viewports */
-@media (max-width: 860px) {
-    .docs-page {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto 1fr;
-    }
-
-    .docs-nav {
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-        max-height: 40vh;
-        overflow-y: auto;
-    }
-
-    .docs-content {
-        padding: 1.5rem 1.25rem 3rem;
-    }
-}
+.docs-pagination-btn--next { margin-left: auto; }

@@ -10,4 +10,6 @@ learning/
 .obsidian/
 obsidian-vault/
 .claude/
+data/*.m
+data/examples/
 

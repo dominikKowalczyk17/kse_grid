@@ -63,7 +63,7 @@ def serialize_network(
     geo_view = _compute_geo_view(geo_positions) if geo_positions else None
 
     return {
-        "name": getattr(net, "name", None) or "Sieć elektroenergetyczna",
+        "name": getattr(net, "name", None) or "Power network",
         "isEmpty": net.bus.empty,
         "hasResults": has_bus_results,
         "voltageLevels": voltage_levels,

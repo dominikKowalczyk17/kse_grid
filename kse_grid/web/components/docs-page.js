@@ -1,7 +1,7 @@
-import { onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { NConfigProvider, NLayout, NLayoutSider, NLayoutContent, NMenu, NTag, darkTheme } from 'naive-ui';
 
 // ── Navigation tree ────────────────────────────────────────────────────────
-// Each node: { id, label } = leaf page | { id, label, children } = collapsible group
 const NAV = [
     {
         id: 'getting-started', label: 'Getting started',
@@ -84,80 +84,100 @@ function getLeaves(nodes) {
 }
 const SECTIONS = getLeaves(NAV);
 
-// For each leaf id, find its ancestor chain
-function buildAncestors(nodes, target, path = []) {
-    for (const n of nodes) {
-        const next = [...path, n.id];
-        if (n.id === target) return next;
-        if (n.children) {
-            const found = buildAncestors(n.children, target, next);
-            if (found) return found;
-        }
-    }
-    return null;
-}
-
 function parseSection(hash) {
     const m = hash.match(/^#\/docs\/(.+)$/);
     return (m && SECTIONS.find(s => s.id === m[1])) ? m[1] : 'overview';
 }
 
+function navToMenu(nodes) {
+    return nodes.map(n => ({
+        key: n.id,
+        label: n.label,
+        ...(n.children ? { children: navToMenu(n.children) } : {}),
+    }));
+}
+
+function collectGroupIds(nodes) {
+    const ids = [];
+    for (const n of nodes) {
+        if (n.children) { ids.push(n.id); ids.push(...collectGroupIds(n.children)); }
+    }
+    return ids;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export const DocsPage = {
+    components: { NConfigProvider, NLayout, NLayoutSider, NLayoutContent, NMenu, NTag },
     emits: ['back'],
     setup(_, { emit }) {
         const currentSection = ref(parseSection(window.location.hash));
 
-        // All group IDs expanded by default
-        const allGroupIds = [];
-        function collectGroupIds(nodes) {
-            for (const n of nodes) {
-                if (n.children) { allGroupIds.push(n.id); collectGroupIds(n.children); }
-            }
-        }
-        collectGroupIds(NAV);
-        const openNodes = ref(new Set(allGroupIds));
+        // ── Theme ──────────────────────────────────────────────────────────
+        const isDark = ref(document.documentElement.dataset.theme !== 'light');
+        const naiveTheme = computed(() => isDark.value ? darkTheme : null);
 
-        function toggle(id) {
-            const next = new Set(openNodes.value);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            openNodes.value = next;
-        }
+        let themeObserver;
 
-        function isOpen(id) { return openNodes.value.has(id); }
+        watch(isDark, (dark) => {
+            const elDark  = document.getElementById('hljs-dark');
+            const elLight = document.getElementById('hljs-light');
+            if (elDark)  elDark.disabled  = !dark;
+            if (elLight) elLight.disabled = dark;
+        }, { immediate: true });
 
-        function navigate(id) { window.location.hash = `#/docs/${id}`; }
+        // ── Navigation ─────────────────────────────────────────────────────
+        const menuOptions = navToMenu(NAV);
+        const expandedKeys = ref(collectGroupIds(NAV));
 
-        function goBack() { window.location.hash = ''; emit('back'); }
+        function onMenuSelect(key) { window.location.hash = `#/docs/${key}`; }
+        function onHashChange()    { currentSection.value = parseSection(window.location.hash); }
+        function goBack()          { window.location.hash = ''; emit('back'); }
 
-        function onHashChange() { currentSection.value = parseSection(window.location.hash); }
-
-        // Ensure ancestor groups of active section are always open
-        watchEffect(() => {
-            const ancestors = buildAncestors(NAV, currentSection.value);
-            if (!ancestors) return;
-            const next = new Set(openNodes.value);
-            for (const id of ancestors) next.add(id);
-            openNodes.value = next;
-        });
-
-        watch(currentSection, () => {
-            document.querySelector('.docs-content')?.scrollTo({ top: 0, behavior: 'instant' });
-        });
-
-        onMounted(() => window.addEventListener('hashchange', onHashChange));
-        onBeforeUnmount(() => window.removeEventListener('hashchange', onHashChange));
-
+        // ── Pagination ─────────────────────────────────────────────────────
         const sIdx = () => SECTIONS.findIndex(s => s.id === currentSection.value);
         function prevSection() { const i = sIdx(); return i > 0 ? SECTIONS[i - 1] : null; }
         function nextSection() { const i = sIdx(); return i < SECTIONS.length - 1 ? SECTIONS[i + 1] : null; }
 
-        return { currentSection, openNodes, toggle, isOpen, navigate, goBack, prevSection, nextSection, NAV };
+        // ── Highlight.js ───────────────────────────────────────────────────
+        function applyHljs() {
+            nextTick(() => {
+                if (!window.hljs) return;
+                window.hljs.configure({ ignoreUnescapedHTML: true });
+                document.querySelectorAll('pre.docs-pre > code:not(.hljs)').forEach(el => {
+                    window.hljs.highlightElement(el);
+                });
+            });
+        }
+
+        watch(currentSection, async () => {
+            document.querySelector('.docs-content')?.scrollTo({ top: 0, behavior: 'instant' });
+            applyHljs();
+        });
+
+        onMounted(() => {
+            window.addEventListener('hashchange', onHashChange);
+            themeObserver = new MutationObserver(() => {
+                isDark.value = document.documentElement.dataset.theme !== 'light';
+            });
+            themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+            applyHljs();
+        });
+
+        onBeforeUnmount(() => {
+            window.removeEventListener('hashchange', onHashChange);
+            themeObserver?.disconnect();
+        });
+
+        return {
+            currentSection, naiveTheme,
+            menuOptions, expandedKeys, onMenuSelect,
+            goBack, prevSection, nextSection,
+        };
     },
 
     template: `
-<div class="docs-page">
+<n-config-provider :theme="naiveTheme">
+<div class="docs-shell">
 
   <!-- ── Top bar ──────────────────────────────────────────── -->
   <div class="docs-topbar">
@@ -166,46 +186,29 @@ export const DocsPage = {
     <button class="docs-back-btn" type="button" @click="goBack">← Back to app</button>
   </div>
 
-  <!-- ── Sidebar ──────────────────────────────────────────── -->
-  <nav class="docs-nav" aria-label="Documentation navigation">
-    <template v-for="group in NAV" :key="group.id">
-      <div class="docs-nav-group">
-        <button class="docs-nav-group-header" type="button" @click="toggle(group.id)">
-          <span class="docs-nav-arrow" :class="{ open: isOpen(group.id) }">▸</span>
-          {{ group.label }}
-        </button>
-        <div v-if="isOpen(group.id)" class="docs-nav-group-body">
-          <template v-for="child in group.children" :key="child.id">
-            <!-- Sub-group (has children) -->
-            <template v-if="child.children">
-              <button class="docs-nav-subgroup-header" type="button" @click="toggle(child.id)">
-                <span class="docs-nav-arrow" :class="{ open: isOpen(child.id) }">▸</span>
-                {{ child.label }}
-              </button>
-              <div v-if="isOpen(child.id)" class="docs-nav-subgroup-body">
-                <a
-                  v-for="leaf in child.children" :key="leaf.id"
-                  class="docs-nav-link docs-nav-link--deep"
-                  :class="{ active: currentSection === leaf.id }"
-                  href="#" @click.prevent="navigate(leaf.id)"
-                >{{ leaf.label }}</a>
-              </div>
-            </template>
-            <!-- Leaf page -->
-            <a
-              v-else
-              class="docs-nav-link"
-              :class="{ active: currentSection === child.id }"
-              href="#" @click.prevent="navigate(child.id)"
-            >{{ child.label }}</a>
-          </template>
-        </div>
-      </div>
-    </template>
-  </nav>
+  <!-- ── Two-column layout ────────────────────────────────── -->
+  <n-layout has-sider style="flex: 1; min-height: 0; overflow: hidden">
 
-  <!-- ── Content ──────────────────────────────────────────── -->
-  <main class="docs-content">
+    <n-layout-sider
+      :width="240"
+      bordered
+      :native-scrollbar="false"
+      content-style="padding: 0.75rem 0"
+    >
+      <n-menu
+        :options="menuOptions"
+        :value="currentSection"
+        :expanded-keys="expandedKeys"
+        @update:value="onMenuSelect"
+        @update:expanded-keys="expandedKeys = $event"
+        :indent="16"
+        :root-indent="16"
+      />
+    </n-layout-sider>
+
+    <n-layout-content content-style="overflow: hidden; height: 100%">
+      <div class="docs-content">
+        <div class="docs-content-inner">
 
     <!-- ════════════════════════════════════ OVERVIEW ══ -->
     <template v-if="currentSection === 'overview'">
@@ -267,19 +270,19 @@ export const DocsPage = {
       </ul>
 
       <h2 class="docs-h2">Installation</h2>
-      <pre class="docs-pre">git clone https://github.com/your-org/kse-grid.git
+      <pre class="docs-pre"><code class="language-bash">git clone https://github.com/your-org/kse-grid.git
 cd kse-grid
 uv sync          # install all dependencies from pyproject.toml
 
 # Or with pip
-pip install -e .</pre>
+pip install -e .</code></pre>
 
       <h2 class="docs-h2">CLI</h2>
       <p class="docs-p">
         The entry point is <code class="docs-code">main.py</code> in the project root.
         Pass a path to a case file as the only positional argument.
       </p>
-      <pre class="docs-pre"># Open a MATPOWER case
+      <pre class="docs-pre"><code class="language-bash"># Open a MATPOWER case
 uv run python main.py path/to/case.m
 
 # Open a pandapower JSON file
@@ -288,10 +291,10 @@ uv run python main.py path/to/network.json
 # Start with an empty grid (Grid Builder mode)
 uv run python main.py
 
-# Server starts at http://127.0.0.1:8050/ and opens the browser automatically</pre>
+# Server starts at http://127.0.0.1:8050/ and opens the browser automatically</code></pre>
 
       <h2 class="docs-h2">Python API — minimal example</h2>
-      <pre class="docs-pre">import kse_grid
+      <pre class="docs-pre"><code class="language-python">import kse_grid
 
 # One-liner: load → solve → open browser
 kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow().serve()
@@ -300,19 +303,19 @@ kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow().serve()
 grid = kse_grid.KSEGrid.from_matpower_case("case.m")
 grid.run_powerflow(algorithm="nr", tolerance_mva=1e-3)
 grid.report()    # print summary to terminal
-grid.serve()     # blocks until Ctrl+C</pre>
+grid.serve()     # blocks until Ctrl+C</code></pre>
 
       <h2 class="docs-h2">Accessing pandapower results</h2>
-      <pre class="docs-pre">grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
+      <pre class="docs-pre"><code class="language-python">grid = kse_grid.KSEGrid.from_matpower_case("case.m").run_powerflow()
 net = grid.net   # pandapower.pandapowerNet
 
 # Standard pandapower result tables
 print(net.res_bus[["vm_pu", "va_degree"]].head())
 print(net.res_line[["p_from_mw", "loading_percent"]].describe())
-print(net.res_trafo[["loading_percent"]].max())</pre>
+print(net.res_trafo[["loading_percent"]].max())</code></pre>
 
       <h2 class="docs-h2">Using data from the examples directory</h2>
-      <pre class="docs-pre">uv run python main.py data/examples/sse_summer_peak.m</pre>
+      <pre class="docs-pre"><code class="language-bash">uv run python main.py data/examples/sse_summer_peak.m</code></pre>
     </template>
 
     <!-- ════════════════════════════════════ API: KSEGrid ══ -->
@@ -323,11 +326,11 @@ print(net.res_trafo[["loading_percent"]].max())</pre>
         terminal reporting and the web dashboard into a single chainable API.
         This is the primary entry point for interactive use.
       </p>
-      <pre class="docs-pre">from kse_grid import KSEGrid
+      <pre class="docs-pre"><code class="language-python">from kse_grid import KSEGrid
 
 # or via the package namespace
 import kse_grid
-grid = kse_grid.KSEGrid.from_matpower_case("case.m")</pre>
+grid = kse_grid.KSEGrid.from_matpower_case("case.m")</code></pre>
 
       <div class="docs-note">
         <strong>Note:</strong> <code class="docs-code">KSEGrid</code> does not subclass
@@ -367,9 +370,9 @@ from_matpower_case(
       <p class="docs-p"><strong>Returns:</strong> a new <code class="docs-code">KSEGrid</code> instance with <code class="docs-code">.net</code> populated.</p>
       <p class="docs-p"><strong>Raises:</strong> <code class="docs-code">FileNotFoundError</code> if <code class="docs-code">case_file</code> does not exist;
       various <code class="docs-code">matpowercaseframes</code> / pandapower exceptions if the file is malformed.</p>
-      <pre class="docs-pre">grid = KSEGrid.from_matpower_case("data/examples/sse.m", f_hz=50)
+      <pre class="docs-pre"><code class="language-python">grid = KSEGrid.from_matpower_case("data/examples/sse.m", f_hz=50)
 # Loaded: SSE Summer Peak
-#    Buses: 83, lines: 97, trafos: 12</pre>
+#    Buses: 83, lines: 97, trafos: 12</code></pre>
 
       <!-- new_empty -->
       <h2 class="docs-h2">KSEGrid.new_empty()</h2>
@@ -387,7 +390,7 @@ new_empty(f_hz: int = 50) -> KSEGrid</div>
           <tr><td>f_hz</td><td>int</td><td>50</td><td>System frequency used for all subsequent calculations.</td></tr>
         </tbody>
       </table>
-      <pre class="docs-pre">import pandapower as pp
+      <pre class="docs-pre"><code class="language-python">import pandapower as pp
 
 grid = KSEGrid.new_empty()
 pp.create_bus(grid.net, vn_kv=400, name="Bus A")
@@ -398,7 +401,7 @@ pp.create_line_from_parameters(
     length_km=100, r_ohm_per_km=0.03, x_ohm_per_km=0.3,
     c_nf_per_km=10, max_i_ka=1.0
 )
-grid.run_powerflow().serve()</pre>
+grid.run_powerflow().serve()</code></pre>
 
       <!-- run_powerflow -->
       <h2 class="docs-h2">grid.run_powerflow()</h2>
@@ -443,14 +446,14 @@ grid.run_powerflow().serve()</pre>
       </table>
       <p class="docs-p"><strong>Returns:</strong> <code class="docs-code">self</code> (for chaining).</p>
       <p class="docs-p"><strong>Raises:</strong> <code class="docs-code">RuntimeError</code> if called before a network is loaded.</p>
-      <pre class="docs-pre"># Chained usage
+      <pre class="docs-pre"><code class="language-python"># Chained usage
 grid = KSEGrid.from_matpower_case("case.m").run_powerflow()
 
 # With custom parameters
 grid.run_powerflow(algorithm="nr", max_iteration=50, tolerance_mva=1e-4)
 
 # Check convergence on net directly
-print(grid.net.converged)  # True / False</pre>
+print(grid.net.converged)  # True / False</code></pre>
 
       <!-- report -->
       <h2 class="docs-h2">grid.report()</h2>
@@ -473,7 +476,7 @@ print(grid.net.converged)  # True / False</pre>
       </table>
       <p class="docs-p">After the table sections, <code class="docs-code">report()</code> also
       calls <code class="docs-code">voltage_violations()</code> and prints up to 20 buses outside ±5 % Un.</p>
-      <pre class="docs-pre">grid.run_powerflow().report()
+      <pre class="docs-pre"><code class="language-python">grid.run_powerflow().report()
 # ═══════════════════════════════════════════════════════════════════
 #   Network model – SSE Summer Peak
 # ═══════════════════════════════════════════════════════════════════
@@ -482,7 +485,7 @@ print(grid.net.converged)  # True / False</pre>
 #    Import/Slack:       312.7 MW
 #    Load:              4480.1 MW
 #    Losses:              42.9 MW
-# ...</pre>
+# ...</code></pre>
 
       <!-- serve -->
       <h2 class="docs-h2">grid.serve()</h2>
@@ -519,7 +522,7 @@ print(grid.net.converged)  # True / False</pre>
 
       <!-- Full example -->
       <h2 class="docs-h2">Full example</h2>
-      <pre class="docs-pre">import kse_grid, pandapower as pp
+      <pre class="docs-pre"><code class="language-python">import kse_grid, pandapower as pp
 
 # Load, solve, report, serve
 grid = (
@@ -539,7 +542,7 @@ net.load.at[0, "p_mw"] *= 1.10   # increase load at bus 0 by 10 %
 pp.runpp(net)
 print(f"Losses after increase: {net.res_line.pl_mw.sum():.1f} MW")
 
-grid.serve(port=8050)</pre>
+grid.serve(port=8050)</code></pre>
     </template>
 
     <!-- ════════════════════════════════════ API: PowerFlowRunner ══ -->
@@ -551,7 +554,7 @@ grid.serve(port=8050)</pre>
         don't need the full <code class="docs-code">KSEGrid</code> pipeline, or when you want to
         access convergence results programmatically.
       </p>
-      <pre class="docs-pre">from kse_grid import PowerFlowRunner
+      <pre class="docs-pre"><code class="language-python">from kse_grid import PowerFlowRunner
 import pandapower as pp
 
 net = pp.from_json("network.json")
@@ -560,7 +563,7 @@ runner = PowerFlowRunner(net)
 if runner.run():
     runner.summary()
     violations = runner.voltage_violations()
-    print(f"{len(violations)} buses outside ±5 % Un")</pre>
+    print(f"{len(violations)} buses outside ±5 % Un")</code></pre>
 
       <h2 class="docs-h2">PowerFlowRunner(net)</h2>
       <div class="docs-signature">__init__(net: pandapowerNet) -> None</div>
@@ -599,10 +602,10 @@ if runner.run():
           <tr><td>vn_kv</td><td>float</td><td>Nominal voltage in kV.</td></tr>
         </tbody>
       </table>
-      <pre class="docs-pre">violations = runner.voltage_violations()
+      <pre class="docs-pre"><code class="language-python">violations = runner.voltage_violations()
 if not violations.empty:
     print(violations.sort_values("vm_pu"))
-    # Index = bus id, vm_pu column shows the violating voltage</pre>
+    # Index = bus id, vm_pu column shows the violating voltage</code></pre>
     </template>
 
     <!-- ════════════════════════════════════ API: SwitchingSession ══ -->
@@ -632,10 +635,10 @@ if not violations.empty:
         Results are cleared after each change and re-computed only on an explicit
         <code class="docs-code">recalculate()</code> call.
       </div>
-      <pre class="docs-pre">from kse_grid import SwitchingSession, load_matpower_case
+      <pre class="docs-pre"><code class="language-python">from kse_grid import SwitchingSession, load_matpower_case
 
 net = load_matpower_case("case.m")
-session = SwitchingSession(net)</pre>
+session = SwitchingSession(net)</code></pre>
 
       <!-- build_payload -->
       <h2 class="docs-h2">session.build_payload()</h2>
@@ -650,8 +653,8 @@ session = SwitchingSession(net)</pre>
       <div class="docs-signature">get_element_params(kind: str, element_id: int) -> dict</div>
       <p class="docs-p">Return current editable parameters for one element, formatted
       for the frontend edit form (field name, label, type, current value, unit, allowed options).</p>
-      <pre class="docs-pre">params = session.get_element_params("line", 0)
-# {"fields": [{"name": "max_i_ka", "label": "I max", "type": "float", ...}, ...]}</pre>
+      <pre class="docs-pre"><code class="language-python">params = session.get_element_params("line", 0)
+# {"fields": [{"name": "max_i_ka", "label": "I max", "type": "float", ...}, ...]}</code></pre>
 
       <!-- update_element -->
       <h2 class="docs-h2">session.update_element()</h2>
@@ -663,8 +666,8 @@ session = SwitchingSession(net)</pre>
       <p class="docs-p">Stage a parameter change. Clears load flow results and sets the pending-recalc flag.
       Returns a slim topology-update payload that includes a <code class="docs-code">changedElement</code>
       key so the frontend can patch its local state without a full reload.</p>
-      <pre class="docs-pre">update = session.update_element("line", 0, {"max_i_ka": 1.5, "name": "Line 400A"})
-# Returns: {"topology": {..., "pendingRecalc": True}, "changedElement": {...}}</pre>
+      <pre class="docs-pre"><code class="language-python">update = session.update_element("line", 0, {"max_i_ka": 1.5, "name": "Line 400A"})
+# Returns: {"topology": {..., "pendingRecalc": True}, "changedElement": {...}}</code></pre>
 
       <!-- create_element -->
       <h2 class="docs-h2">session.create_element()</h2>
@@ -688,16 +691,22 @@ session = SwitchingSession(net)</pre>
       <div class="docs-signature">set_switch_state(switch_id: int, closed: bool) -> dict</div>
       <p class="docs-p">Open or close a single switch. Clears load flow results and sets the pending-recalc flag.
       Returns a slim topology-update payload.</p>
-      <pre class="docs-pre">update = session.set_switch_state(3, closed=False)  # open switch #3</pre>
+      <pre class="docs-pre"><code class="language-python">update = session.set_switch_state(3, closed=False)  # open switch #3</code></pre>
 
       <!-- recalculate -->
       <h2 class="docs-h2">session.recalculate()</h2>
       <div class="docs-signature">recalculate() -> dict</div>
       <p class="docs-p">Run load flow on the current working network. Uses the same algorithm / tolerance /
-      iteration limit as the initial run (stored at construction time). Returns a slim topology-update payload
-      with fresh load flow results. If convergence fails, <code class="docs-code">pendingRecalc</code> stays
-      <code class="docs-code">True</code> and <code class="docs-code">lastRunSucceeded</code> is
-      <code class="docs-code">False</code>.</p>
+      max_iteration stored from the last <code class="docs-code">run_powerflow()</code> call.
+      Returns the full updated network payload.</p>
+
+      <!-- is_pending -->
+      <h2 class="docs-h2">session.is_pending()</h2>
+      <div class="docs-signature">is_pending() -> bool</div>
+      <p class="docs-p">Return <code class="docs-code">True</code> if any topology change has been staged
+      since the last load flow run, meaning the displayed results may be stale.
+      The frontend uses this flag to show the "pending recalc" indicator in the header.
+      Returns <code class="docs-code">False</code>.</p>
 
       <!-- reset -->
       <h2 class="docs-h2">session.reset()</h2>
@@ -777,34 +786,21 @@ field_schema() -> dict[str, list[dict]]</div>
       </table>
       <p class="docs-p"><strong>Returns:</strong> a fully-populated <code class="docs-code">pandapowerNet</code>.
       <code class="docs-code">net.bus_geodata</code> is populated if a sidecar was found.</p>
-
-      <h2 class="docs-h2">Example</h2>
-      <pre class="docs-pre">from kse_grid import load_matpower_case
-import pandapower as pp
-
-net = load_matpower_case("case.m")
-print(net.bus.head())
-print(net.line.head())
-
-# Run load flow with pandapower directly
-pp.runpp(net, algorithm="nr")
-print(net.res_bus[["vm_pu"]].describe())</pre>
     </template>
 
     <!-- ════════════════════════════════════ REST: Network ══ -->
     <template v-else-if="currentSection === 'rest-network'">
       <h1 class="docs-h1">REST API — Network</h1>
-      <p class="docs-lead">Base URL: <code class="docs-code">http://127.0.0.1:8050/api</code></p>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method get">GET</span>
+          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
           <span class="docs-endpoint-url">/api/network</span>
           <span class="docs-endpoint-desc">Full network state</span>
         </div>
         <div class="docs-endpoint-body">
           <p class="docs-p">Returns the complete serialised network payload. This is the same object the frontend fetches on startup.</p>
-          <pre class="docs-pre">curl http://127.0.0.1:8050/api/network</pre>
+          <pre class="docs-pre"><code class="language-bash">curl http://127.0.0.1:8050/api/network</code></pre>
           <table class="docs-table">
             <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
             <tbody>
@@ -828,38 +824,38 @@ print(net.res_bus[["vm_pu"]].describe())</pre>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method post">POST</span>
+          <n-tag type="primary" size="small" :bordered="false">POST</n-tag>
           <span class="docs-endpoint-url">/api/network/upload</span>
           <span class="docs-endpoint-desc">Upload and load a network file</span>
         </div>
         <div class="docs-endpoint-body">
           <p class="docs-p">Upload a <code class="docs-code">.m</code> (MATPOWER) or <code class="docs-code">.json</code> (pandapower JSON) file. Format is auto-detected from content. On success, creates a new session and returns the full network payload.</p>
-          <pre class="docs-pre">curl -X POST http://127.0.0.1:8050/api/network/upload \
-  -F "file=@path/to/case.m"</pre>
+          <pre class="docs-pre"><code class="language-bash">curl -X POST http://127.0.0.1:8050/api/network/upload \
+  -F "file=@path/to/case.m"</code></pre>
         </div>
       </div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method post">POST</span>
+          <n-tag type="primary" size="small" :bordered="false">POST</n-tag>
           <span class="docs-endpoint-url">/api/network/new</span>
           <span class="docs-endpoint-desc">Reset to empty network</span>
         </div>
         <div class="docs-endpoint-body">
           <p class="docs-p">Discards the current session and creates a fresh empty network. Returns the full network payload (isEmpty: true).</p>
-          <pre class="docs-pre">curl -X POST http://127.0.0.1:8050/api/network/new</pre>
+          <pre class="docs-pre"><code class="language-bash">curl -X POST http://127.0.0.1:8050/api/network/new</code></pre>
         </div>
       </div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method post">POST</span>
+          <n-tag type="primary" size="small" :bordered="false">POST</n-tag>
           <span class="docs-endpoint-url">/api/topology/reset</span>
           <span class="docs-endpoint-desc">Revert all topology changes</span>
         </div>
         <div class="docs-endpoint-body">
           <p class="docs-p">Restores the working network to the baseline state (reverting switch changes and parameter edits since the last create/delete) and re-runs load flow. Returns full payload.</p>
-          <pre class="docs-pre">curl -X POST http://127.0.0.1:8050/api/topology/reset</pre>
+          <pre class="docs-pre"><code class="language-bash">curl -X POST http://127.0.0.1:8050/api/topology/reset</code></pre>
         </div>
       </div>
     </template>
@@ -870,88 +866,88 @@ print(net.res_bus[["vm_pu"]].describe())</pre>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method get">GET</span>
+          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
           <span class="docs-endpoint-url">/api/elements/{kind}/{id}</span>
           <span class="docs-endpoint-desc">Get editable parameters</span>
         </div>
         <div class="docs-endpoint-body">
-          <pre class="docs-pre">curl http://127.0.0.1:8050/api/elements/line/0</pre>
+          <pre class="docs-pre"><code class="language-bash">curl http://127.0.0.1:8050/api/elements/line/0</code></pre>
         </div>
       </div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method patch">PATCH</span>
+          <n-tag type="warning" size="small" :bordered="false">PATCH</n-tag>
           <span class="docs-endpoint-url">/api/elements/{kind}/{id}</span>
           <span class="docs-endpoint-desc">Update element parameters</span>
         </div>
         <div class="docs-endpoint-body">
           <p class="docs-p">Body: <code class="docs-code">{"fields": {"column_name": value, …}}</code>. Marks load flow as pending.</p>
-          <pre class="docs-pre">curl -X PATCH http://127.0.0.1:8050/api/elements/line/0 \
+          <pre class="docs-pre"><code class="language-bash">curl -X PATCH http://127.0.0.1:8050/api/elements/line/0 \
   -H "Content-Type: application/json" \
-  -d '{"fields": {"max_i_ka": 1.2, "name": "Line 400 kV NW"}}'</pre>
+  -d '{"fields": {"max_i_ka": 1.2, "name": "Line 400 kV NW"}}'</code></pre>
         </div>
       </div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method post">POST</span>
+          <n-tag type="primary" size="small" :bordered="false">POST</n-tag>
           <span class="docs-endpoint-url">/api/elements/{kind}?format=pandapower</span>
           <span class="docs-endpoint-desc">Create element</span>
         </div>
         <div class="docs-endpoint-body">
           <p class="docs-p"><code class="docs-code">format</code> query param: <code class="docs-code">pandapower</code> (default) or <code class="docs-code">matpower</code>.</p>
-          <pre class="docs-pre">curl -X POST "http://127.0.0.1:8050/api/elements/bus?format=pandapower" \
+          <pre class="docs-pre"><code class="language-bash">curl -X POST "http://127.0.0.1:8050/api/elements/bus?format=pandapower" \
   -H "Content-Type: application/json" \
-  -d '{"fields": {"name": "Bus 400 kV", "vn_kv": 400, "type": "b"}}'</pre>
+  -d '{"fields": {"name": "Bus 400 kV", "vn_kv": 400, "type": "b"}}'</code></pre>
         </div>
       </div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method delete">DELETE</span>
+          <n-tag type="error" size="small" :bordered="false">DELETE</n-tag>
           <span class="docs-endpoint-url">/api/elements/{kind}/{id}</span>
           <span class="docs-endpoint-desc">Delete element</span>
         </div>
         <div class="docs-endpoint-body">
-          <pre class="docs-pre">curl -X DELETE http://127.0.0.1:8050/api/elements/load/2</pre>
+          <pre class="docs-pre"><code class="language-bash">curl -X DELETE http://127.0.0.1:8050/api/elements/load/2</code></pre>
         </div>
       </div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method get">GET</span>
+          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
           <span class="docs-endpoint-url">/api/elements/schema</span>
           <span class="docs-endpoint-desc">Editable field schema</span>
         </div>
         <div class="docs-endpoint-body">
           <p class="docs-p">Returns the complete editable-field schema for every element kind. Used by the element inspector to build forms.</p>
-          <pre class="docs-pre">curl http://127.0.0.1:8050/api/elements/schema</pre>
+          <pre class="docs-pre"><code class="language-bash">curl http://127.0.0.1:8050/api/elements/schema</code></pre>
         </div>
       </div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method get">GET</span>
+          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
           <span class="docs-endpoint-url">/api/elements/create-schema</span>
           <span class="docs-endpoint-desc">Creation field schema</span>
         </div>
         <div class="docs-endpoint-body">
           <p class="docs-p">Returns required and optional fields for creating each element type, in both pandapower and MATPOWER format variants. Used by Grid Builder.</p>
-          <pre class="docs-pre">curl http://127.0.0.1:8050/api/elements/create-schema</pre>
+          <pre class="docs-pre"><code class="language-bash">curl http://127.0.0.1:8050/api/elements/create-schema</code></pre>
         </div>
       </div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method patch">PATCH</span>
+          <n-tag type="warning" size="small" :bordered="false">PATCH</n-tag>
           <span class="docs-endpoint-url">/api/switches/{id}</span>
           <span class="docs-endpoint-desc">Toggle switch state</span>
         </div>
         <div class="docs-endpoint-body">
-          <pre class="docs-pre">curl -X PATCH http://127.0.0.1:8050/api/switches/0 \
+          <pre class="docs-pre"><code class="language-bash">curl -X PATCH http://127.0.0.1:8050/api/switches/0 \
   -H "Content-Type: application/json" \
-  -d '{"closed": false}'</pre>
+  -d '{"closed": false}'</code></pre>
         </div>
       </div>
     </template>
@@ -962,7 +958,7 @@ print(net.res_bus[["vm_pu"]].describe())</pre>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method post">POST</span>
+          <n-tag type="primary" size="small" :bordered="false">POST</n-tag>
           <span class="docs-endpoint-url">/api/powerflow/recalculate</span>
           <span class="docs-endpoint-desc">Re-run load flow</span>
         </div>
@@ -971,7 +967,7 @@ print(net.res_bus[["vm_pu"]].describe())</pre>
           Uses the same algorithm and tolerance as the initial run.
           Returns the full updated network payload with fresh <code class="docs-code">res_bus</code>,
           <code class="docs-code">res_line</code>, <code class="docs-code">res_trafo</code> results.</p>
-          <pre class="docs-pre">curl -X POST http://127.0.0.1:8050/api/powerflow/recalculate</pre>
+          <pre class="docs-pre"><code class="language-bash">curl -X POST http://127.0.0.1:8050/api/powerflow/recalculate</code></pre>
           <p class="docs-p">On failure the response still has <code class="docs-code">200 OK</code> but
           <code class="docs-code">topology.lastRunSucceeded</code> is <code class="docs-code">false</code>
           and <code class="docs-code">topology.lastRunMessage</code> describes the problem.</p>
@@ -985,25 +981,25 @@ print(net.res_bus[["vm_pu"]].describe())</pre>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method get">GET</span>
+          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
           <span class="docs-endpoint-url">/api/network/export/json</span>
           <span class="docs-endpoint-desc">Export as pandapower JSON</span>
         </div>
         <div class="docs-endpoint-body">
           <p class="docs-p">Triggers a file download of the current working network in pandapower JSON format. The file can be re-uploaded to the app or loaded with <code class="docs-code">pandapower.from_json()</code>.</p>
-          <pre class="docs-pre">curl http://127.0.0.1:8050/api/network/export/json -o network.json</pre>
+          <pre class="docs-pre"><code class="language-bash">curl http://127.0.0.1:8050/api/network/export/json -o network.json</code></pre>
         </div>
       </div>
 
       <div class="docs-endpoint">
         <div class="docs-endpoint-header">
-          <span class="docs-method get">GET</span>
+          <n-tag type="success" size="small" :bordered="false">GET</n-tag>
           <span class="docs-endpoint-url">/api/network/export/matpower</span>
           <span class="docs-endpoint-desc">Export as MATPOWER .m</span>
         </div>
         <div class="docs-endpoint-body">
           <p class="docs-p">Triggers a file download in MATPOWER case format with aligned columns. Compatible with MATPOWER, PowerWorld, PSS/E import scripts, and other tools that accept the MATPOWER format.</p>
-          <pre class="docs-pre">curl http://127.0.0.1:8050/api/network/export/matpower -o case_out.m</pre>
+          <pre class="docs-pre"><code class="language-bash">curl http://127.0.0.1:8050/api/network/export/matpower -o case_out.m</code></pre>
         </div>
       </div>
     </template>
@@ -1078,13 +1074,19 @@ print(net.res_bus[["vm_pu"]].describe())</pre>
       </ul>
 
       <h2 class="docs-h2">OSM — Geographic map</h2>
+      <div class="docs-note">
+        <strong>Requires a GeoJSON sidecar.</strong> The OSM button is disabled unless the loaded
+        network has WGS84 coordinates in <code class="docs-code">net.bus_geodata</code>.
+        For MATPOWER <code class="docs-code">.m</code> files (which carry no geographic data),
+        you must supply a <code class="docs-code">.geojson</code> sidecar with the same base name
+        placed next to the <code class="docs-code">.m</code> file — see
+        <strong>Data formats → GeoJSON sidecar</strong> for the format and naming convention.
+        pandapower JSON files may already contain coordinates if they were exported with
+        <code class="docs-code">bus_geodata</code> populated.
+      </div>
       <p class="docs-p">Renders the network on an OpenStreetMap base layer using Plotly's
-      <code class="docs-code">scattermapbox</code>. Requires WGS84 coordinates to be present in
-      <code class="docs-code">net.bus_geodata</code> — populated from a GeoJSON sidecar or from
-      the case file's geographic data. The button is disabled (greyed out) if no coordinates
-      are available.</p>
-      <p class="docs-p">Pan and zoom work natively. Clicking a bus or line opens the same element
-      inspector as the graph view.</p>
+      <code class="docs-code">scattermapbox</code>. Pan and zoom work natively. Clicking a bus
+      or line opens the same element inspector as the graph view.</p>
 
       <h2 class="docs-h2">Atlas — KSE 2019 overlay</h2>
       <p class="docs-p">Renders the loaded network on top of the KSE 2019 reference atlas
@@ -1104,7 +1106,7 @@ print(net.res_bus[["vm_pu"]].describe())</pre>
 
     <!-- ════════════════════════════════════ UI: Filters ══ -->
     <template v-else-if="currentSection === 'ui-filters'">
-      <h1 class="docs-h1">Sidebar & filters</h1>
+      <h1 class="docs-h1">Sidebar &amp; filters</h1>
       <p class="docs-lead">
         The left sidebar collapses and expands with the chevron buttons.
         It hosts all filters, diagnostics, and the bus search. Changes are
@@ -1286,15 +1288,14 @@ print(net.res_bus[["vm_pu"]].describe())</pre>
       </p>
 
       <h2 class="docs-h2">Loading</h2>
-      <pre class="docs-pre">uv run python main.py path/to/case.m
-
-# Python
+      <pre class="docs-pre"><code class="language-bash">uv run python main.py path/to/case.m</code></pre>
+      <pre class="docs-pre"><code class="language-python"># Python
 from kse_grid import load_matpower_case
 net = load_matpower_case("case.m")
 
 # Or via KSEGrid
 import kse_grid
-grid = kse_grid.KSEGrid.from_matpower_case("case.m")</pre>
+grid = kse_grid.KSEGrid.from_matpower_case("case.m")</code></pre>
 
       <h2 class="docs-h2">Supported MATPOWER columns</h2>
       <table class="docs-table">
@@ -1319,14 +1320,14 @@ grid = kse_grid.KSEGrid.from_matpower_case("case.m")</pre>
       <p class="docs-p">Via the UI: <strong>Export MATPOWER</strong> button in Grid Builder.</p>
       <p class="docs-p">Via REST: <code class="docs-code">GET /api/network/export/matpower</code>.</p>
       <p class="docs-p">The exporter writes aligned columns for human-readable diffs:</p>
-      <pre class="docs-pre">function mpc = exported_network
+      <pre class="docs-pre"><code class="language-matlab">function mpc = exported_network
 mpc.version = '2';
 mpc.baseMVA = 100;
 
 mpc.bus = [
 %%  bus_i  type   Pd     Qd   Gs   Bs  area  Vm    Va  baseKV  zone  Vmax  Vmin
     1      3      0.0    0.0  0.0  0.0  1   1.050  0.0  400     1   1.05  0.95
-    ...];</pre>
+    ...];</code></pre>
     </template>
 
     <!-- ════════════════════════════════════ FORMAT: pandapower JSON ══ -->
@@ -1338,11 +1339,11 @@ mpc.bus = [
       </p>
 
       <h2 class="docs-h2">Saving from pandapower</h2>
-      <pre class="docs-pre">import pandapower as pp
+      <pre class="docs-pre"><code class="language-python">import pandapower as pp
 
 net = pp.from_json("network.json")   # load
 pp.runpp(net)
-pp.to_json(net, "network_solved.json")  # save with results</pre>
+pp.to_json(net, "network_solved.json")  # save with results</code></pre>
 
       <h2 class="docs-h2">Loading in the app</h2>
       <p class="docs-p">Upload a <code class="docs-code">.json</code> file via the landing page or
@@ -1375,13 +1376,22 @@ pp.to_json(net, "network_solved.json")  # save with results</pre>
         It is a standard GeoJSON <code class="docs-code">FeatureCollection</code> of Point features.
       </p>
 
+      <div class="docs-note">
+        <strong>The OSM view will not work without this file.</strong>
+        MATPOWER <code class="docs-code">.m</code> files contain no geographic data.
+        To unlock the OSM map view for a <code class="docs-code">.m</code> case, you must create a
+        <code class="docs-code">.geojson</code> sidecar with WGS84 coordinates for each bus
+        and place it in the same directory with the same base name.
+        Without it, the <strong>OSM</strong> button in the top bar stays disabled.
+      </div>
+
       <h2 class="docs-h2">File naming convention</h2>
       <p class="docs-p">Place the sidecar next to the <code class="docs-code">.m</code> file with
       the same base name and the <code class="docs-code">.geojson</code> extension. It is loaded
       automatically on import — no extra steps needed.</p>
-      <pre class="docs-pre">data/
+      <pre class="docs-pre"><code class="language-plaintext">data/
   sse_summer_peak.m
-  sse_summer_peak.geojson   ← loaded automatically</pre>
+  sse_summer_peak.geojson   ← loaded automatically</code></pre>
 
       <h2 class="docs-h2">Feature properties</h2>
       <p class="docs-p">Each feature must be a <code class="docs-code">Point</code> with
@@ -1391,7 +1401,7 @@ pp.to_json(net, "network_solved.json")  # save with results</pre>
         <li><code class="docs-code">"id"</code> (integer) — direct match against the MATPOWER bus number.</li>
         <li><code class="docs-code">"name"</code> (string) — fuzzy match against bus names (Levenshtein distance).</li>
       </ul>
-      <pre class="docs-pre">{
+      <pre class="docs-pre"><code class="language-json">{
   "type": "FeatureCollection",
   "features": [
     {
@@ -1405,7 +1415,7 @@ pp.to_json(net, "network_solved.json")  # save with results</pre>
       "properties": { "id": 2, "name": "Poznan Plewiska 400" }
     }
   ]
-}</pre>
+}</code></pre>
 
       <h2 class="docs-h2">Generating sidecars</h2>
       <table class="docs-table">
@@ -1420,16 +1430,21 @@ pp.to_json(net, "network_solved.json")  # save with results</pre>
 
     <!-- ── Prev / Next ────────────────────────────────────── -->
     <div class="docs-pagination">
-      <button v-if="prevSection()" class="docs-pagination-btn" type="button" @click="navigate(prevSection().id)">
+      <button v-if="prevSection()" class="docs-pagination-btn" type="button" @click="onMenuSelect(prevSection().id)">
         ← {{ prevSection().label }}
       </button>
       <span v-else></span>
-      <button v-if="nextSection()" class="docs-pagination-btn docs-pagination-btn--next" type="button" @click="navigate(nextSection().id)">
+      <button v-if="nextSection()" class="docs-pagination-btn docs-pagination-btn--next" type="button" @click="onMenuSelect(nextSection().id)">
         {{ nextSection().label }} →
       </button>
     </div>
 
-  </main>
+        </div>
+      </div>
+    </n-layout-content>
+
+  </n-layout>
 </div>
+</n-config-provider>
 `,
 };
