@@ -44,10 +44,12 @@ uv run python main.py
 
 On startup the application:
 
-1. loads the default case `data/case2383wp.m`,
-2. runs the AC power flow,
-3. starts a local server at `http://127.0.0.1:8050/`,
-4. opens the dashboard in the default browser.
+1. creates an empty editable network,
+2. starts a local server at `http://127.0.0.1:8050/`,
+3. opens the dashboard in the default browser.
+
+Pass a MATPOWER file path as an argument to load a case at startup and run
+the initial AC power flow automatically.
 
 Press `Ctrl+C` to stop the server.
 
@@ -59,6 +61,19 @@ source .venv/bin/activate   # Windows: .\.venv\Scripts\Activate.ps1
 pip install -e .
 python main.py
 ```
+
+---
+
+## Executable Builds
+
+The repository includes a PyInstaller build configuration for single-file
+executables on Linux and Windows. The GitHub Actions workflow can build:
+
+- `PowerFlow-linux`
+- `PowerFlow.exe`
+
+The build workflow runs manually or when a tag matching `v*` is pushed. For
+version tags, the workflow publishes both binaries to the GitHub Release.
 
 ---
 
@@ -90,7 +105,7 @@ print(net.res_line[net.res_line.loading_percent > 100])
 | --- | --- | --- |
 | `from_matpower_case` | `(path: str) -> KSEGrid` | Load a MATPOWER `.m` file and convert it to a pandapower network. |
 | `new_empty` | `() -> KSEGrid` | Create an empty network (no case file required). |
-| `run_powerflow` | `(algorithm="nr", max_iteration=100, tolerance_mva=1e-8, ...) -> KSEGrid` | Run an AC power flow. Returns `self` for chaining. |
+| `run_powerflow` | `(algorithm="nr", max_iteration=100, tolerance_mva=1e-3) -> KSEGrid` | Run an AC power flow. Returns `self` for chaining. |
 | `report` | `() -> KSEGrid` | Print a text summary of power flow results to stdout. |
 | `serve` | `(host="127.0.0.1", port=8050) -> None` | Start the FastAPI server and open the dashboard in the browser. |
 
@@ -112,7 +127,7 @@ violations = runner.voltage_violations()  # pd.DataFrame
 
 | Method | Signature | Description |
 | --- | --- | --- |
-| `run` | `(algorithm="nr", ...) -> None` | Execute the AC power flow on the wrapped network. |
+| `run` | `(algorithm="nr", ...) -> bool` | Execute the AC power flow on the wrapped network and return whether it converged. |
 | `summary` | `() -> None` | Print per-bus and per-branch results to stdout. |
 | `voltage_violations` | `() -> pd.DataFrame` | Return a DataFrame of buses outside the configured voltage band. |
 
@@ -131,14 +146,14 @@ net = load_matpower_case("case.m")   # returns pp.pandapowerNet
 ## CLI Usage
 
 ```bash
-# Start with the default case (data/case2383wp.m)
+# Start with an empty editable network
 uv run python main.py
 
 # Load a specific MATPOWER case
 uv run python main.py path/to/case.m
 ```
 
-A file can also be loaded at runtime using the **"Load .m file"** button in the dashboard header. The uploaded case replaces the current session without restarting the server process. The upload is in-memory only: restarting the process without a path argument returns to the default case.
+A file can also be loaded at runtime using the **"Load .m file"** button in the dashboard header. The uploaded case replaces the current session without restarting the server process. The upload is in-memory only: restarting the process without a path argument starts a new empty network.
 
 ---
 
